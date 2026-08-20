@@ -1,5 +1,29 @@
 # GS-QA: A Benchmark for Geospatial Question Answering
 
+## VN-GeoQA — Vietnamese Extension
+
+This fork adds **VN-GeoQA**, a Vietnamese-language geospatial QA benchmark built on OpenStreetMap Vietnam data.
+
+| | VN-GeoQA |
+|--|--|
+| Language | Vietnamese |
+| Questions | 800 (100 × 8 types) |
+| Database | OSM Vietnam (PostGIS `osm_vn`) |
+| Dataset | [`generator/questions_vi/`](generator/questions_vi/) |
+| Baselines | direct, text2sql (llamacpp / Ollama) |
+| Results | [`baselines/REPORT_VN_GEOQA.md`](baselines/REPORT_VN_GEOQA.md) |
+
+**Full Vietnamese documentation: [README_VI.md](README_VI.md)**
+
+Quick start:
+```bash
+bash setup_vn.sh   # install PostGIS + load OSM Vietnam data
+pip install -r baselines/requirements.txt
+python baselines/baselines_vi.py --model ollama:<model> --baseline text2sql
+```
+
+---
+
 ### Abstract
 
 Recent advances in Large Language Models (LLMs) have led to dramatic improvements in question answering (QA). 
