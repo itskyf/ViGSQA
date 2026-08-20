@@ -15,6 +15,10 @@ This fork adds **VN-GeoQA**, a Vietnamese-language geospatial QA benchmark built
 
 **Full Vietnamese documentation: [README_VI.md](README_VI.md)**
 
+Docs:
+- [docs/data_generation.md](docs/data_generation.md) — pipeline, templates, output format
+- [docs/results.md](docs/results.md) — all baseline results and analysis
+
 Quick start:
 ```bash
 bash setup_vn.sh   # install PostGIS + load OSM Vietnam data
