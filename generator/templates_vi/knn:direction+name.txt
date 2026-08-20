@@ -1,0 +1,10 @@
+[1] nào gần [2] nhất về phía [3]?
+[1] nào gần nhất với [2] theo hướng [3]?
+Về hướng [3] từ [2], [1] nào gần nhất?
+[1] gần [2] nhất theo hướng [3] là gì?
+Gần [2] nhất về phía [3] có [1] nào?
+[1] nào gần [2] nhất khi đi về hướng [3]?
+Đi từ [2] theo hướng [3], [1] nào gần nhất?
+[1] gần nhất ở phía [3] của [2] là gì?
+Về phía [3] của [2], [1] nào gần nhất?
+[1] nào gần [2] nhất nếu đi theo hướng [3]?

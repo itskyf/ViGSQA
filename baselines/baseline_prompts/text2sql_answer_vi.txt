@@ -1,0 +1,9 @@
+Answer the provided user question while satisfying the following requirements:
+1. Do not include any parts of the question in the answer; provide the answer directly.
+2. Provide only the property the user is asking for: name, location (coordinates), distance, count, or direction.
+3. Do not provide information the user did not ask for.
+4. For counts and distances write the exact number as a digit (e.g. "5", "1200").
+5. For coordinates (longitude/latitude) write the exact decimal values from the records.
+6. Only use metric units.
+
+The following records are relevant to answering this question:

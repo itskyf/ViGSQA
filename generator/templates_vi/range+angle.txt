@@ -1,0 +1,10 @@
+[1] trong vòng [2] từ [3] nằm theo hướng nào?
+Hướng từ [3] đến [1] nào trong phạm vi [2] là gì?
+[1] nào trong bán kính [2] từ [3] và ở hướng nào?
+Từ [3], [1] trong vòng [2] nằm theo hướng nào?
+Hướng từ [3] đến [1] gần nhất trong phạm vi [2] là gì?
+[1] trong phạm vi [2] từ [3] nằm về phía nào?
+Góc phương vị đến [1] trong bán kính [2] từ [3] là bao nhiêu?
+Từ [3] nhìn hướng nào để đến [1] trong vòng [2]?
+[1] nào trong phạm vi [2] từ [3] và theo hướng nào?
+Hướng đi từ [3] đến [1] trong bán kính [2] là gì?

@@ -1,0 +1,10 @@
+Khoảng cách từ [3] đến [1] gần nhất trong vòng [2] là bao xa?
+[1] gần nhất trong phạm vi [2] từ [3] cách bao xa?
+Từ [3], [1] nào trong vòng [2] và cách bao xa?
+Khoảng cách từ [3] đến [1] trong bán kính [2] là bao nhiêu?
+[1] nào trong phạm vi [2] từ [3] và khoảng cách là bao nhiêu?
+Cho tôi biết khoảng cách đến [1] trong bán kính [2] từ [3].
+Từ [3] đến [1] gần nhất trong vòng [2] là mấy km?
+[1] trong phạm vi [2] từ [3] cách [3] bao xa?
+Khoảng cách giữa [3] và [1] trong vòng [2] là bao nhiêu?
+Tôi muốn biết [1] nào trong bán kính [2] từ [3] và cách bao xa.

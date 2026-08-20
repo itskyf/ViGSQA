@@ -1,0 +1,8 @@
+Tổng diện tích các [1] giao với [2] là bao nhiêu?
+Tổng cộng diện tích [1] cắt qua [2] là bao nhiêu?
+Diện tích tổng cộng của [1] giao với [2] là gì?
+Các [1] giao với [2] có tổng diện tích bao nhiêu?
+Tổng diện tích [1] giao nhau với [2] là bao nhiêu?
+Cho tôi biết tổng diện tích [1] giao với [2].
+Diện tích tổng các [1] giao với [2] là bao nhiêu km²?
+Bao nhiêu km² tổng cộng [1] giao với [2]?

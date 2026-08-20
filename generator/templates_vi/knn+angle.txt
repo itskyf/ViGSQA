@@ -1,0 +1,10 @@
+[1] gần [2] nhất nằm theo hướng nào từ [2]?
+[1] gần [2] nhất ở hướng nào so với [2]?
+Hướng từ [2] đến [1] gần nhất là gì?
+[1] gần nhất với [2] nằm về phía nào?
+Từ [2] nhìn về hướng nào thì thấy [1] gần nhất?
+[1] gần [2] nhất theo hướng nào?
+Góc phương vị từ [2] đến [1] gần nhất là bao nhiêu độ?
+[1] gần [2] nhất nằm ở hướng mấy độ?
+Từ [2] đến [1] gần nhất theo hướng nào?
+Hướng đi từ [2] đến [1] gần nhất là hướng gì?

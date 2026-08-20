@@ -1,0 +1,10 @@
+[1] nào trong phạm vi [2] từ [3] theo hướng [4] và ở đâu?
+Vị trí [1] trong vòng [2] từ [3] về phía [4] là ở đâu?
+Địa điểm [1] trong bán kính [2] từ [3] theo hướng [4] nằm ở đâu?
+Tìm vị trí [1] trong phạm vi [2] từ [3] hướng [4].
+[1] trong vòng [2] từ [3] về phía [4] tọa lạc ở đâu?
+Cho tôi biết địa điểm [1] trong bán kính [2] từ [3] theo hướng [4].
+Địa chỉ [1] trong phạm vi [2] từ [3] hướng [4] là gì?
+Đi từ [3] theo hướng [4], [1] trong vòng [2] nằm ở đâu?
+[1] nào trong vòng [2] từ [3] phía [4] và ở chỗ nào?
+Chỉ cho tôi [1] trong bán kính [2] từ [3] về phía [4].

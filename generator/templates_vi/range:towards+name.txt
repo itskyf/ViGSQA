@@ -1,0 +1,10 @@
+Đi từ [3] về phía [4], có [1] nào trong vòng [2] không?
+Trên đường từ [3] đến [4], [1] nào trong phạm vi [2]?
+[1] nào trong vòng [2] trên lộ trình từ [3] đến [4]?
+Đi từ [3] hướng về [4], [1] nào trong bán kính [2]?
+[1] nào trong phạm vi [2] khi đi từ [3] về phía [4]?
+Trên hành trình từ [3] đến [4], [1] nào cách [3] trong vòng [2]?
+Từ [3] đi về [4], [1] nào trong khoảng [2]?
+[1] nào xuất hiện trong vòng [2] khi đi từ [3] đến [4]?
+Có [1] nào trong bán kính [2] trên đường từ [3] đến [4] không?
+Đi theo hướng từ [3] về [4], [1] nào trong phạm vi [2]?

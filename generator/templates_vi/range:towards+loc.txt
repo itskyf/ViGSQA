@@ -1,0 +1,8 @@
+Đi từ [3] về phía [4], [1] nào trong vòng [2] và ở đâu?
+Trên đường từ [3] đến [4], [1] nào trong phạm vi [2] và nằm ở đâu?
+Vị trí [1] trong bán kính [2] trên lộ trình từ [3] đến [4] là ở đâu?
+Đi từ [3] hướng về [4], [1] trong vòng [2] nằm ở chỗ nào?
+[1] nào trong phạm vi [2] khi đi từ [3] về [4] và ở đâu?
+Tìm vị trí [1] trong bán kính [2] trên đường từ [3] đến [4].
+Địa điểm [1] trong vòng [2] trên hành trình từ [3] đến [4] là gì?
+Cho tôi biết [1] nào trong phạm vi [2] khi đi từ [3] về phía [4] và nó ở đâu.

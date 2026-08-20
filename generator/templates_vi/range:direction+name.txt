@@ -1,0 +1,10 @@
+Có [1] nào trong vòng [2] từ [3] theo hướng [4] không?
+[1] nào trong phạm vi [2] từ [3] về phía [4]?
+Về hướng [4], [1] nào trong vòng [2] từ [3]?
+[1] nào nằm trong bán kính [2] từ [3] theo hướng [4]?
+Gợi ý [1] trong phạm vi [2] từ [3] về phía [4].
+[1] nào trong bán kính [2] từ [3] ở phía [4]?
+Đi từ [3] theo hướng [4], có [1] nào trong vòng [2] không?
+[1] trong phạm vi [2] từ [3] hướng [4] là gì?
+Có [1] nào cách [3] trong vòng [2] theo hướng [4] không?
+Tìm [1] trong bán kính [2] từ [3] về phía [4].

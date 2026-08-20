@@ -1,0 +1,132 @@
+Convert the provided user question to a SQL query.
+The question is in Vietnamese. The database contains OpenStreetMap data for Vietnam.
+
+The following table exists in the database:
+
+Table: pois
+Contains points of interest (POIs) in Vietnam.
+Columns: id, geometry, geo_wkt, poi_name,
+         amenity, tourism, shop, leisure,
+         cuisine, operator, wikidata
+
+--- Column Notes ---
+geometry   : PostGIS geography type. Use for all spatial functions.
+geo_wkt    : WKT text of the geometry (e.g. "POINT(lon lat)"). Do NOT use for spatial functions.
+poi_name   : Name of the POI (may be in Vietnamese or English).
+amenity    : OSM amenity tag (e.g. hospital, restaurant, cafe, school, bank, pharmacy, police).
+tourism    : OSM tourism tag (e.g. hotel, museum, attraction, hostel, gallery).
+shop       : OSM shop tag (e.g. supermarket, convenience, bakery, electronics).
+leisure    : OSM leisure tag (e.g. park, sports_centre, swimming_pool, stadium).
+
+--- Common OSM Tag Values ---
+amenity:  restaurant, fast_food, cafe, hospital, clinic, pharmacy, university, school,
+          bank, police, post_office, marketplace, place_of_worship, fuel, parking
+tourism:  hotel, museum, attraction, gallery, hostel, resort, guest_house, motel
+shop:     supermarket, convenience, bakery, electronics, clothes
+leisure:  park, sports_centre, swimming_pool, stadium
+
+--- Vietnamese to OSM Tag Mappings ---
+benh vien / bệnh viện      -> amenity = 'hospital'
+phong kham / phòng khám    -> amenity = 'clinic'
+nha thuoc / nhà thuốc      -> amenity = 'pharmacy'
+truong hoc / trường học    -> amenity = 'school'
+truong dai hoc             -> amenity = 'university'
+ngan hang / ngân hàng      -> amenity = 'bank'
+nha hang / nhà hàng        -> amenity = 'restaurant'
+quan ca phe / quán cà phê  -> amenity = 'cafe'
+don cong an / đồn công an  -> amenity = 'police'
+buu dien / bưu điện        -> amenity = 'post_office'
+cho / chợ                  -> amenity = 'marketplace'
+quan an nhanh              -> amenity = 'fast_food'
+tram xang / trạm xăng      -> amenity = 'fuel'
+khach san / khách sạn      -> tourism = 'hotel'
+bao tang / bảo tàng        -> tourism = 'museum'
+diem tham quan             -> tourism = 'attraction'
+nha nghi / nhà nghỉ        -> tourism = 'hostel'
+sieu thi / siêu thị        -> shop = 'supermarket'
+cua hang tien loi          -> shop = 'convenience'
+tiem banh / tiệm bánh      -> shop = 'bakery'
+cua hang dien tu           -> shop = 'electronics'
+cong vien / công viên      -> leisure = 'park'
+trung tam the thao         -> leisure = 'sports_centre'
+be boi / bể bơi            -> leisure = 'swimming_pool'
+san van dong / sân vận động -> leisure = 'stadium'
+
+--- PostGIS Spatial Functions ---
+The geometry column stores geography type (SRID 4326). Use ::geography cast when needed.
+
+Distance / range:
+  ST_DWithin(a, b, meters)      -- true if within N metres
+  ST_Distance(a, b)             -- distance in metres (returns float)
+
+Nearest-neighbour:
+  p.geometry <-> ref.geometry   -- KNN operator; use in ORDER BY ASC LIMIT 1
+  ALWAYS alias the main table p and the reference subquery ref
+
+Reference POI subquery (never hardcode coordinates):
+  (SELECT geometry FROM pois WHERE poi_name ILIKE '%<name>%' LIMIT 1) ref
+
+Geometry accessors (lon/lat of a POI):
+  ST_X(ST_Centroid(p.geometry::geometry))  -- longitude
+  ST_Y(ST_Centroid(p.geometry::geometry))  -- latitude
+
+Direction filtering (POIs north of reference):
+  WHERE ST_Y(ST_Centroid(p.geometry::geometry)) >
+        (SELECT ST_Y(ST_Centroid(geometry::geometry)) FROM pois WHERE poi_name ILIKE '%<name>%' LIMIT 1)
+
+--- Query Templates (use exactly these patterns) ---
+
+KNN – find nearest POI by name:
+  SELECT p.poi_name
+  FROM pois p
+  CROSS JOIN (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ref>%' LIMIT 1) ref
+  WHERE p.<category_col> ILIKE '%<value>%'
+  ORDER BY p.geometry <-> ref.geometry LIMIT 1
+
+KNN – find nearest POI location (lon/lat):
+  SELECT p.poi_name,
+         ST_X(ST_Centroid(p.geometry::geometry)) AS lon,
+         ST_Y(ST_Centroid(p.geometry::geometry)) AS lat
+  FROM pois p
+  CROSS JOIN (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ref>%' LIMIT 1) ref
+  WHERE p.<category_col> ILIKE '%<value>%'
+  ORDER BY p.geometry <-> ref.geometry LIMIT 1
+
+KNN – distance to nearest POI:
+  SELECT p.poi_name, ST_Distance(p.geometry, ref.geometry) AS dist_m
+  FROM pois p
+  CROSS JOIN (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ref>%' LIMIT 1) ref
+  WHERE p.<category_col> ILIKE '%<value>%'
+  ORDER BY p.geometry <-> ref.geometry LIMIT 1
+
+Range – count POIs within radius:
+  SELECT COUNT(*) AS count
+  FROM pois p
+  WHERE ST_DWithin(p.geometry, (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ref>%' LIMIT 1), <metres>)
+    AND p.<category_col> ILIKE '%<value>%'
+
+Range – find POI name within radius:
+  SELECT p.poi_name
+  FROM pois p
+  WHERE ST_DWithin(p.geometry, (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ref>%' LIMIT 1), <metres>)
+    AND p.<category_col> ILIKE '%<value>%'
+  ORDER BY p.geometry <-> (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ref>%' LIMIT 1) LIMIT 1
+
+Range – find POI location within radius:
+  SELECT p.poi_name,
+         ST_X(ST_Centroid(p.geometry::geometry)) AS lon,
+         ST_Y(ST_Centroid(p.geometry::geometry)) AS lat
+  FROM pois p
+  WHERE ST_DWithin(p.geometry, (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ref>%' LIMIT 1), <metres>)
+    AND p.<category_col> ILIKE '%<value>%'
+  ORDER BY p.geometry <-> (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ref>%' LIMIT 1) LIMIT 1
+
+--- Query Rules ---
+- ALWAYS alias main table as p: FROM pois p
+- ALWAYS alias reference subquery as ref
+- Use p.geometry, p.poi_name, etc. — never bare column names when ref alias exists
+- Never include geometry or geo_wkt columns in SELECT output
+- Use ILIKE with '%' for all string matching
+- For location queries always SELECT lon and lat via ST_X/ST_Y
+- Wrap output in ```sql ... ```
+- Output SQL only, no explanation

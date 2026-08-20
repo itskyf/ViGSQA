@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Inference caches (large intermediate files — not needed to reproduce)
+baselines/cache/
+baselines/cache_vi/
+baselines/address_cache/
+
+# Ruff / tool caches
+**/.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Model weights
+*.gguf
+*.bin
+*.safetensors
+
+# OS
+.DS_Store
+Thumbs.db

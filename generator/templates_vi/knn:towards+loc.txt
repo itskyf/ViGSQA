@@ -1,0 +1,10 @@
+Đi từ [2] về phía [3], [1] nào đầu tiên và ở đâu?
+Trên đường từ [2] đến [3], [1] gần nhất nằm ở đâu?
+Vị trí [1] gần nhất trên lộ trình từ [2] đến [3] là ở đâu?
+Đi theo hướng từ [2] về [3], [1] gần nhất tọa lạc ở đâu?
+[1] gần nhất khi đi từ [2] về phía [3] nằm ở đâu?
+Chỉ giúp tôi [1] gần nhất trên đường từ [2] đến [3].
+Từ [2] đi về [3], [1] gần nhất nằm ở đâu?
+Địa điểm [1] đầu tiên khi đi từ [2] đến [3] là ở đâu?
+[1] nào gần nhất khi di chuyển từ [2] về phía [3] và nó ở đâu?
+Trên hành trình từ [2] đến [3], [1] gần nhất ở chỗ nào?
