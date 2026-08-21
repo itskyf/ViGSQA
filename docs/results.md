@@ -26,8 +26,8 @@
 |-------|:------:|:--------:|
 | Gemma-4-26B | 0.058 | 0.343 |
 | Qwen3.5-9B | 0.040 | 0.342 |
-| **Qwen3.5-27B** | 0.059 | **0.386** |
-| Qwen3.6-27B | 0.047 | *(running)* |
+| **Qwen3.5-27B** | **0.059** | **0.386** |
+| Qwen3.6-27B | 0.047 | 0.385 |
 
 ---
 
@@ -53,15 +53,15 @@ All models near-zero — no DB access means relying on parametric knowledge of l
 
 | Type | Gemma-4-26B | Qwen3.5-9B | Qwen3.5-27B | Qwen3.6-27B | Winner |
 |------|:-----------:|:---------:|:-----------:|:-----------:|:------:|
-| knn+name | 0.392 | **0.586** | 0.535 | *(running)* | Qwen3.5-9B |
-| knn+loc | 0.000 | 0.000 | 0.000 | *(running)* | tie |
-| knn+distance | **0.670** | 0.580 | **0.670** | *(running)* | Gemma/27B |
-| knn:direction+name | 0.519 | 0.294 | **0.583** | *(running)* | Qwen3.5-27B |
-| range+name | 0.181 | **0.293** | 0.245 | *(running)* | Qwen3.5-9B |
-| range+loc | 0.000 | 0.000 | 0.000 | *(running)* | tie |
-| range+count | 0.660 | **0.740** | 0.680 | *(running)* | Qwen3.5-9B |
-| range:direction+name | 0.322 | 0.241 | **0.374** | *(running)* | Qwen3.5-27B |
-| **Overall** | 0.343 | 0.342 | **0.386** | *(running)* | **Qwen3.5-27B** |
+| knn+name | 0.392 | **0.586** | 0.535 | 0.538 | Qwen3.5-9B |
+| knn+loc | 0.000 | 0.000 | 0.000 | 0.000 | tie |
+| knn+distance | **0.670** | 0.580 | **0.670** | **0.670** | Gemma/27B/36B |
+| knn:direction+name | 0.519 | 0.294 | 0.583 | **0.590** | Qwen3.6-27B |
+| range+name | 0.181 | **0.293** | 0.245 | 0.280 | Qwen3.5-9B |
+| range+loc | 0.000 | 0.000 | 0.000 | 0.000 | tie |
+| range+count | 0.660 | **0.740** | 0.680 | 0.640 | Qwen3.5-9B |
+| range:direction+name | 0.322 | 0.241 | **0.374** | 0.358 | Qwen3.5-27B |
+| **Overall** | 0.343 | 0.342 | **0.386** | 0.385 | **Qwen3.5-27B** |
 
 ---
 
@@ -71,8 +71,8 @@ All models near-zero — no DB access means relying on parametric knowledge of l
 
 | Type | Gemma-4-26B | Qwen3.5-9B | Qwen3.5-27B | Qwen3.6-27B |
 |------|:-----------:|:---------:|:-----------:|:-----------:|
-| knn+loc | **0.135** | 0.162 | 0.172 | *(running)* |
-| range+loc | 0.161 | **0.155** | 0.224 | *(running)* |
+| knn+loc | **0.135** | 0.162 | 0.172 | 0.206 |
+| range+loc | 0.161 | **0.155** | 0.224 | 0.230 |
 
 text F1 = 0.000 for all — model outputs natural-language addresses instead of coordinates. SQL execution partially correct (dist_err shows proximity), but answer-generation step loses structured output.
 
@@ -80,8 +80,8 @@ text F1 = 0.000 for all — model outputs natural-language addresses instead of 
 
 | Type | Gemma-4-26B | Qwen3.5-9B | Qwen3.5-27B | Qwen3.6-27B |
 |------|:-----------:|:---------:|:-----------:|:-----------:|
-| knn+distance | **0.361** | 0.414 | 0.276 | *(running)* |
-| range+count | 0.350 | **0.240** | 0.287 | *(running)* |
+| knn+distance | 0.361 | 0.414 | **0.276** | 0.292 |
+| range+count | 0.350 | **0.240** | 0.287 | 0.327 |
 
 ---
 
@@ -90,19 +90,19 @@ text F1 = 0.000 for all — model outputs natural-language addresses instead of 
 **1. DB access is mandatory.**
 Direct tops out at 0.059. Models hallucinate POI names, output Vietnamese words for distances ("hai mươi mét"), refuse to answer count questions. text2sql lifts this to 0.342–0.386 — a 5–8× gain.
 
-**2. Scale helps with DB access.**
-Qwen3.5-27B text2sql (0.386) clearly outperforms 9B (0.342) and 26B (0.343). Larger model generates better SQL especially for direction queries (`knn:direction+name` +0.064 over Gemma, +0.289 over 9B). Also best numeric rel_err on knn+distance (0.276 vs 0.361/0.414).
+**2. Qwen3.5-27B and Qwen3.6-27B essentially tied overall (0.386 vs 0.385).**
+Qwen3.6-27B wins on `knn:direction+name` (0.590 vs 0.583) and matches on `knn+distance` (0.670). Qwen3.5-27B edges ahead on `range:direction+name` (0.374 vs 0.358) and `range+count` (0.680 vs 0.640).
 
 **3. Models have complementary strengths.**
-- Qwen3.5-27B: best overall, direction/distance types, numeric precision
+- Qwen3.5-27B / Qwen3.6-27B: best overall, direction types, numeric precision
 - Qwen3.5-9B: best for name retrieval (`knn+name` 0.586) and counting (`range+count` 0.740)
 - Gemma-4-26B: best location accuracy (dist_err 0.135 on knn+loc)
 
 **4. Location types unsolved (text F1 = 0.000 across all models).**
-SQL execution partially correct (dist_err 0.135–0.224), but answer-generation LLM converts coordinates into prose addresses. Fix: extract coordinates directly from SQL result rows, skip LLM answer step for loc types.
+SQL execution partially correct (dist_err 0.135–0.230), but answer-generation LLM converts coordinates into prose addresses. Fix: extract coordinates directly from SQL result rows, skip LLM answer step for loc types.
 
 **5. Scale doesn't help without DB.**
-Direct scores cluster tightly (0.040–0.059) regardless of model size. No uplift from scale when DB is absent.
+Direct scores cluster tightly (0.040–0.059) regardless of model size or generation. No uplift from scale when DB is absent.
 
 ---
 
