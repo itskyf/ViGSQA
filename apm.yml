@@ -1,0 +1,22 @@
+name: ViGSQA
+version: 1.0.0
+description: APM project for ViGSQA
+author: Kỳ
+targets:
+- antigravity
+- claude
+- codex
+dependencies:
+  apm: []
+  mcp: []
+includes: auto
+scripts: {}
+devDependencies:
+  apm:
+  - googlecolab/google-colab-cli/skills/colab-operator#main
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli#main
+  mcp:
+  - name: colab-mcp
+    registry: false
+    transport: stdio
+    command: colab-mcp

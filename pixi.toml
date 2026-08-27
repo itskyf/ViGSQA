@@ -1,0 +1,16 @@
+[workspace]
+channels = ["conda-forge"]
+platforms = [
+  { platform = "linux-64", cuda = "13" },
+]
+preview = ["pixi-build"]
+
+[dependencies]
+llama-cpp-python = ">=0.3.35,<0.4"
+nb-cli = ">=0.0.9,<0.0.10"
+ruff = ">=0.16.4,<0.17"
+sqlfluff = ">=4.3.0,<5"
+
+[pypi-dependencies]
+google-colab-cli = ">=0.6.0, <0.7"
+colab-mcp = { git = "https://github.com/googlecolab/colab-mcp", tag = "v1.0.2" }

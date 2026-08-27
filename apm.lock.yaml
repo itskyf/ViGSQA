@@ -1,0 +1,333 @@
+lockfile_version: '1'
+generated_at: '2026-08-27T05:59:30.665310+00:00'
+apm_version: 0.28.0
+dependencies:
+- repo_url: googlecolab/google-colab-cli
+  name: colab-operator
+  host: github.com
+  resolved_commit: a834bfabd711afd457f96921007fec66cb4629de
+  resolved_ref: main
+  version: unknown
+  virtual_path: skills/colab-operator
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/colab-operator
+  - .agents/skills/colab-operator/SKILL.md
+  - .claude/skills/colab-operator
+  - .claude/skills/colab-operator/SKILL.md
+  deployed_file_hashes:
+    .agents/skills/colab-operator/SKILL.md: sha256:b2b0de427e748a74c5c79f889713b96cc3ce4f72251cfe6c1419f4cb70def2f1
+    .claude/skills/colab-operator/SKILL.md: sha256:b2b0de427e748a74c5c79f889713b96cc3ce4f72251cfe6c1419f4cb70def2f1
+  content_hash: sha256:e687812cde5980a8498847d76da9b8be1318f86fdd6a64885c67771bebd64d4f
+  is_dev: true
+- repo_url: jupyter-ai-contrib/nb-cli
+  name: notebook-cli
+  host: github.com
+  resolved_commit: afd0a47397a7dedb02a4d2fda2a74254aa7cd765
+  resolved_ref: main
+  version: unknown
+  virtual_path: skills/notebook-cli
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/notebook-cli
+  - .agents/skills/notebook-cli/SKILL.md
+  - .agents/skills/notebook-cli/references/best-practices.md
+  - .agents/skills/notebook-cli/references/connect-mode.md
+  - .agents/skills/notebook-cli/references/create.md
+  - .agents/skills/notebook-cli/references/edit-cells.md
+  - .agents/skills/notebook-cli/references/execute.md
+  - .agents/skills/notebook-cli/references/output-format.md
+  - .agents/skills/notebook-cli/references/read.md
+  - .agents/skills/notebook-cli/references/validation-prompts.md
+  - .claude/skills/notebook-cli
+  - .claude/skills/notebook-cli/SKILL.md
+  - .claude/skills/notebook-cli/references/best-practices.md
+  - .claude/skills/notebook-cli/references/connect-mode.md
+  - .claude/skills/notebook-cli/references/create.md
+  - .claude/skills/notebook-cli/references/edit-cells.md
+  - .claude/skills/notebook-cli/references/execute.md
+  - .claude/skills/notebook-cli/references/output-format.md
+  - .claude/skills/notebook-cli/references/read.md
+  - .claude/skills/notebook-cli/references/validation-prompts.md
+  deployed_file_hashes:
+    .agents/skills/notebook-cli/SKILL.md: sha256:201898f05659c180316d69fd5167d05585fc2998be4ca566ffd432d977e3c81c
+    .agents/skills/notebook-cli/references/best-practices.md: sha256:acb037fbc45317ea3e568fe2f7cb6aa2668439a2628d9165ee51888078742ec3
+    .agents/skills/notebook-cli/references/connect-mode.md: sha256:c19a3f5860366890469911e2fe2a5c18ca0021c4c061b15511771a7d0921976f
+    .agents/skills/notebook-cli/references/create.md: sha256:2f3a842c238456c8233118b4a04b38b0d71b81dc4f11533e332382f15eb31280
+    .agents/skills/notebook-cli/references/edit-cells.md: sha256:aba7dbea19213a5d824e1a68dc5c07a09d782db6c619966383e03c7b221705dd
+    .agents/skills/notebook-cli/references/execute.md: sha256:77213bf25a3c24f8756d287b219dfc212116d983570ea592a32c8608f34ef0c0
+    .agents/skills/notebook-cli/references/output-format.md: sha256:f19137fc81289ee5e025dfb133d518682861bf672283d4bef43342d080f0f1b5
+    .agents/skills/notebook-cli/references/read.md: sha256:e1b745ac9342a66a52d8480319878867a10513c4ac9cac16793fc5389375ac80
+    .agents/skills/notebook-cli/references/validation-prompts.md: sha256:e4db424577f705737aaa220acf5aebc6d903dab847d8a767bb82004600b60f45
+    .claude/skills/notebook-cli/SKILL.md: sha256:201898f05659c180316d69fd5167d05585fc2998be4ca566ffd432d977e3c81c
+    .claude/skills/notebook-cli/references/best-practices.md: sha256:acb037fbc45317ea3e568fe2f7cb6aa2668439a2628d9165ee51888078742ec3
+    .claude/skills/notebook-cli/references/connect-mode.md: sha256:c19a3f5860366890469911e2fe2a5c18ca0021c4c061b15511771a7d0921976f
+    .claude/skills/notebook-cli/references/create.md: sha256:2f3a842c238456c8233118b4a04b38b0d71b81dc4f11533e332382f15eb31280
+    .claude/skills/notebook-cli/references/edit-cells.md: sha256:aba7dbea19213a5d824e1a68dc5c07a09d782db6c619966383e03c7b221705dd
+    .claude/skills/notebook-cli/references/execute.md: sha256:77213bf25a3c24f8756d287b219dfc212116d983570ea592a32c8608f34ef0c0
+    .claude/skills/notebook-cli/references/output-format.md: sha256:f19137fc81289ee5e025dfb133d518682861bf672283d4bef43342d080f0f1b5
+    .claude/skills/notebook-cli/references/read.md: sha256:e1b745ac9342a66a52d8480319878867a10513c4ac9cac16793fc5389375ac80
+    .claude/skills/notebook-cli/references/validation-prompts.md: sha256:e4db424577f705737aaa220acf5aebc6d903dab847d8a767bb82004600b60f45
+  content_hash: sha256:021bed2cada1d104b9aae5be71a72e7f9f180fead57a43c7efce9312974785b5
+  is_dev: true
+deployments:
+- kind: project-relative
+  target: agents
+  value: .agents/skills/colab-operator
+  runtime: null
+  scope: project
+  owners:
+  - googlecolab/google-colab-cli/skills/colab-operator
+  active_owner: googlecolab/google-colab-cli/skills/colab-operator
+  content_hash: null
+- kind: project-relative
+  target: agents
+  value: .agents/skills/colab-operator/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - googlecolab/google-colab-cli/skills/colab-operator
+  active_owner: googlecolab/google-colab-cli/skills/colab-operator
+  content_hash: sha256:b2b0de427e748a74c5c79f889713b96cc3ce4f72251cfe6c1419f4cb70def2f1
+- kind: project-relative
+  target: agents
+  value: .agents/skills/notebook-cli
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: null
+- kind: project-relative
+  target: agents
+  value: .agents/skills/notebook-cli/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:201898f05659c180316d69fd5167d05585fc2998be4ca566ffd432d977e3c81c
+- kind: project-relative
+  target: agents
+  value: .agents/skills/notebook-cli/references/best-practices.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:acb037fbc45317ea3e568fe2f7cb6aa2668439a2628d9165ee51888078742ec3
+- kind: project-relative
+  target: agents
+  value: .agents/skills/notebook-cli/references/connect-mode.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:c19a3f5860366890469911e2fe2a5c18ca0021c4c061b15511771a7d0921976f
+- kind: project-relative
+  target: agents
+  value: .agents/skills/notebook-cli/references/create.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:2f3a842c238456c8233118b4a04b38b0d71b81dc4f11533e332382f15eb31280
+- kind: project-relative
+  target: agents
+  value: .agents/skills/notebook-cli/references/edit-cells.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:aba7dbea19213a5d824e1a68dc5c07a09d782db6c619966383e03c7b221705dd
+- kind: project-relative
+  target: agents
+  value: .agents/skills/notebook-cli/references/execute.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:77213bf25a3c24f8756d287b219dfc212116d983570ea592a32c8608f34ef0c0
+- kind: project-relative
+  target: agents
+  value: .agents/skills/notebook-cli/references/output-format.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:f19137fc81289ee5e025dfb133d518682861bf672283d4bef43342d080f0f1b5
+- kind: project-relative
+  target: agents
+  value: .agents/skills/notebook-cli/references/read.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:e1b745ac9342a66a52d8480319878867a10513c4ac9cac16793fc5389375ac80
+- kind: project-relative
+  target: agents
+  value: .agents/skills/notebook-cli/references/validation-prompts.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:e4db424577f705737aaa220acf5aebc6d903dab847d8a767bb82004600b60f45
+- kind: project-relative
+  target: claude
+  value: .claude/skills/colab-operator
+  runtime: null
+  scope: project
+  owners:
+  - googlecolab/google-colab-cli/skills/colab-operator
+  active_owner: googlecolab/google-colab-cli/skills/colab-operator
+  content_hash: null
+- kind: project-relative
+  target: claude
+  value: .claude/skills/colab-operator/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - googlecolab/google-colab-cli/skills/colab-operator
+  active_owner: googlecolab/google-colab-cli/skills/colab-operator
+  content_hash: sha256:b2b0de427e748a74c5c79f889713b96cc3ce4f72251cfe6c1419f4cb70def2f1
+- kind: project-relative
+  target: claude
+  value: .claude/skills/notebook-cli
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: null
+- kind: project-relative
+  target: claude
+  value: .claude/skills/notebook-cli/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:201898f05659c180316d69fd5167d05585fc2998be4ca566ffd432d977e3c81c
+- kind: project-relative
+  target: claude
+  value: .claude/skills/notebook-cli/references/best-practices.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:acb037fbc45317ea3e568fe2f7cb6aa2668439a2628d9165ee51888078742ec3
+- kind: project-relative
+  target: claude
+  value: .claude/skills/notebook-cli/references/connect-mode.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:c19a3f5860366890469911e2fe2a5c18ca0021c4c061b15511771a7d0921976f
+- kind: project-relative
+  target: claude
+  value: .claude/skills/notebook-cli/references/create.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:2f3a842c238456c8233118b4a04b38b0d71b81dc4f11533e332382f15eb31280
+- kind: project-relative
+  target: claude
+  value: .claude/skills/notebook-cli/references/edit-cells.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:aba7dbea19213a5d824e1a68dc5c07a09d782db6c619966383e03c7b221705dd
+- kind: project-relative
+  target: claude
+  value: .claude/skills/notebook-cli/references/execute.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:77213bf25a3c24f8756d287b219dfc212116d983570ea592a32c8608f34ef0c0
+- kind: project-relative
+  target: claude
+  value: .claude/skills/notebook-cli/references/output-format.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:f19137fc81289ee5e025dfb133d518682861bf672283d4bef43342d080f0f1b5
+- kind: project-relative
+  target: claude
+  value: .claude/skills/notebook-cli/references/read.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:e1b745ac9342a66a52d8480319878867a10513c4ac9cac16793fc5389375ac80
+- kind: project-relative
+  target: claude
+  value: .claude/skills/notebook-cli/references/validation-prompts.md
+  runtime: null
+  scope: project
+  owners:
+  - jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
+  content_hash: sha256:e4db424577f705737aaa220acf5aebc6d903dab847d8a767bb82004600b60f45
+- kind: uri
+  target: mcp
+  value: colab-mcp
+  runtime: antigravity
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: colab-mcp
+  runtime: claude
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+- kind: uri
+  target: mcp
+  value: colab-mcp
+  runtime: codex
+  scope: project
+  owners:
+  - .
+  active_owner: .
+  content_hash: null
+mcp_servers:
+- colab-mcp
+mcp_configs:
+  colab-mcp:
+    name: colab-mcp
+    transport: stdio
+    registry: false
+    command: colab-mcp
+mcp_target_servers:
+  antigravity:
+  - colab-mcp
+  claude:
+  - colab-mcp
+  codex:
+  - colab-mcp
