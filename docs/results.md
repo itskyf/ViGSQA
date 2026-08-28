@@ -1,5 +1,7 @@
 # Baseline Results — VN-GeoQA
 
+> **ARCHIVED — PRE-FREEZE RESULTS.** These numbers predate the v1.0.0 benchmark freeze (superseded candidate dataset) and are **not valid benchmark evidence**. Official results come from fresh runs against the frozen benchmark (T03).
+
 ## Setup
 
 - **Dataset:** 800 Vietnamese geospatial questions (8 types × 100)
@@ -94,6 +96,7 @@ Direct tops out at 0.059. Models hallucinate POI names, output Vietnamese words 
 Qwen3.6-27B wins on `knn:direction+name` (0.590 vs 0.583) and matches on `knn+distance` (0.670). Qwen3.5-27B edges ahead on `range:direction+name` (0.374 vs 0.358) and `range+count` (0.680 vs 0.640).
 
 **3. Models have complementary strengths.**
+
 - Qwen3.5-27B / Qwen3.6-27B: best overall, direction types, numeric precision
 - Qwen3.5-9B: best for name retrieval (`knn+name` 0.586) and counting (`range+count` 0.740)
 - Gemma-4-26B: best location accuracy (dist_err 0.135 on knn+loc)
@@ -110,7 +113,7 @@ Direct scores cluster tightly (0.040–0.059) regardless of model size or genera
 
 Files in `baselines/`:
 
-```
+```text
 <model>_<baseline>_text_eval.csv   → id, attempted, P, R, F1, type
 <model>_<baseline>_parsed_eval.csv → id, attempted, distance_error, relative_error, type
 ```
