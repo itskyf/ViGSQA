@@ -13,7 +13,7 @@ ViGSQA extends GS-QA to Vietnamese OSM data and investigates whether database gr
 | ID | Goal | Status | Current state |
 | --- | --- | --- | --- |
 | T01 | Establish a trustworthy Vietnamese benchmark | `done` | `v1.0.0` frozen (2026-08-28) from the pinned `vietnam-260825` snapshot, seed 42, 800/800 verified, jsonl byte-identical to the prior freeze so its 80/80 human QC carries over. Published as the `data-v1.0.0` GitHub Release asset; restored by `scripts/restore_dataset.sh`. |
-| T02 | Make the whole experiment runnable end-to-end | `in_progress` | All coursework cells behind the barrier are implemented: §1 runtime/DB health gates (incl. read-only probe), §2 dataset restore + 5-table EDA, §3 smoke baselines + answer-type-masked comparison, §4 error taxonomy, grounded 5-question demo, extension point. Full local run passes with zero errors. llama.cpp moved to port 8000 repo-wide (Colab's proxy holds 8080); Colab install fixed to non-editable `uv pip install --python sys.executable .` (PEP 660 `.pth` is invisible to a running kernel). Fresh-Colab smoke (exit criterion) remains. |
+| T02 | Make the whole experiment runnable end-to-end | `done` | All coursework cells implemented (health gates, dataset restore + EDA, smoke baselines, masked comparison, error taxonomy, grounded 5-question demo, extension point). Full local run passes; the exit criterion passed on 2026-08-29 — a fresh Colab VM cloned `main` and ran all cells end-to-end with zero errors, tables matching local greedy-decoding output. llama.cpp now serves on repo-wide port 8000; Colab bootstrap uses non-editable `uv pip install --python sys.executable .`, kernel-stop on bootstrap failure, `punkt_tab` download, and `NLTK_ALLOW_PROXIED_URLOPEN=1` (details in the task record). |
 | T03 | Measure correctly and establish official baselines | `planned` | Validate metric semantics per answer type (best-match against full gold candidate sets), then run and report the official full 800-question comparison on the frozen benchmark. |
 | T04 | Improve what the frozen baselines fail at | `planned` | Select the intervention from full-baseline error evidence; the typed deterministic renderer stays a hypothesis until that evidence supports it. Plugs into the `baselines_vi.py` patch layer without a pipeline rewrite. |
 | T05 | Analyze Vietnamese-specific behavior and errors | `planned` | Full/stripped diacritic surfaces exist; robustness, error taxonomy, and new-data demonstration remain. |
@@ -25,10 +25,11 @@ ViGSQA extends GS-QA to Vietnamese OSM data and investigates whether database gr
 - All pre-freeze result artifacts (`baselines/*_eval.csv`, `baselines/REPORT_VN_GEOQA.md`, `docs/results.md`) are archived, describe a superseded candidate dataset, and must not be used as benchmark evidence.
 - The dataset lives outside version control; restore it with `scripts/restore_dataset.sh` (public Release asset) or byte-identical regeneration with the pinned seed. Read through the `generator/questions_vi` symlink; never commit `data/`.
 - Range-type gold answers are full distance-ordered sets (up to ~1254 candidates): score predictions by best applicable match against the complete gold set; never require exhaustive enumeration. T03 owns metric semantics.
+- The T02 smoke produced identical evaluation tables locally and on a fresh Colab VM (greedy decoding, same GGUF), and every environment quirk Colab exposed (port 8000, non-editable uv install, punkt_tab + proxied-urlopen) is now encoded in the bootstrap cell — T03's full run can treat local and Colab executions as equivalent.
 
 ## Active Next Action
 
-Run the same 8-question smoke from a fresh Colab clone (fresh VM, Run-all) to satisfy T02's exit criterion; then mark T02 done and start T03's metric-semantics validation on the full 800-question run.
+Start T03: validate metric semantics per answer type, then run the official full 800-question comparison on the frozen benchmark with `RUN_MODE = "full"`.
 
 ## Session Prompt
 
