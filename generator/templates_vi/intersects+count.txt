@@ -1,10 +1,5 @@
-Có bao nhiêu [1] giao với [2]?
-Số lượng [1] cắt qua [2] là bao nhiêu?
-[1] nào giao nhau với [2] và có bao nhiêu?
-Đếm số [1] giao với [2].
-Bao nhiêu [1] đi qua [2]?
-Có tất cả bao nhiêu [1] giao với [2]?
-Số [1] cắt qua [2] là mấy?
-Tổng số [1] giao với [2] là bao nhiêu?
-Bao nhiêu [1] nằm giao nhau với [2]?
-[1] giao với [2] có tất cả bao nhiêu cái?
+Có bao nhiêu [1] ở [2]?
+Trong [2] có bao nhiêu [1]?
+Đếm số [1] nằm trong [2].
+Số lượng [1] tại [2] là bao nhiêu?
+Tổng cộng có mấy [1] ở [2]?

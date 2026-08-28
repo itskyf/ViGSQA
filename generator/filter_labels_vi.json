@@ -1,0 +1,27 @@
+{
+    "restaurant": [
+        ["nhà hàng món Việt", "cuisine ILIKE '%vietnamese%'"],
+        ["nhà hàng hải sản", "cuisine ILIKE '%seafood%'"],
+        ["quán mì và phở", "cuisine ILIKE '%noodle%'"],
+        ["nhà hàng Nhật", "cuisine ILIKE '%japanese%'"],
+        ["nhà hàng Hàn", "cuisine ILIKE '%korean%'"],
+        ["quán pizza", "cuisine ILIKE '%pizza%'"],
+        ["quán burger", "cuisine ILIKE '%burger%'"],
+        ["nhà hàng Ấn", "cuisine ILIKE '%indian%'"],
+        ["quán gà rán", "cuisine ILIKE '%chicken%'"],
+        ["nhà hàng mang về", "takeaway ILIKE '%yes%'"],
+        ["nhà hàng có chỗ ngồi ngoài trời", "outdoor_seating ILIKE '%yes%'"],
+        ["nhà hàng có giao hàng", "delivery ILIKE '%yes%'"]
+    ],
+    "cafe": [
+        ["quán cà phê", "cuisine ILIKE '%coffee_shop%'"],
+        ["quán trà sữa", "cuisine ILIKE '%bubble_tea%'"]
+    ],
+    "museum": [
+        ["bảo tàng lịch sử", "museum = 'history'"],
+        ["bảo tàng thiên nhiên", "museum = 'nature'"]
+    ],
+    "hospital": [
+        ["bệnh viện có khoa cấp cứu", "emergency ILIKE '%yes%'"]
+    ]
+}

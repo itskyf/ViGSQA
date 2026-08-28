@@ -1,8 +1,5 @@
-[1] nào giao với [2] và có diện tích lớn nhất?
-[1] lớn nhất giao với [2] là gì?
-Trong số [1] giao với [2], cái nào có diện tích lớn nhất?
-[1] nào cắt qua [2] và có diện tích lớn nhất?
-Cho tôi biết [1] có diện tích lớn nhất giao với [2].
-[1] giao với [2] có diện tích lớn nhất là cái nào?
-Tìm [1] lớn nhất trong số những [1] giao với [2].
-[1] nào giao với [2] và có diện tích lớn nhất?
+[1] nào lớn nhất ở [2]?
+[1] có diện tích lớn nhất trong [2] là gì?
+Ở [2], [1] nào rộng nhất?
+Cho tôi biết [1] rộng nhất tại [2].
+Đâu là [1] có diện tích lớn nhất của [2]?

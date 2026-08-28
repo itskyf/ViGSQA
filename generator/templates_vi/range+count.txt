@@ -1,28 +1,5 @@
-Có bao nhiêu [1] trong vòng [2] từ [3]?
-Số lượng [1] trong bán kính [2] từ [3] là bao nhiêu?
-[1] trong phạm vi [2] từ [3] có bao nhiêu cái?
-Đếm số [1] trong bán kính [2] từ [3].
-Bao nhiêu [1] nằm trong vòng [2] kể từ [3]?
-Có bao nhiêu [1] cách [3] không quá [2]?
-Số lượng [1] trong khoảng cách [2] từ [3] là mấy?
-Trong bán kính [2] từ [3] có mấy [1]?
-Bao nhiêu [1] tồn tại trong phạm vi [2] từ [3]?
-Tổng số [1] trong vòng [2] từ [3] là bao nhiêu?
-Có tất cả bao nhiêu [1] trong bán kính [2] từ [3]?
-Đếm giúp tôi [1] trong phạm vi [2] từ [3].
-[1] trong vòng [2] từ [3] có tất cả bao nhiêu?
-Số [1] nằm trong khoảng [2] từ [3] là bao nhiêu?
-Bao nhiêu [1] có thể tìm thấy trong vòng [2] từ [3]?
 Có bao nhiêu [1] trong bán kính [2] quanh [3]?
-Tổng cộng bao nhiêu [1] trong phạm vi [2] từ [3]?
-Trong khu vực [2] từ [3] có bao nhiêu [1]?
-Bao nhiêu [1] nằm trong vòng bán kính [2] từ [3]?
-Số lượng [1] cách [3] trong khoảng [2] là bao nhiêu?
-Có bao nhiêu [1] ở trong phạm vi [2] từ [3]?
-[1] nào trong vòng [2] từ [3] và có bao nhiêu cái?
-Đếm xem có bao nhiêu [1] cách [3] dưới [2].
-Trong bán kính [2] từ [3], tôi tìm được bao nhiêu [1]?
-Bao nhiêu [1] nằm trong khu vực [2] xung quanh [3]?
-Số [1] trong bán kính [2] từ [3] là bao nhiêu cái?
-Có tất cả mấy [1] trong phạm vi [2] từ [3]?
-Tổng số lượng [1] trong vòng [2] từ [3] là bao nhiêu?
+Trong phạm vi [2] từ [3] có bao nhiêu [1]?
+Đếm giúp tôi số [1] cách [3] không quá [2].
+Số lượng [1] trong vòng [2] tính từ [3] là bao nhiêu?
+Tổng cộng có mấy [1] nằm trong bán kính [2] từ [3]?

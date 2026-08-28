@@ -1,20 +1,5 @@
-[1] nào trong vòng [2] từ [3] và ở đâu?
-Vị trí [1] nào trong phạm vi [2] từ [3]?
-Tìm địa điểm [1] trong bán kính [2] từ [3].
-[1] trong phạm vi [2] từ [3] nằm ở đâu?
-Cho tôi biết vị trí [1] nào trong vòng [2] từ [3].
-Địa chỉ [1] nào trong bán kính [2] từ [3] là gì?
-Bạn có thể chỉ vị trí [1] nào trong phạm vi [2] từ [3] không?
-[1] trong vòng [2] từ [3] tọa lạc ở đâu?
-Tôi muốn biết địa điểm [1] trong bán kính [2] từ [3].
-Chỉ giúp tôi vị trí [1] trong phạm vi [2] từ [3].
-[1] nào cách [3] trong vòng [2] và nó ở đâu?
-Địa điểm [1] trong bán kính [2] từ [3] ở chỗ nào?
-Bạn biết [1] nào trong phạm vi [2] từ [3] không, nó ở đâu?
-Vị trí của [1] trong vòng [2] từ [3] là gì?
-Tôi cần địa chỉ [1] trong bán kính [2] từ [3].
-[1] nào gần [3] trong phạm vi [2] và ở đâu?
-Cho biết địa điểm [1] trong vòng [2] từ [3].
-[1] trong phạm vi [2] từ [3] nằm tại đâu?
-Bạn có thể gợi ý và chỉ vị trí [1] trong bán kính [2] từ [3] không?
-Địa chỉ chính xác [1] nào trong phạm vi [2] từ [3]?
+Các [1] trong bán kính [2] quanh [3] nằm ở đâu?
+Vị trí của những [1] trong phạm vi [2] từ [3] là gì?
+Những [1] cách [3] không quá [2] nằm ở đâu?
+Cho tôi biết vị trí các [1] trong bán kính [2] quanh [3].
+[1] nào nằm trong vòng [2] từ [3] và chúng ở đâu?

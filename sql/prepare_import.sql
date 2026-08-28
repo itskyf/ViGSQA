@@ -3,11 +3,16 @@ SET client_min_messages = warning;
 TRUNCATE osm_import_complete;
 
 DROP VIEW IF EXISTS pois;
+DROP VIEW IF EXISTS regions;
 DROP VIEW IF EXISTS roads;
 DROP VIEW IF EXISTS parks;
 DROP VIEW IF EXISTS lakes;
 
 DROP TABLE IF EXISTS planet_osm_point;
+DROP TABLE IF EXISTS planet_osm_region;
+DROP TABLE IF EXISTS planet_osm_park;
+DROP TABLE IF EXISTS planet_osm_lake;
+DROP TABLE IF EXISTS planet_osm_road;
 DROP TABLE IF EXISTS planet_osm_roads;
 DROP TABLE IF EXISTS planet_osm_line;
 DROP TABLE IF EXISTS planet_osm_polygon;

@@ -1,10 +1,4 @@
-[1] nào trong phạm vi [2] từ [3] và ở đâu?
-Vị trí [1] trong vòng [2] từ [3] là ở đâu?
-Địa điểm [1] trong bán kính [2] từ [3] nằm ở đâu?
-[1] trong phạm vi [2] từ [3] tọa lạc ở đâu?
-Cho tôi biết vị trí [1] trong vòng [2] từ [3].
-Địa chỉ [1] trong bán kính [2] từ [3] là gì?
-[1] nào trong phạm vi [2] từ [3] và nó ở chỗ nào?
-Tìm địa điểm [1] trong vòng [2] từ [3].
-Chỉ giúp tôi [1] trong bán kính [2] từ [3] ở đâu.
-[1] nào cách [3] không quá [2] và nằm ở đâu?
+Các [1] trong bán kính [2] quanh [3] nằm ở đâu?
+Vị trí của những [1] cách [3] không quá [2] là gì?
+Những [1] trong phạm vi [2] từ [3] nằm ở đâu?
+Cho tôi biết vị trí các [1] trong bán kính [2] quanh [3].

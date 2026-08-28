@@ -1,8 +1,5 @@
-[1] nào giao với [2] và có chiều dài lớn nhất?
-[1] dài nhất giao với [2] là gì?
-Trong số [1] giao với [2], cái nào dài nhất?
-[1] nào cắt qua [2] và có chiều dài lớn nhất?
-Cho tôi biết [1] dài nhất giao với [2].
-[1] giao với [2] có chiều dài lớn nhất là cái nào?
-Tìm [1] dài nhất trong số những [1] giao với [2].
-[1] nào giao với [2] và dài nhất?
+[1] nào dài nhất đi qua [2]?
+[1] dài nhất trong [2] là gì?
+Ở [2], [1] nào có chiều dài lớn nhất?
+Cho tôi biết [1] dài nhất cắt qua [2].
+Đâu là [1] có tổng chiều dài lớn nhất tại [2]?

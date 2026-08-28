@@ -1,28 +1,6 @@
-Có [1] nào trong phạm vi [2] từ [3] không?
-[1] nào nằm trong vòng [2] từ [3]?
-Tìm [1] trong bán kính [2] từ [3].
-Bạn có thể gợi ý [1] nào trong phạm vi [2] từ [3] không?
-Có [1] nào cách [3] trong vòng [2] không?
-[1] nào nằm trong khoảng cách [2] từ [3]?
-Cho tôi biết [1] nào trong phạm vi [2] từ [3].
-Tôi đang tìm [1] trong bán kính [2] từ [3].
-Bạn biết [1] nào cách [3] không quá [2] không?
-Có [1] nào trong vòng [2] kể từ [3] không?
-Gợi ý cho tôi [1] trong phạm vi [2] từ [3].
-[1] nào nằm trong bán kính [2] xung quanh [3]?
-Tôi muốn tìm [1] cách [3] không quá [2].
-Có [1] nào trong khu vực bán kính [2] từ [3] không?
-Bạn có thể gợi ý [1] gần [3], trong vòng [2] không?
-[1] nào trong phạm vi [2] của [3]?
-Tìm giúp tôi [1] trong bán kính [2] từ [3].
-Có [1] nào nằm trong vòng [2] từ [3] không?
-Gợi ý [1] nào cách [3] trong khoảng [2].
-Tôi cần [1] trong phạm vi [2] từ [3].
-Cho tôi biết [1] nào trong vòng [2] từ [3].
-Bạn có gợi ý [1] nào cách [3] dưới [2] không?
-Tìm [1] trong khoảng [2] từ [3] giúp tôi.
-[1] nào trong bán kính [2] từ [3] mà bạn biết?
-Có [1] nào không xa [3] quá [2] không?
-Cho biết [1] trong phạm vi [2] từ [3].
-Tôi muốn biết [1] nào cách [3] không hơn [2].
-[1] gần [3] nhất trong bán kính [2] là gì?
+[1] nào nằm trong bán kính [2] quanh [3]?
+Có những [1] nào trong phạm vi [2] từ [3]?
+Cho tôi biết các [1] cách [3] không quá [2].
+[1] nào nằm cách [3] trong vòng [2]?
+Tất cả [1] trong bán kính [2] tính từ [3] là gì?
+Danh sách các [1] ở trong phạm vi [2] quanh [3].

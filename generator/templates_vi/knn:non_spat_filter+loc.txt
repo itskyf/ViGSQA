@@ -1,10 +1,4 @@
-[1] gần [2] nhất ở đâu?
-Vị trí [1] gần [2] nhất là ở đâu?
-Cho tôi biết [1] gần [2] nhất nằm ở đâu.
-Địa chỉ [1] gần [2] nhất là gì?
-Tôi muốn biết [1] gần [2] nhất ở chỗ nào.
-[1] gần [2] nhất tọa lạc ở đâu?
-Chỉ giúp tôi vị trí [1] gần [2] nhất.
-Bạn biết [1] gần [2] nhất ở đâu không?
-Địa điểm [1] gần [2] nhất nằm ở đâu?
-[1] gần nhất với [2] nằm tại đâu?
+[1] gần [2] nhất nằm ở đâu?
+Vị trí của [1] gần [2] nhất là gì?
+[1] nào gần [2] nhất và nó nằm ở đâu?
+Cho tôi biết vị trí [1] gần [2] nhất.

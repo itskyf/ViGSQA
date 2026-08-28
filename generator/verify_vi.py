@@ -12,14 +12,23 @@ Vietnamese GeoQA verification pipeline — 3 layers:
     d) Diacritic surface consistency (full vs stripped differ where expected)
     e) OSM name sanity (entity names contain at least one Vietnamese-range char
        OR standard ASCII — not garbled encoding)
-    f) Anchor exclusion: SQL must exclude the anchor POI id, and no answer may
-       carry the excluded id or the anchor entity's geometry
+    f) Anchor exclusion, per family: POI-anchored SQL must exclude the anchor
+       id (`id <> N`) and no answer may carry it or the anchor geometry;
+       region-anchored SQL must reference the region by id subquery and no
+       answer may carry that region id
     g) Determinism: no LIMIT unless the statement also has ORDER BY
-    h) Record identity: stable `{type}-NNN` id present; type matches filename
+    h) Record identity: stable `{type}-NNN` id and `Tnn` tid present; type
+       matches filename; answer_type matches the type string's output suffix
     i) Surfaces: question equals question_surfaces.full; no duplicate questions
+       (per file and globally across the dataset)
+    j) Spatial-op agreement: direction/towards SQL contains ST_Azimuth;
+       intersects SQL contains ST_Intersects
+    k) Answer payload sanity: `angle` in [0,360), `area`/`length` > 0,
+       `count` >= 1, `distance` key present; T7 answers carry the frozen
+       multi_source_* fields
 
   Layer 3 — Human spot-check sample:
-    Stratified 5% sample per template type, printed as TSV for annotators.
+    Stratified 5% sample per tid, printed as TSV for annotators.
     Annotators mark: correct / incorrect / unclear
 
 Usage:
@@ -39,6 +48,9 @@ from pathlib import Path
 
 # Record count every question file is expected to hold.
 EXPECTED_RECORD_COUNT = 100
+
+# Azimuth answers span a full turn, [0, 360) degrees.
+FULL_TURN_DEG = 360
 
 # ── Layer 2 checks ───────────────────────────────────────────────────────────
 
@@ -81,6 +93,20 @@ def check_osm_name(name: str) -> bool:
 # Matches the anchor-exclusion predicate the generators emit, e.g. `id <> 123`
 # or `p.osm_id <> 123`.
 ANCHOR_EXCLUSION_RE = re.compile(r"\b(?:p\.)?(?:osm_id|id)\s*<>\s*(\d+)")
+
+# Matches the region-anchor reference the intersects family emits (regions are
+# never inlined as WKT multipolygons).
+REGION_SUBQUERY_RE = re.compile(
+    r"\(\s*SELECT geometry FROM regions WHERE id = (\d+)\s*\)"
+)
+
+
+# Expected answer_type derived from the type string alone: the segment after
+# the final '+' (multi-source types answer with a name).
+def expected_answer_type(qtype: str) -> str:
+    if "multi_source" in qtype:
+        return "name"
+    return qtype.rsplit("+", maxsplit=1)[-1]
 
 
 def excluded_anchor_ids(sql: str) -> set[str]:
@@ -145,27 +171,50 @@ def run_layer2(entry: dict, idx: int, expected_type: str | None = None) -> Check
     if "SELECT" not in sql.upper() or "FROM" not in sql.upper():
         failures.append("SQL_MALFORMED: missing SELECT or FROM")
 
-    # anchor exclusion: the anchor POI must not be able to answer its own question
-    excluded = excluded_anchor_ids(sql)
-    if not excluded:
-        failures.append(
-            "SQL_NO_ANCHOR_EXCLUSION: anchor POI can appear in its own answers"
-        )
-    for ans in answers:
-        if str(ans.get("id", "")) in excluded:
+    # anchor exclusion, branched by family: the anchor must never answer its
+    # own question. Intersects types anchor on a region id subquery instead
+    # of an excluded POI id.
+    if qtype.startswith("intersects"):
+        if "ST_INTERSECTS" not in sql.upper():
             failures.append(
-                f"SELF_ANCHOR: answer id {ans.get('id')} equals the excluded anchor id"
+                "SQL_NO_ST_INTERSECTS: intersects type without ST_Intersects"
             )
-    anchor_wkts = {
-        v.get("geo_wkt")
-        for v in entities.values()
-        if isinstance(v, dict) and v.get("geo_wkt")
-    }
-    for ans in answers:
-        if ans.get("geo_wkt") in anchor_wkts:
+        region_ids = {m.group(1) for m in REGION_SUBQUERY_RE.finditer(sql)}
+        if not region_ids:
+            failures.append("SQL_NO_REGION_SUBQUERY: region not referenced by id")
+        for ans in answers:
+            if str(ans.get("id", "")) in region_ids:
+                failures.append(
+                    "SELF_ANCHOR: answer id equals the anchor region id: "
+                    f"{ans.get('id')}"
+                )
+    else:
+        excluded = excluded_anchor_ids(sql)
+        if not excluded:
             failures.append(
-                "SELF_ANCHOR_WKT: answer geometry equals the anchor entity geometry"
+                "SQL_NO_ANCHOR_EXCLUSION: anchor POI can appear in its own answers"
             )
+        for ans in answers:
+            if str(ans.get("id", "")) in excluded:
+                failures.append(
+                    "SELF_ANCHOR: answer id equals the excluded anchor id: "
+                    f"{ans.get('id')}"
+                )
+        anchor_wkts = {
+            v.get("geo_wkt")
+            for v in entities.values()
+            if isinstance(v, dict) and v.get("geo_wkt")
+        }
+        for ans in answers:
+            if ans.get("geo_wkt") in anchor_wkts:
+                failures.append(
+                    "SELF_ANCHOR_WKT: answer geometry equals the anchor entity geometry"
+                )
+
+    # spatial-operator agreement with the type string
+    if ":direction" in qtype or ":towards" in qtype:
+        if "ST_AZIMUTH" not in sql.upper():
+            failures.append("SQL_NO_ST_AZIMUTH: direction/towards semantics missing")
 
     # determinism: a bare LIMIT stores an arbitrary subset of the true answers
     if not check_limit_ordered(sql):
@@ -181,6 +230,54 @@ def run_layer2(entry: dict, idx: int, expected_type: str | None = None) -> Check
         failures.append(
             f"TYPE_MISMATCH: record type {qtype!r} != filename type {expected_type!r}"
         )
+
+    # tid and answer_type agreement with the type string
+    tid = entry.get("tid")
+    if not isinstance(tid, str) or not re.fullmatch(r"T\d{2}", tid):
+        failures.append(f"BAD_TID: expected 'Tnn', got {tid!r}")
+    if entry.get("answer_type") != expected_answer_type(qtype):
+        failures.append(
+            f"BAD_ANSWER_TYPE: {entry.get('answer_type')!r} != "
+            f"{expected_answer_type(qtype)!r} for {qtype!r}"
+        )
+
+    # answer payload sanity per answer_type (generator contract)
+    for ans in answers:
+        try:
+            if entry.get("answer_type") == "angle" and not (
+                0 <= float(ans["angle"]) < FULL_TURN_DEG
+            ):
+                failures.append(
+                    f"ANGLE_RANGE: angle {ans.get('angle')} outside [0,360)"
+                )
+            if entry.get("answer_type") in ("area", "length") and not (
+                float(ans[entry["answer_type"]]) > 0
+            ):
+                failures.append(
+                    f"{entry['answer_type'].upper()}_NONPOSITIVE: "
+                    f"{ans.get(entry['answer_type'])}"
+                )
+            if entry.get("answer_type") == "distance" and (
+                "distance" not in ans or float(ans["distance"]) < 0
+            ):
+                failures.append(f"BAD_DISTANCE: {ans.get('distance')!r}")
+            if entry.get("answer_type") == "count" and not int(ans["count"]) >= 1:
+                failures.append(f"NONPOSITIVE_COUNT: {ans.get('count')!r}")
+        except (KeyError, TypeError, ValueError):
+            failures.append(
+                "PAYLOAD_MALFORMED: answer missing its "
+                f"{entry.get('answer_type')} value"
+            )
+
+    # T7 freezes the external Wikipedia value into the answer row
+    if qtype == "knn+name+multi_source1":
+        for field in (
+            "multi_source_answer",
+            "multi_source_attribute",
+            "multi_source_long_answer",
+        ):
+            if not answers or not answers[0].get(field):
+                failures.append(f"MISSING_MULTI_SOURCE: answers[0] lacks {field}")
 
     # the two surfaces must agree with the canonical question
     if full != q:
@@ -198,29 +295,33 @@ def run_layer2(entry: dict, idx: int, expected_type: str | None = None) -> Check
 
 
 def spot_check_sample(entries: list[dict], rate: float = 0.05) -> list[dict]:
-    """Stratified sample by template type."""
-    by_type: dict[str, list] = {}
+    """Stratified sample by tid (one question family each)."""
+    by_tid: dict[str, list] = {}
     for e in entries:
-        by_type.setdefault(e.get("type", "unknown"), []).append(e)
+        by_tid.setdefault(e.get("tid") or e.get("type", "unknown"), []).append(e)
     sample = []
-    for group in by_type.values():
+    for group in by_tid.values():
         k = max(1, int(len(group) * rate))
         sample.extend(random.sample(group, min(k, len(group))))
     return sample
 
 
 def print_spot_check_tsv(sample: list[dict]):
-    print("id\ttype\tquestion\texpected_answer\tannotation")
+    print("id\ttid\ttype\tquestion\texpected_answer\tannotation")
     for i, e in enumerate(sample):
         q = e.get("question", "")
         qtype = e.get("type", "")
         ans = e.get("answers", [{}])
         ans_name = (
-            ans[0].get("poi_name") or ans[0].get("road_name") or str(ans[0])[:60]
+            ans[0].get("poi_name")
+            or ans[0].get("road_name")
+            or ans[0].get("park_name")
+            or ans[0].get("lake_name")
+            or str(ans[0])[:60]
             if ans
             else ""
         )
-        print(f"{e.get('id', i)}\t{qtype}\t{q}\t{ans_name}\t")
+        print(f"{e.get('id', i)}\t{e.get('tid', '')}\t{qtype}\t{q}\t{ans_name}\t")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -236,18 +337,23 @@ def load_jsonl(path: Path) -> list[dict]:
     return entries
 
 
-def verify_file(path: Path, spot_rate: float = 0.0) -> tuple[int, int]:
+def verify_file(
+    path: Path, spot_rate: float = 0.0, seen_questions: set[str] | None = None
+) -> tuple[int, int]:
+    """Verify one JSONL file. `seen_questions` carries the dataset-global
+    question set so duplicates across files are also caught."""
     entries = load_jsonl(path)
     passed = 0
     failed = 0
     fail_log = []
-    seen_questions: set[str] = set()
+    if seen_questions is None:
+        seen_questions = set()
 
     for i, entry in enumerate(entries):
         result = run_layer2(entry, i, expected_type=path.stem)
         if entry.get("question") in seen_questions:
             result.failures.append(
-                "DUPLICATE: identical question text earlier in this file"
+                "DUPLICATE: identical question text seen earlier in the dataset"
             )
             result.passed = False
         else:
@@ -307,6 +413,7 @@ def main():
 
     p = Path(args.input)
     total_pass, total_fail = 0, 0
+    global_questions: set[str] = set()
 
     if p.is_dir():
         files = sorted(p.glob("*.jsonl"))
@@ -314,11 +421,11 @@ def main():
             print(f"No .jsonl files found in {p}")
             sys.exit(1)
         for f in files:
-            pp, ff = verify_file(f, args.spot_check)
+            pp, ff = verify_file(f, args.spot_check, global_questions)
             total_pass += pp
             total_fail += ff
     else:
-        total_pass, total_fail = verify_file(p, args.spot_check)
+        total_pass, total_fail = verify_file(p, args.spot_check, global_questions)
 
     total = total_pass + total_fail
     pct = 100 * total_pass / total if total else 0

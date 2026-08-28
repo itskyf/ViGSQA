@@ -18,14 +18,24 @@ baselines/cache/
 baselines/cache_vi/
 baselines/address_cache/
 
+# T7/T8 generation-time Wikipedia fetch cache; external values live frozen
+# inside the question records
+generator/wikipedia_cache_vi.json
+
 # Per-run eval outputs; official results are reported via release assets/docs
 baselines/*_eval.csv
+results/
+
+# Overnight run logs (provenance lives in the run manifests)
+logs/
 
 # Ruff / tool caches
 **/.ruff_cache/
 
 # Jupyter
 .ipynb_checkpoints/
+# Authoritative notebook copy lives in Google Drive/Colab; never track it
+main.ipynb
 
 # Python environments
 .venv/

@@ -1,10 +1,5 @@
-Đi từ [2] về phía [3], [1] nào đầu tiên?
-Trên đường từ [2] đến [3], [1] nào gần nhất?
-[1] nào nằm trên đường đi từ [2] đến [3]?
-Đi theo hướng từ [2] về [3], [1] nào gần nhất?
-[1] nào xuất hiện đầu tiên khi đi từ [2] về phía [3]?
-Trên lộ trình từ [2] đến [3], [1] nào ở gần nhất?
-Từ [2] đi về phía [3], [1] gần nhất là gì?
-Hướng từ [2] đến [3], [1] nào gặp đầu tiên?
-[1] nào gần nhất khi di chuyển từ [2] về phía [3]?
-Đi từ [2] hướng về [3], [1] nào gần nhất?
+[1] nào gần [2] nhất và nằm về hướng [3]?
+[1] gần [2] nhất về phía [3] là gì?
+Từ [2] đi về hướng [3], [1] gần nhất là gì?
+Đâu là [1] gần [2] nhất nằm về hướng [3]?
+Tìm giúp tôi [1] gần [2] nhất theo hướng [3].

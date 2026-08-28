@@ -19,17 +19,29 @@ echo "[INFO] PostgreSQL branch: preparing the pinned OSM snapshot..."
 ./scripts/import_osm.sh
 
 echo "[INFO] PostgreSQL branch: validating the import..."
-# Querying the pois view exercises PostGIS functions, so a missing extension
-# fails the psql call itself; here only the non-empty result needs asserting.
+# Querying the views exercises PostGIS functions, so a missing extension
+# fails the psql call itself; here only the non-empty results need asserting.
 if [[ -n "${COLAB_RELEASE_TAG:-}" ]]; then
-	POI_COUNT="$(psql \
+	COUNTS="$(psql \
 		--tuples-only --no-align --set=ON_ERROR_STOP=1 \
-		--file="${SQL_DIR}/count_pois.sql")"
+		--file="${SQL_DIR}/count_reference_tables.sql")"
 else
-	POI_COUNT="$(podman compose exec --no-tty postgres psql \
+	COUNTS="$(podman compose exec --no-tty postgres psql \
 		--username="${PGUSER}" --dbname="${PGDATABASE}" \
 		--tuples-only --no-align --set=ON_ERROR_STOP=1 \
-		<"${SQL_DIR}/count_pois.sql")"
+		<"${SQL_DIR}/count_reference_tables.sql")"
 fi
-((POI_COUNT > 0))
-echo "[INFO] PostgreSQL branch ready: ${POI_COUNT} POIs."
+
+EMPTY_TABLES=()
+while IFS='|' read -r TABLE_NAME TABLE_COUNT; do
+	TABLE_COUNT="${TABLE_COUNT//[[:space:]]/}"
+	TABLE_NAME="${TABLE_NAME//[[:space:]]/}"
+	echo "[INFO] ${TABLE_NAME}: ${TABLE_COUNT} rows"
+	((TABLE_COUNT > 0)) || EMPTY_TABLES+=("${TABLE_NAME}")
+done < <(printf '%s\n' "${COUNTS}")
+
+if ((${#EMPTY_TABLES[@]} > 0)); then
+	echo "[ERROR] Reference tables absent or empty: ${EMPTY_TABLES[*]}" >&2
+	exit 1
+fi
+echo "[INFO] PostgreSQL branch ready."

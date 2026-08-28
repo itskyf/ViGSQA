@@ -173,7 +173,7 @@ awk \
 echo "[INFO] Preparing database tables..."
 psql_file "${SQL_DIR}/prepare_import.sql"
 
-echo "[INFO] Importing POI nodes with osm2pgsql..."
+echo "[INFO] Importing reference tables with osm2pgsql..."
 osm2pgsql \
 	--create \
 	--output=flex \
