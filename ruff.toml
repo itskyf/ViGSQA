@@ -1,0 +1,31 @@
+fix = true
+
+[lint]
+select = [
+  "ASYNC",  # flake8-async
+  "B",  # flake8-bugbear
+  "BLE",  # flake8-blind-except
+  "DTZ",  # flake8-datetimez
+  "E",  # pycodestyle
+  "F",  # Pyflakes
+  "FAST",  # FastAPI
+  "FURB",  # refurb
+  "I",  # isort
+  "PL",  # Pylint
+  "RUF",  # Ruff-specific rules
+  "UP",  # pyupgrade
+  "W",  # pycodestyle
+]
+
+[lint.pydocstyle]
+convention = "google"
+
+# Coursework/reproducibility repo: complexity ceilings sized to the frozen
+# upstream pipeline so the rules stay active for new code without refactoring
+# generated-benchmark provenance.
+[lint.pylint]
+max-args = 8
+max-positional-args = 8
+max-returns = 13
+max-branches = 65
+max-statements = 190
