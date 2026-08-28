@@ -1,12 +1,11 @@
-# Core langchain ecosystem — all must be on the 1.x series together
-langchain>=1.0.0
+# Runtime dependencies of the VN-GeoQA baselines (baselines.py, baselines_vi.py,
+# evaluate.py). Trimmed to what is actually imported — the RAG/shuffled English
+# baselines and their heavy extras (torch, faiss, chroma, sentence-transformers)
+# are not part of the Vietnamese pipeline.
+
+# LLM client — llama.cpp OpenAI-compatible /v1 endpoint
 langchain-core>=1.2.19
-langchain-text-splitters>=1.1.1
-langchain-anthropic>=1.4.0
 langchain-openai>=1.0.0
-langchain-ollama>=1.0.0
-langchain-chroma>=1.0.0
-langchain-huggingface>=0.1.0
 
 # Database
 psycopg[binary]>=3.2.3
@@ -14,26 +13,11 @@ psycopg2-binary>=2.9.9
 
 # Geospatial
 shapely>=2.0.1
-geopandas
 pyproj>=3.6.1
 geopy>=2.4.1
 
-# Data / ML
+# Data / NLP utilities
 pandas>=2.2.3
-numpy>=1.26.4
-pydantic>=2.0.0
-sentence-transformers>=3.1.1
-bert-score>=0.3.13
-faiss-cpu>=1.8.0
-bm25s>=0.2.1
-
-# NLP utilities
+nltk>=3.9
 num2words>=0.5.13
-textblob>=0.18.0
-language_tool_python>=2.8
-
-# Misc
 tqdm>=4.66.1
-lxml>=5.3.0
-protobuf>=4.25.5
-tenacity>=8.3.0

@@ -1,0 +1,20 @@
+Given a question and a text answer, parse the text answer to json format. Any measurement must be in metric units, and directions must be converted to azimuth angle in degrees. Try to match the following schema:
+{
+    "name": string,
+    "address": string,
+    "lon": number,
+    "lat": number,
+    "count": integer,
+    "distance": integer,
+    "length": integer,
+    "area": integer,
+    "azimuth_angle": integer,
+    %OTHER_ATT%
+}
+Rules:
+- If the answer contains coordinates (longitude/latitude), include "lon" and "lat" as numbers.
+- If the answer contains a location name or address, include "address".
+- "distance" must be in metres (convert km to metres if needed).
+- "count" must be an integer (not words).
+- If a value is missing don't include it in the output, and don't write any comments.
+- All json blocks must be enclosed with ```json and ```

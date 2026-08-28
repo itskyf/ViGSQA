@@ -13,32 +13,38 @@ Short-name convention used here:
 import glob
 import json
 import os
+from itertools import groupby
+
 import pandas as pd
 
 # ── Customize model short labels here ────────────────────────────────────────
 MODEL_MAP = {
     # ministral
-    "ministral-3:14b-cloud_direct":   "M",
-    "ministral-3:14b-cloud_rag":      "MR",
+    "ministral-3:14b-cloud_direct": "M",
+    "ministral-3:14b-cloud_rag": "MR",
     "ministral-3:14b-cloud_text2sql": "MT",
     # sonnet
-    "sonnet4.6_direct":               "S",
-    "sonnet4.6_rag":                  "SR",
-    "sonnet4.6_text2sql":             "ST",
+    "sonnet4.6_direct": "S",
+    "sonnet4.6_rag": "SR",
+    "sonnet4.6_text2sql": "ST",
     # gpt-4o
-    "gpt4o_direct":                   "G",
-    "gpt4o_rag":                      "GR",
-    "gpt4o_text2sql":                 "GT",
+    "gpt4o_direct": "G",
+    "gpt4o_rag": "GR",
+    "gpt4o_text2sql": "GT",
     # shuffled baseline
-    "shuffled":                       "R",
+    "shuffled": "R",
 }
 # ── Output-type row ordering ──────────────────────────────────────────────────
 OUTPUT_TYPE_ORDER = ["name", "loc", "angle", "area", "count", "distance", "length"]
 # ─────────────────────────────────────────────────────────────────────────────
 
-BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
-INPUT_DIR  = os.path.join(BASE_DIR, "exp_tables")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+INPUT_DIR = os.path.join(BASE_DIR, "exp_tables")
 OUTPUT_DIR = os.path.join(INPUT_DIR, "latex")
+
+# Correctness thresholds for _is_correct / _sql_correct_counts.
+REL_ERROR_THRESHOLD = 0.1
+F1_THRESHOLD = 0.5
 
 # Sort longest-first so that e.g. "ministral-3:14b-cloud_direct" is replaced
 # before a hypothetical shorter substring could match first.
@@ -58,12 +64,10 @@ def process_df(df: pd.DataFrame) -> pd.DataFrame:
     """Apply model-name renaming to column headers, index, and string cells."""
     df = df.copy()
     df.columns = [rename_str(str(c)) for c in df.columns]
-    df.index   = [rename_str(str(i)) for i in df.index]
+    df.index = [rename_str(str(i)) for i in df.index]
     for col in df.columns:
         if df[col].dtype == object:
-            df[col] = df[col].apply(
-                lambda x: rename_str(str(x)) if pd.notna(x) else x
-            )
+            df[col] = df[col].apply(lambda x: rename_str(str(x)) if pd.notna(x) else x)
     return df
 
 
@@ -83,18 +87,16 @@ def reorder_df(df: pd.DataFrame) -> pd.DataFrame:
     Called *after* process_df so model names are already short.
     """
     # ── Row ordering ─────────────────────────────────────────────────────────
-    type_col = next(
-        (c for c in df.columns if c in ("output_type", "type")), None
-    )
+    type_col = next((c for c in df.columns if c in ("output_type", "type")), None)
     if type_col is not None:
-        present  = [t for t in OUTPUT_TYPE_ORDER if t in df[type_col].values]
+        present = [t for t in OUTPUT_TYPE_ORDER if t in df[type_col].values]
         leftover = [v for v in df[type_col] if v not in OUTPUT_TYPE_ORDER]
         new_order = present + leftover
         df = (
             df.set_index(type_col)
-              .reindex(new_order)
-              .reset_index()
-              .rename(columns={"index": type_col})
+            .reindex(new_order)
+            .reset_index()
+            .rename(columns={"index": type_col})
         )
 
     # ── Column ordering: M, MT, MR, S, ST, SR, G, GT, GR, R ─────────────────
@@ -120,8 +122,13 @@ def reorder_df(df: pd.DataFrame) -> pd.DataFrame:
 
 def _latex_escape(s: str) -> str:
     """Escape LaTeX special characters in a plain string."""
-    for ch, repl in [("_", r"\_"), ("&", r"\&"), ("%", r"\%"),
-                     ("#", r"\#"), ("$", r"\$")]:
+    for ch, repl in [
+        ("_", r"\_"),
+        ("&", r"\&"),
+        ("%", r"\%"),
+        ("#", r"\#"),
+        ("$", r"\$"),
+    ]:
         s = s.replace(ch, repl)
     return s
 
@@ -153,8 +160,8 @@ def make_name_text_recall_table(df: pd.DataFrame) -> str:
     # Model order after renaming (direct → text2sql → rag → shuffled)
     models = ["M", "S", "G", "MT", "ST", "GT", "MR", "SR", "GR", "R"]
     recall_cols = [f"R_{m}" for m in models]
-    f1_cols     = [f"F1_{m}" for m in models]
-    n = len(models)   # 10
+    f1_cols = [f"F1_{m}" for m in models]
+    n = len(models)  # 10
 
     col_spec = f"l|{'c' * n}|{'c' * n}"
 
@@ -164,7 +171,7 @@ def make_name_text_recall_table(df: pd.DataFrame) -> str:
         r"\label{tab:name_text_recall_parsed_f1}",
         f"\\begin{{tabular}}{{{col_spec}}}",
         r"\hline",
-        # Header row 1 – group labels; TID spans both rows.
+        # Header row 1 - group labels; TID spans both rows.
         # Use |c| on the first multicolumn to keep the left border explicit
         # (multicolumn would otherwise suppress the | from the column spec).
         (
@@ -174,25 +181,33 @@ def make_name_text_recall_table(df: pd.DataFrame) -> str:
         ),
         # Partial hline between the group-label row and the model-name row.
         # Starts at col 2 so it doesn't cut through the TID \multirow cell.
-        f"\\cline{{2-{1 + 2*n}}}",
-        # Header row 2 – individual model names.
+        f"\\cline{{2-{1 + 2 * n}}}",
+        # Header row 2 - individual model names.
         # \multicolumn{1}{l|}{} on col 1 ensures the right border of the TID
         # column is drawn in this row too (otherwise the empty \multirow cell
         # may suppress it in some renderers).
-        r"\multicolumn{1}{l|}{} & " + " & ".join(models) + " & " + " & ".join(models) + r" \\",
+        r"\multicolumn{1}{l|}{} & "
+        + " & ".join(models)
+        + " & "
+        + " & ".join(models)
+        + r" \\",
         r"\hline",
     ]
 
     for _, row in df.iterrows():
-        tid_cell  = str(row["TID"])
-        r_vals  = " & ".join(_fmt(row.get(c)) for c in recall_cols)
+        tid_cell = str(row["TID"])
+        r_vals = " & ".join(_fmt(row.get(c)) for c in recall_cols)
         f1_vals = " & ".join(_fmt(row.get(c)) for c in f1_cols)
         lines.append(f"{tid_cell} & {r_vals} & {f1_vals} \\\\")
 
     # Average row
     lines.append(r"\hline")
-    avg_r  = " & ".join(f"{df[c].mean():.2f}" if c in df.columns else "--" for c in recall_cols)
-    avg_f1 = " & ".join(f"{df[c].mean():.2f}" if c in df.columns else "--" for c in f1_cols)
+    avg_r = " & ".join(
+        f"{df[c].mean():.2f}" if c in df.columns else "--" for c in recall_cols
+    )
+    avg_f1 = " & ".join(
+        f"{df[c].mean():.2f}" if c in df.columns else "--" for c in f1_cols
+    )
     lines.append(f"\\textbf{{Avg}} & {avg_r} & {avg_f1} \\\\")
 
     lines += [r"\hline", r"\end{tabular}", r"\end{table}"]
@@ -232,9 +247,9 @@ def make_loc_parsed_scores_table(df: pd.DataFrame) -> str:
     df = process_df(df)
 
     models = ["M", "S", "G", "MT", "ST", "GT", "MR", "SR", "GR", "R"]
-    metric_keys    = ["F1",                  "distance_error"]
-    metric_labels  = ["F1 for address text", "Distance Error"]
-    n = len(models)   # 10
+    metric_keys = ["F1", "distance_error"]
+    metric_labels = ["F1 for address text", "Distance Error"]
+    n = len(models)  # 10
     g = len(metric_keys)  # 2
 
     col_spec = "l|" + "|".join("c" * n for _ in range(g))
@@ -251,10 +266,10 @@ def make_loc_parsed_scores_table(df: pd.DataFrame) -> str:
         f"\\begin{{tabular}}{{{col_spec}}}",
         r"\hline",
         r"\multirow{2}{*}{TID} & " + " & ".join(group_headers) + r" \\",
-        f"\\cline{{2-{1 + g*n}}}",
-        r"\multicolumn{1}{l|}{} & " + " & ".join(
-            " & ".join(models) for _ in range(g)
-        ) + r" \\",
+        f"\\cline{{2-{1 + g * n}}}",
+        r"\multicolumn{1}{l|}{} & "
+        + " & ".join(" & ".join(models) for _ in range(g))
+        + r" \\",
         r"\hline",
     ]
 
@@ -284,8 +299,8 @@ def make_angle_parsed_scores_table(df: pd.DataFrame) -> str:
     df = process_df(df)
 
     models = ["M", "S", "G", "MT", "ST", "GT", "MR", "SR", "GR", "R"]
-    metric_keys   = ["F1",                       "angle_error"]
-    metric_labels = ["F1 for parsed direction",  "Angle Error"]
+    metric_keys = ["F1", "angle_error"]
+    metric_labels = ["F1 for parsed direction", "Angle Error"]
     n = len(models)
     g = len(metric_keys)
 
@@ -303,10 +318,10 @@ def make_angle_parsed_scores_table(df: pd.DataFrame) -> str:
         f"\\begin{{tabular}}{{{col_spec}}}",
         r"\hline",
         r"\multirow{2}{*}{TID} & " + " & ".join(group_headers) + r" \\",
-        f"\\cline{{2-{1 + g*n}}}",
-        r"\multicolumn{1}{l|}{} & " + " & ".join(
-            " & ".join(models) for _ in range(g)
-        ) + r" \\",
+        f"\\cline{{2-{1 + g * n}}}",
+        r"\multicolumn{1}{l|}{} & "
+        + " & ".join(" & ".join(models) for _ in range(g))
+        + r" \\",
         r"\hline",
     ]
 
@@ -322,8 +337,9 @@ def make_angle_parsed_scores_table(df: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-def df_to_latex(df: pd.DataFrame, caption: str, label: str,
-                add_avg: bool = False) -> str:
+def df_to_latex(
+    df: pd.DataFrame, caption: str, label: str, add_avg: bool = False
+) -> str:
     df = process_df(df)
     df = reorder_df(df)
     latex = df.to_latex(
@@ -341,7 +357,7 @@ def df_to_latex(df: pd.DataFrame, caption: str, label: str,
 
 
 def make_relative_error_table() -> str:
-    """
+    r"""
     Combined relative-error table across Count, Distance, Area, Length.
 
     Row structure (mirrors the user's example):
@@ -356,10 +372,10 @@ def make_relative_error_table() -> str:
 
     # ── Load and tag each CSV ─────────────────────────────────────────────────
     groups = [
-        ("Count",    "count_parsed_scores.csv"),
+        ("Count", "count_parsed_scores.csv"),
         ("Distance", "distance_parsed_scores.csv"),
-        ("Area",     "area_parsed_scores.csv"),
-        ("Length",   "length_parsed_scores.csv"),
+        ("Area", "area_parsed_scores.csv"),
+        ("Length", "length_parsed_scores.csv"),
     ]
 
     # Build list of (group_label, tid, {model: value})
@@ -380,22 +396,23 @@ def make_relative_error_table() -> str:
         r"\label{tab:relative_error}",
         f"\\begin{{tabular}}{{{col_spec}}}",
         r"\hline",
-        "\\textbf{Type} & \\textbf{TID} & " + " & ".join(f"\\textbf{{{m}}}" for m in models) + r" \\",
+        "\\textbf{Type} & \\textbf{TID} & "
+        + " & ".join(f"\\textbf{{{m}}}" for m in models)
+        + r" \\",
         r"\hline",
     ]
 
     # Group rows by type label to know how many TIDs each has
-    from itertools import groupby
-    grouped = [(lbl, list(grp)) for lbl, grp in
-               groupby(rows, key=lambda r: r[0])]
+    grouped = [(lbl, list(grp)) for lbl, grp in groupby(rows, key=lambda r: r[0])]
 
     last_group_idx = len(grouped) - 1
     for g_idx, (group_label, group_rows) in enumerate(grouped):
         n_rows = len(group_rows)
         for r_idx, (_, tid, vals) in enumerate(group_rows):
             # Bold the minimum value in this row
-            numeric = {m: v for m, v in vals.items()
-                       if v is not None and not pd.isna(v)}
+            numeric = {
+                m: v for m, v in vals.items() if v is not None and not pd.isna(v)
+            }
             min_val = min(numeric.values()) if numeric else None
 
             cells = []
@@ -420,7 +437,6 @@ def make_relative_error_table() -> str:
             tid_cell = f"\\textbf{{{tid}}}"
             lines.append(f"{type_cell} & {tid_cell} & " + " & ".join(cells) + r" \\")
 
-
         # \midrule between groups (not after the last one)
         if g_idx < last_group_idx:
             lines.append(r"\hline")
@@ -440,10 +456,10 @@ def _is_correct(scores: dict, output_type: str) -> bool:
     numeric_types = {"count", "area", "length", "distance"}
     if output_type in numeric_types:
         err = scores.get("relative_error")
-        return err is not None and err <= 0.1
+        return err is not None and err <= REL_ERROR_THRESHOLD
     else:
         f1 = scores.get("F1", 0) or 0
-        return f1 >= 0.5
+        return f1 >= F1_THRESHOLD
 
 
 def _sql_correct_counts() -> dict:
@@ -480,7 +496,7 @@ def _sql_correct_counts() -> dict:
                 "output_type": output_type,
                 "ans_path": qf.replace("question.json", "baseline_answers.json"),
             }
-        except Exception:
+        except (KeyError, OSError, ValueError):
             continue
 
     results = {}
@@ -505,10 +521,12 @@ def _sql_correct_counts() -> dict:
                 continue
             try:
                 answers = json.load(open(ans_path))
-            except Exception:
+            except (OSError, ValueError):
                 continue
 
-            parsed_scores = answers.get(model_key, {}).get("parsed", {}).get("scores", {})
+            parsed_scores = (
+                answers.get(model_key, {}).get("parsed", {}).get("scores", {})
+            )
             if not parsed_scores.get("attempted", False):
                 continue
 
@@ -536,19 +554,19 @@ def make_sql_error_table(df: pd.DataFrame) -> str:
     # Index by model label for easy lookup
     data = df.set_index("label")
 
-    error_cols = [c for c in df.columns if c != "label" and c != "valid"]
+    error_cols = [c for c in df.columns if c not in ("label", "valid")]
 
     # Pretty-print error type names (keys are raw column names, no escaping)
     label_map = {
-        "timeout":                   "Timeout",
-        "column_does_not_exist":     "Column not found",
-        "sub_query_error":           "Sub-query error",
-        "function_does_not_exist":   "Function not found",
-        "other":                     "Other",
-        "missing_from":              "Missing FROM",
-        "syntax_error":              "Syntax error",
-        "relation_does_not_exist":   "Relation not found",
-        "operator_does_not_exist":   "Operator not found",
+        "timeout": "Timeout",
+        "column_does_not_exist": "Column not found",
+        "sub_query_error": "Sub-query error",
+        "function_does_not_exist": "Function not found",
+        "other": "Other",
+        "missing_from": "Missing FROM",
+        "syntax_error": "Syntax error",
+        "relation_does_not_exist": "Relation not found",
+        "operator_does_not_exist": "Operator not found",
     }
 
     col_spec = "l|" + "c" * len(present)
@@ -559,7 +577,9 @@ def make_sql_error_table(df: pd.DataFrame) -> str:
         r"\label{tab:sql_error_summary}",
         f"\\begin{{tabular}}{{{col_spec}}}",
         r"\hline",
-        "\\textbf{Error Type} & " + " & ".join(f"\\textbf{{{m}}}" for m in present) + r" \\",
+        "\\textbf{Error Type} & "
+        + " & ".join(f"\\textbf{{{m}}}" for m in present)
+        + r" \\",
         r"\hline",
     ]
 
@@ -569,7 +589,9 @@ def make_sql_error_table(df: pd.DataFrame) -> str:
     totals = {}
     for m in present:
         folder = model_folder.get(m)
-        cache_path = os.path.join(BASE_DIR, "cache", folder, "sql_exec.json") if folder else None
+        cache_path = (
+            os.path.join(BASE_DIR, "cache", folder, "sql_exec.json") if folder else None
+        )
         if cache_path and os.path.exists(cache_path):
             cache = json.load(open(cache_path))
             totals[m] = sum(len(item.get("records", [])) or 1 for item in cache)
@@ -590,51 +612,53 @@ def make_sql_error_table(df: pd.DataFrame) -> str:
 
     # ── Valid SQL group ───────────────────────────────────────────────────────
     # Valid SQL = executed without error (valid) + timed out (timeout)
-    valid_counts   = [get_count(m, "valid")   for m in present]
+    valid_counts = [get_count(m, "valid") for m in present]
     timeout_counts = [get_count(m, "timeout") for m in present]
-    valid_sql      = [v + t for v, t in zip(valid_counts, timeout_counts)]
+    valid_sql = [v + t for v, t in zip(valid_counts, timeout_counts, strict=False)]
     correct_counts = [
-        correct_stats[m]["correct"] if correct_stats.get(m) else 0
-        for m in present
+        correct_stats[m]["correct"] if correct_stats.get(m) else 0 for m in present
     ]
     incorrect_counts = [
         vs - t - c
-        for vs, t, c in zip(valid_sql, timeout_counts, correct_counts)
+        for vs, t, c in zip(valid_sql, timeout_counts, correct_counts, strict=False)
     ]
 
     lines.append(
         "\\textbf{Valid SQL} & "
-        + " & ".join(pct(v, m) for v, m in zip(valid_sql, present)) + r" \\"
+        + " & ".join(pct(v, m) for v, m in zip(valid_sql, present, strict=False))
+        + r" \\"
     )
     lines.append(
         r"\quad Timeout & "
-        + " & ".join(pct(t, m) for t, m in zip(timeout_counts, present)) + r" \\"
+        + " & ".join(pct(t, m) for t, m in zip(timeout_counts, present, strict=False))
+        + r" \\"
     )
     lines.append(
         r"\quad Correct Output & "
-        + " & ".join(pct(c, m) for c, m in zip(correct_counts, present)) + r" \\"
+        + " & ".join(pct(c, m) for c, m in zip(correct_counts, present, strict=False))
+        + r" \\"
     )
     lines.append(
         r"\quad Incorrect Output & "
-        + " & ".join(pct(i, m) for i, m in zip(incorrect_counts, present)) + r" \\"
+        + " & ".join(pct(i, m) for i, m in zip(incorrect_counts, present, strict=False))
+        + r" \\"
     )
     lines.append(r"\hline")
 
     # ── Invalid SQL group ─────────────────────────────────────────────────────
-    invalid_counts = [
-        sum(get_count(m, c) for c in error_type_cols)
-        for m in present
-    ]
+    invalid_counts = [sum(get_count(m, c) for c in error_type_cols) for m in present]
     lines.append(
         "\\textbf{Invalid SQL} & "
-        + " & ".join(pct(v, m) for v, m in zip(invalid_counts, present)) + r" \\"
+        + " & ".join(pct(v, m) for v, m in zip(invalid_counts, present, strict=False))
+        + r" \\"
     )
     for col in error_type_cols:
         pretty = label_map.get(col, col.replace("_", " ").title())
         vals = [get_count(m, col) for m in present]
         lines.append(
             f"\\quad {pretty} & "
-            + " & ".join(pct(v, m) for v, m in zip(vals, present)) + r" \\"
+            + " & ".join(pct(v, m) for v, m in zip(vals, present, strict=False))
+            + r" \\"
         )
 
     lines += [r"\hline", r"\end{tabular}", r"\end{table}"]
@@ -663,7 +687,7 @@ def make_prf_text_table() -> str:
 
     df["output_type"] = df["type"].apply(extract_output_type)
 
-    models  = ["M", "MT", "MR", "S", "ST", "SR", "G", "GT", "GR", "R"]
+    models = ["M", "MT", "MR", "S", "ST", "SR", "G", "GT", "GR", "R"]
     metrics = ["F1"]
     n = len(models)
     g = len(metrics)
@@ -717,7 +741,9 @@ def make_prf_text_table() -> str:
     for metric in metrics:
         for m in models:
             col = f"{metric}_{m}"
-            avg_cells.append(f"{agg_df[col].mean():.2f}" if col in agg_df.columns else "--")
+            avg_cells.append(
+                f"{agg_df[col].mean():.2f}" if col in agg_df.columns else "--"
+            )
     lines.append(r"\textbf{Avg} & " + " & ".join(avg_cells) + r" \\")
 
     lines += [r"\hline", r"\end{tabular}", r"\end{table*}"]
@@ -733,13 +759,13 @@ def main() -> None:
         return
 
     for fname in csv_files:
-        base    = fname[:-4]                          # strip .csv
-        inpath  = os.path.join(INPUT_DIR, fname)
+        base = fname[:-4]  # strip .csv
+        inpath = os.path.join(INPUT_DIR, fname)
         outpath = os.path.join(OUTPUT_DIR, base + ".tex")
 
-        df      = pd.read_csv(inpath)
+        df = pd.read_csv(inpath)
         caption = base.replace("_", " ").title()
-        label   = f"tab:{base}"
+        label = f"tab:{base}"
 
         if base == "name_text_recall_parsed_f1":
             latex = make_name_text_recall_table(df)
@@ -762,7 +788,9 @@ def main() -> None:
     rel_path = os.path.join(OUTPUT_DIR, "relative_error_scores.tex")
     with open(rel_path, "w") as fh:
         fh.write(make_relative_error_table())
-    print(f"  {'(combined)relative_error_scores':<45}  →  latex/relative_error_scores.tex")
+    print(
+        f"  {'(combined)relative_error_scores':<45}  →  latex/relative_error_scores.tex"
+    )
 
     # ── Extra: average P/R/F1 on free text output ─────────────────────────────
     prf_path = os.path.join(OUTPUT_DIR, "prf_text_average.tex")

@@ -6,8 +6,7 @@ The following table exists in the database:
 Table: pois
 Contains points of interest (POIs) in Vietnam.
 Columns: id, geometry, geo_wkt, poi_name,
-         amenity, tourism, shop, leisure,
-         cuisine, operator, wikidata
+         amenity, tourism, shop, leisure
 
 --- Column Notes ---
 geometry   : PostGIS geography type. Use for all spatial functions.

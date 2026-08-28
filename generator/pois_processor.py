@@ -1,75 +1,89 @@
 # %%
 import json
-from shapely.geometry import shape
-from shapely import wkb, wkt
-import psycopg2
 from glob import glob
 
+import psycopg2
+from shapely.geometry import shape
+
 # %%
-#pois = json.loads(open("/home/mrash013/spatial_llm/data/osm21_pois_California_USA.geojson", "r").read())['features']
-pois_files = glob('./osm_extract/pois/*.geojson')
+# pois = json.loads(
+#     open(
+#         "/home/mrash013/spatial_llm/data/osm21_pois_California_USA.geojson", "r"
+#     ).read()
+# )['features']
+pois_files = glob("./osm_extract/pois/*.geojson")
 
 
 # %%
 type_map = {
-            type(""): "string",
-            type(2342): "integer",
-            type(322.2323): "float",
-            type({'abc': 231}): "string"
-        }
-def define_schema(features, useTags = True):
+    str: "string",
+    int: "integer",
+    float: "float",
+    type({"abc": 231}): "string",
+}
+
+# Schema filter: keep tags present in at least this fraction of features.
+TAG_MIN_RATIO = 0.8
+
+
+def define_schema(features, useTags=True):
     aggregate_schema = {}
     for i in range(len(features)):
-        tags = features[i]['properties']['tagsMap'] if useTags else features[i]['properties']
+        tags = (
+            features[i]["properties"]["tagsMap"]
+            if useTags
+            else features[i]["properties"]
+        )
         for k in tags:
             # if 'wiki' in k or 'addr' in k or 'gnis' in k or 'source' in k or ':' in k:
             #     continue
             aggregate_schema[k] = aggregate_schema.get(k, 0) + 1
-    filtered_schema = {k: aggregate_schema[k] for k in aggregate_schema if (aggregate_schema[k]/len(features) > .8 or not useTags)}
-    final_schema = {
-        "geometry": {
-            "type": "string",
-            "coordinates": "array[double]"
-        }
+    filtered_schema = {
+        k: aggregate_schema[k]
+        for k in aggregate_schema
+        if (aggregate_schema[k] / len(features) > TAG_MIN_RATIO or not useTags)
     }
+    final_schema = {"geometry": {"type": "string", "coordinates": "array[double]"}}
     for i in range(len(features)):
-        tags = features[i]['properties']['tagsMap'] if useTags else features[i]['properties']
+        tags = (
+            features[i]["properties"]["tagsMap"]
+            if useTags
+            else features[i]["properties"]
+        )
         for k in tags:
             if k not in filtered_schema:
                 continue
             final_schema[k] = type_map[type(tags[k])]
-        if len(final_schema) == len(filtered_schema)+1:
+        if len(final_schema) == len(filtered_schema) + 1:
             break
     return final_schema
 
+
 def schema_to_sql(schema, table_name):
-    columns = ''
-    type_map = {
-        "string": "VARCHAR(255)",
-        "integer": "BIGINT",
-        "float": "DOUBLE"
-    }
+    columns = ""
+    type_map = {"string": "VARCHAR(255)", "integer": "BIGINT", "float": "DOUBLE"}
     for k in schema:
-        if k != 'geometry':
-            columns += '        %s %s,\n' % (k, type_map[schema[k]])
+        if k != "geometry":
+            columns += f"        {k} {type_map[schema[k]]},\n"
     columns = columns[:-2]
-    'customer_name VARCHAR(255) NOT NULL'
-    create_table = '''
-    DROP TABLE IF EXISTS %s CASCADE;
-    CREATE TABLE %s (
+    "customer_name VARCHAR(255) NOT NULL"
+    create_table = f"""
+    DROP TABLE IF EXISTS {table_name} CASCADE;
+    CREATE TABLE {table_name} (
         id SERIAL PRIMARY KEY,
-        geometry GEOGRAPHY(GEOMETRY, 4326),\n%s
+        geometry GEOGRAPHY(GEOMETRY, 4326),\n{columns}
     );
-    ''' % (table_name, table_name, columns)
+    """
     return create_table
+
 
 def run_sql(sql):
     conn = psycopg2.connect(
-        host = 'localhost',
-        dbname = 'osm_ca',
-        user = 'postgres',
-        password = 'postgres',
-        port = 5432
+        host="localhost",
+        dbname="osm_ca",
+        user="postgres",
+        password="postgres",
+        port=5432,
     )
     cur = conn.cursor()
     cur.execute(sql)
@@ -81,101 +95,141 @@ def run_sql(sql):
 def insert_rows_sql(table_name, schema, features, useTags=True):
     columns = []
     for k in schema:
-        if k != 'geometry':
+        if k != "geometry":
             columns.append(k)
-    values = ''
+    values = ""
     for f in features:
-        if 'name' in f['properties']['tagsMap']:
-            f['properties']['tagsMap']['poi_name'] = f['properties']['tagsMap']['name']
-        f['properties']['tagsMap']['osm_id'] = f['properties']['id']
-        value = "\n        ('%s'" % shape(f['geometry']).wkt
-        tags = f['properties']['tagsMap'] if useTags else f['properties']
+        if "name" in f["properties"]["tagsMap"]:
+            f["properties"]["tagsMap"]["poi_name"] = f["properties"]["tagsMap"]["name"]
+        f["properties"]["tagsMap"]["osm_id"] = f["properties"]["id"]
+        value = f"\n        ('{shape(f['geometry']).wkt}'"
+        tags = f["properties"]["tagsMap"] if useTags else f["properties"]
         for c in columns:
-            _c = c.replace('_', ':') if 'addr_' in c else c
+            _c = c.replace("_", ":") if "addr_" in c else c
             if _c in tags:
-                if schema[c] == 'string':
-                    value += ",'%s'" % str(tags[_c]).replace("'", "''")
+                if schema[c] == "string":
+                    tag = str(tags[_c]).replace("'", "''")
+                    value += f",'{tag}'"
                 else:
-                    value += ",%s" % str(tags[_c])
+                    value += f",{tags[_c]!s}"
             else:
-                value += ',NULL'
-        value += '),'
+                value += ",NULL"
+        value += "),"
         values += value
     values = values[:-1]
-    columns = 'geometry,' + ','.join(columns)
-    query = '''
-    INSERT INTO %s (%s) 
-    VALUES%s;
-    ''' % (table_name, columns, values)
+    columns = "geometry," + ",".join(columns)
+    # Trailing space after ({columns}) mirrors the original template byte-for-byte.
+    query = f"\n    INSERT INTO {table_name} ({columns}) \n    VALUES{values};\n    "
     return query
 
 
 # %%
 pois = []
 for f in pois_files:
-    pois += json.loads(open(f, "r").read())['features']
+    pois += json.loads(open(f).read())["features"]
     print(len(pois))
 
 # %%
-schema = json.loads(open('poi_schema.json','r').read())
+schema = json.loads(open("poi_schema.json").read())
 
-selected_tourism = ['aquarium', 'attraction',
-                       'viewpoint', 'art_gallery', 'theme_park', 'museum',
-                       'bed_and_breakfast', 'gallery', 'zoo', 'hotel']
-selected_amenities = ['restaurant', 'hospital', 'university', 'food', 'fast_food', 'coffee', 'cafe']
-selected_leisure = ['park', 'beach_resort', 'golf_course', 'nature_reserve', 'garden', 'stadium']
+selected_tourism = [
+    "aquarium",
+    "attraction",
+    "viewpoint",
+    "art_gallery",
+    "theme_park",
+    "museum",
+    "bed_and_breakfast",
+    "gallery",
+    "zoo",
+    "hotel",
+]
+selected_amenities = [
+    "restaurant",
+    "hospital",
+    "university",
+    "food",
+    "fast_food",
+    "coffee",
+    "cafe",
+]
+selected_leisure = [
+    "park",
+    "beach_resort",
+    "golf_course",
+    "nature_reserve",
+    "garden",
+    "stadium",
+]
 
-tourism_features = [p for p in pois if 'tourism' in p['properties']['tagsMap'] and p['properties']['tagsMap']['tourism'] in selected_tourism and 'name' in p['properties']['tagsMap']]
-amenties_features = [p for p in pois if 'amenity' in p['properties']['tagsMap'] and p['properties']['tagsMap']['amenity'] in selected_amenities and 'name' in p['properties']['tagsMap']]
-leisure_features = [p for p in pois if 'leisure' in p['properties']['tagsMap'] and p['properties']['tagsMap']['leisure'] in selected_leisure and 'name' in p['properties']['tagsMap']]
+tourism_features = [
+    p
+    for p in pois
+    if "tourism" in p["properties"]["tagsMap"]
+    and p["properties"]["tagsMap"]["tourism"] in selected_tourism
+    and "name" in p["properties"]["tagsMap"]
+]
+amenties_features = [
+    p
+    for p in pois
+    if "amenity" in p["properties"]["tagsMap"]
+    and p["properties"]["tagsMap"]["amenity"] in selected_amenities
+    and "name" in p["properties"]["tagsMap"]
+]
+leisure_features = [
+    p
+    for p in pois
+    if "leisure" in p["properties"]["tagsMap"]
+    and p["properties"]["tagsMap"]["leisure"] in selected_leisure
+    and "name" in p["properties"]["tagsMap"]
+]
 
 categorized_features = {}
 
-def select_features(features, category_tag='tourism'):
+
+def select_features(features, category_tag="tourism"):
     for f in features:
-        tags = f['properties']['tagsMap']
+        tags = f["properties"]["tagsMap"]
         category = tags[category_tag]
         record = {}
-        record['osm_id'] = f['properties']['id']
+        record["osm_id"] = f["properties"]["id"]
         for t in tags:
             if t in schema:
                 record[t] = tags[t]
             # elif t == 'name':
             #     record['poi_name'] = tags[t]
-        categorized_features[category] = categorized_features.get(category, []) + [record]
+        categorized_features[category] = [
+            *categorized_features.get(category, []),
+            record,
+        ]
 
 
+select_features(tourism_features, "tourism")
+select_features(amenties_features, "amenity")
+select_features(leisure_features, "leisure")
 
-
-
-select_features(tourism_features, 'tourism')
-select_features(amenties_features, 'amenity')
-select_features(leisure_features, 'leisure')
-
-with open('selected_features.json', 'w') as f:
+with open("selected_features.json", "w") as f:
     f.write(json.dumps(categorized_features, indent=4))
 
 
 category_attributes = {}
 
-for c in categorized_features:
+for c, cat_features in categorized_features.items():
     keys = []
-    for f in categorized_features[c]:
+    for f in cat_features:
         keys += f.keys()
     category_attributes[c] = list(set(keys))
 
-with open('category_attributes.json', 'w') as f:
+with open("category_attributes.json", "w") as f:
     f.write(json.dumps(category_attributes, indent=4))
-
-
 
 
 # %%
 # run_sql('CREATE EXTENSION postgis;')
 
 # %%
-schema = json.loads(open('poi_schema.json', 'r').read())
-run_sql(schema_to_sql(schema, 'pois'))
+schema = json.loads(open("poi_schema.json").read())
+run_sql(schema_to_sql(schema, "pois"))
 # print(schema_to_sql(schema, 'pois'))
 
 # %%
@@ -183,12 +237,12 @@ run_sql(schema_to_sql(schema, 'pois'))
 # print sql query to create pois table
 
 
-
 def insert_features(features):
-    for i in range(0,len(features), 100):
-        _features = features[i:min(len(features),i+100)]
-        run_sql(insert_rows_sql('pois', schema, _features, useTags=True))
+    for i in range(0, len(features), 100):
+        _features = features[i : min(len(features), i + 100)]
+        run_sql(insert_rows_sql("pois", schema, _features, useTags=True))
         # print(str(i+100) + ' out of ' + len(features))
+
 
 insert_features(tourism_features)
 insert_features(amenties_features)
@@ -321,7 +375,9 @@ insert_features(leisure_features)
 #     for row in categorized_features[k]:
 #         for t in row:
 #             if t in selected_filter_attributes[k]:
-#                 filter_attirbute_values[k][t] = filter_attirbute_values[k].get(t, []) + [row[t]]
+#                 filter_attirbute_values[k][t] = (
+#                     filter_attirbute_values[k].get(t, []) + [row[t]]
+#                 )
 
 # for k in filter_attirbute_values:
 #     print("### " + k)
@@ -330,6 +386,8 @@ insert_features(leisure_features)
 #         print(t, filter_attirbute_values[k][t])
 
 # # %%
-# print("SELECT geometry,poi_name FROM pois\nWHERE leisure = 'garden'\nORDER BY geometry <-> (SELECT geometry FROM pois WHERE poi_name = 'Carnegie Art Museum' LIMIT 1)\nLIMIT 1;\n")
-
-
+# print(
+#     "SELECT geometry,poi_name FROM pois\nWHERE leisure = 'garden'\n"
+#     "ORDER BY geometry <-> (SELECT geometry FROM pois "
+#     "WHERE poi_name = 'Carnegie Art Museum' LIMIT 1)\nLIMIT 1;\n"
+# )

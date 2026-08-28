@@ -3,25 +3,28 @@
 
 # %%
 import json
+import os
 import random
-import psycopg2
 import time
-import shapely
-from tqdm import tqdm
-from textblob.blob import Word
+from io import StringIO
+
 import language_tool_python
 import pandas as pd
+import psycopg2
 import requests
-import os
+import shapely
 from dateutil.parser import parse
-from io import StringIO  
+from textblob.blob import Word
+from tqdm import tqdm
+
+
 def run_sql_select(sql, return_dict=False):
     conn = psycopg2.connect(
-        host = 'localhost',
-        dbname = 'osm_ca',
-        user = 'postgres',
-        password = 'postgres',
-        port = 5432
+        host="localhost",
+        dbname="osm_ca",
+        user="postgres",
+        password="postgres",
+        port=5432,
     )
     cur = conn.cursor()
     cur.execute(sql)
@@ -32,116 +35,242 @@ def run_sql_select(sql, return_dict=False):
     if return_dict:
         answers_dict = []
         for i in range(len(records)):
-            answers_dict.append({
-                colnames[j]: records[i][j] for j in range(len(colnames)) if records[i][j] is not None
-            })
+            answers_dict.append(
+                {
+                    colnames[j]: records[i][j]
+                    for j in range(len(colnames))
+                    if records[i][j] is not None
+                }
+            )
         return answers_dict
     return records
 
-output_folder = './questions/'
+
+output_folder = "./questions/"
 N = 1000
 
+# Distinct POI categories required by the "towards" verifiers.
+MIN_DISTINCT_CATEGORIES = 3
+# Question count target for the multi-source (Wikipedia) generation loops.
+MULTI_SOURCE_TARGET_COUNT = 150
+
 # %%
-language_tool = language_tool_python.LanguageTool('en-US')
-is_bad_rule = lambda rule: 'spelling' in rule.message.lower() and len(rule.replacements) and rule.replacements[0][0].isupper()
+language_tool = language_tool_python.LanguageTool("en-US")
+
+
+def is_bad_rule(rule):
+    return (
+        "spelling" in rule.message.lower()
+        and len(rule.replacements)
+        and rule.replacements[0][0].isupper()
+    )
 
 
 # %%
 pois_selector = {
-    'tourism': ['aquarium', 'attraction',
-                       'viewpoint', 'art gallery', 'theme park', 'museum',
-                       'bed and breakfast', 'gallery', 'zoo', 'hotel'],
-    'amenity': ['restaurant', 'hospital', 'university', 'food', 'fast food restaurant', 'coffee shop', 'cafe'],
-    'leisure': ['park', 'beach resort', 'golf course', 'nature reserve', 'garden', 'stadium']}
+    "tourism": [
+        "aquarium",
+        "attraction",
+        "viewpoint",
+        "art gallery",
+        "theme park",
+        "museum",
+        "bed and breakfast",
+        "gallery",
+        "zoo",
+        "hotel",
+    ],
+    "amenity": [
+        "restaurant",
+        "hospital",
+        "university",
+        "food",
+        "fast food restaurant",
+        "coffee shop",
+        "cafe",
+    ],
+    "leisure": [
+        "park",
+        "beach resort",
+        "golf course",
+        "nature reserve",
+        "garden",
+        "stadium",
+    ],
+}
 
-poi_filters = json.loads(open('filter_labels.json','r').read())
+poi_filters = json.loads(open("filter_labels.json").read())
 
 
 park_lake_selector = {
-    'parks': ["recreation ground", "common", "nature reserve", "park", "garden", "sports centre", "golf course", "marina"],
-    'water': ["bay", "harbour", "lake", "reservoir"],
+    "parks": [
+        "recreation ground",
+        "common",
+        "nature reserve",
+        "park",
+        "garden",
+        "sports centre",
+        "golf course",
+        "marina",
+    ],
+    "water": ["bay", "harbour", "lake", "reservoir"],
 }
 
 road_waterway_selector = {
-    'roads': ["road", "footway", "cycleway", "secondary", "pedestrian", "primary", "residential", "track", "motorway"],
-    'waterway': ["canal", "river", "stream"],
+    "roads": [
+        "road",
+        "footway",
+        "cycleway",
+        "secondary",
+        "pedestrian",
+        "primary",
+        "residential",
+        "track",
+        "motorway",
+    ],
+    "waterway": ["canal", "river", "stream"],
     #'natural': ['coastline']
 }
 
 direction_filters = [
-    ['north', '((degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 0.0 AND 22.5) OR (degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 337.5 AND 360))'],
-    ['northeast', 'degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 22.5 AND 67.5'],
-    ['east', 'degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 67.5 AND 112.5'],
-    ['southeast', 'degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 112.5 AND 157.5'],
-    ['south', 'degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 157.5 AND 202.5'],
-    ['southwest', 'degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 202.5 AND 247.5'],
-    ['west', 'degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 247.5 AND 292.5'],
-    ['northwest', 'degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 292.5 AND 337.5'],
+    [
+        "north",
+        "((degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 0.0 AND 22.5) "
+        "OR (degrees(ST_Azimuth(origin.geometry, pois.geometry)) "
+        "BETWEEN 337.5 AND 360))",
+    ],
+    [
+        "northeast",
+        "degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 22.5 AND 67.5",
+    ],
+    [
+        "east",
+        "degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 67.5 AND 112.5",
+    ],
+    [
+        "southeast",
+        "degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 112.5 AND 157.5",
+    ],
+    [
+        "south",
+        "degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 157.5 AND 202.5",
+    ],
+    [
+        "southwest",
+        "degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 202.5 AND 247.5",
+    ],
+    [
+        "west",
+        "degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 247.5 AND 292.5",
+    ],
+    [
+        "northwest",
+        "degrees(ST_Azimuth(origin.geometry, pois.geometry)) BETWEEN 292.5 AND 337.5",
+    ],
 ]
 
 
 def poi_category_to_sql_name(value):
-    if ' ' in value:
-        if value == 'coffee shop':
-            value = 'coffee'
-        elif value == 'fast food restaurant':
-            value = 'fast_food'
+    if " " in value:
+        if value == "coffee shop":
+            value = "coffee"
+        elif value == "fast food restaurant":
+            value = "fast_food"
         else:
-            value = value.replace(' ', '_')
+            value = value.replace(" ", "_")
     return value
 
-regions_selector = ["city","town","village", "island","municipality","county","neighbourhood","suburb","state"]
 
-sql_no_ref = "SELECT * FROM TABLE2  TABLESAMPLE SYSTEM(5) WHERE PREDICATE MUST_HAVE IS NOT NULL LIMIT 1"
-sql_with_ref = "SELECT * FROM TABLE2 TABLESAMPLE SYSTEM(5) WHERE PREDICATE MUST_HAVE IS NOT NULL AND ST_DWithin(TABLE2.geometry, ST_GeomFromText('WKT',4326)::geography, 1E5) LIMIT 1"
+regions_selector = [
+    "city",
+    "town",
+    "village",
+    "island",
+    "municipality",
+    "county",
+    "neighbourhood",
+    "suburb",
+    "state",
+]
+
+sql_no_ref = (
+    "SELECT * FROM TABLE2  TABLESAMPLE SYSTEM(5) "
+    "WHERE PREDICATE MUST_HAVE IS NOT NULL LIMIT 1"
+)
+sql_with_ref = (
+    "SELECT * FROM TABLE2 TABLESAMPLE SYSTEM(5) "
+    "WHERE PREDICATE MUST_HAVE IS NOT NULL "
+    "AND ST_DWithin(TABLE2.geometry, ST_GeomFromText('WKT',4326)::geography, 1E5) "
+    "LIMIT 1"
+)
+
 
 # %%
 def verify_geo_wkts(template_tokens, selected_entities, sql):
     """
     For each [k_wkt] token in template_tokens, verify that:
-    1. selected_entities[k]['geo_wkt'] is present in the built SQL (correct substitution).
+    1. selected_entities[k]['geo_wkt'] is present in the built SQL
+       (correct substitution).
     2. The geometry matches the DB record for that entity (looked up by osm_id).
     """
     for tt in template_tokens:
         token_key = tt[0]
-        if not token_key.endswith('_wkt]'):
+        if not token_key.endswith("_wkt]"):
             continue
-        entity_key = token_key.replace('_wkt]', ']')
+        entity_key = token_key.replace("_wkt]", "]")
         if entity_key not in selected_entities:
             continue
         entity = selected_entities[entity_key]
-        if 'geo_wkt' not in entity:
+        if "geo_wkt" not in entity:
             continue
-        expected_wkt = entity['geo_wkt']
+        expected_wkt = entity["geo_wkt"]
         # Check 1: WKT was correctly substituted into the SQL
-        assert expected_wkt in sql, \
-            f"geo_wkt for {entity_key} not found in SQL. Expected '{expected_wkt}' to appear in:\n{sql}"
+        assert expected_wkt in sql, (
+            f"geo_wkt for {entity_key} not found in SQL. "
+            f"Expected '{expected_wkt}' to appear in:\n{sql}"
+        )
         # Check 2: verify geometry matches the DB record via osm_id
-        for subkey, table in [('poi', 'pois'), ('region', 'regions')]:
+        for subkey, table in [("poi", "pois"), ("region", "regions")]:
             if subkey in entity:
-                osm_id = entity[subkey].get('osm_id')
+                osm_id = entity[subkey].get("osm_id")
                 if osm_id:
                     db_result = run_sql_select(
                         f"SELECT geometry FROM {table} WHERE osm_id = {osm_id} LIMIT 1"
                     )
-                    assert db_result, \
-                        f"No DB record found in {table} for osm_id={osm_id} (entity {entity_key})"
+                    assert db_result, (
+                        f"No DB record found in {table} for osm_id={osm_id} "
+                        f"(entity {entity_key})"
+                    )
                     db_wkt = shapely.to_wkt(shapely.from_wkb(db_result[0][0]))
-                    assert db_wkt == expected_wkt, \
-                        f"geo_wkt mismatch for {entity_key} (osm_id={osm_id}): stored='{expected_wkt}' vs db='{db_wkt}'"
+                    assert db_wkt == expected_wkt, (
+                        f"geo_wkt mismatch for {entity_key} (osm_id={osm_id}): "
+                        f"stored='{expected_wkt}' vs db='{db_wkt}'"
+                    )
                 break
 
 
-def question_generator(text_templates, variable_types, template_tokens, sql_template, answer_type, verifier, n=100, disable_progress=False):
-    '''
-    @text_templates: an array containing text templates with substrings that contain the template variables.
+def question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    sql_template,
+    answer_type,
+    verifier,
+    n=100,
+    disable_progress=False,
+):
+    """
+    @text_templates: an array containing text templates with substrings that
+    contain the template variables.
     @variable_types: the entity type for each variable
-    @template_tokens: defines the tokens to be replaced in the template and how they should be populated from the selected instances in the based on the variable types
+    @template_tokens: defines the tokens to be replaced in the template and how
+    they should be populated from the selected instances in the based on the
+    variable types
     @template_sql: sql query to retreive answers based on selected variables
     @answer_type: a string identifyibng the expected final answer for the text question
     @verifier: a function that verifies the selected variables and checks the answer
     @n: the number of questions to be generated
-    '''
+    """
     generated_questions = []
     progress = None
     if not disable_progress:
@@ -152,26 +281,44 @@ def question_generator(text_templates, variable_types, template_tokens, sql_temp
         skip_iteration = False
         geo_wkt = None
         poi_mbr = [1e100, 1e100, -1e100, -1e100]
-        for k,v in variable_types:
-            if 'poi_filter' in v:
+        for k, v in variable_types:
+            if "poi_filter" in v:
                 sub_category = random.choice(list(poi_filters.keys()))
-                main_cateogory = None
-                for kk in pois_selector:
-                    if sub_category in pois_selector[kk]:
+                for kk, categories in pois_selector.items():
+                    if sub_category in categories:
                         main_category = kk
                         break
                 selected_filter = random.choice(poi_filters[sub_category])
-                selected_entities[k] = {'main_category': main_category, 'sub_category': sub_category, 'poi_filter_desc':  selected_filter[0], 'poi_filter_sql': selected_filter[1]}  
-            elif 'poi' in v:
+                selected_entities[k] = {
+                    "main_category": main_category,
+                    "sub_category": sub_category,
+                    "poi_filter_desc": selected_filter[0],
+                    "poi_filter_sql": selected_filter[1],
+                }
+            elif "poi" in v:
                 main_category = random.choice(list(pois_selector.keys()))
                 sub_category = random.choice(pois_selector[main_category])
-                if 'distance_limited' in v and ref_geo_wkt is not None:
-                    predicate = "%s ILIKE '%s' AND " % (main_category, poi_category_to_sql_name(sub_category))
-                    if sub_category == 'restaurant' or sub_category == 'food':
-                        predicate = " (amenity ILIKE 'fast_food' OR amenity ILIKE 'restaurant' OR amenity ILIKE 'food') AND "
-                    elif sub_category == 'cafe' or sub_category == 'coffee_shop':
-                        predicate = " (amenity ILIKE 'cafe' OR amenity ILIKE 'coffee_shop') AND "
-                    _sql = sql_with_ref.replace('TABLE2', 'pois').replace('MUST_HAVE', 'addr_state').replace('WKT', ref_geo_wkt).replace('PREDICATE', predicate)
+                if "distance_limited" in v and ref_geo_wkt is not None:
+                    predicate = (
+                        f"{main_category} ILIKE "
+                        f"'{poi_category_to_sql_name(sub_category)}' AND "
+                    )
+                    if sub_category in ("restaurant", "food"):
+                        predicate = (
+                            " (amenity ILIKE 'fast_food' OR amenity ILIKE 'restaurant'"
+                            " OR amenity ILIKE 'food') AND "
+                        )
+                    elif sub_category in ("cafe", "coffee_shop"):
+                        predicate = (
+                            " (amenity ILIKE 'cafe' OR amenity ILIKE 'coffee_shop')"
+                            " AND "
+                        )
+                    _sql = (
+                        sql_with_ref.replace("TABLE2", "pois")
+                        .replace("MUST_HAVE", "addr_state")
+                        .replace("WKT", ref_geo_wkt)
+                        .replace("PREDICATE", predicate)
+                    )
                     # print(_sql)
                     output = run_sql_select(_sql, return_dict=True)
                     if len(output) == 0:
@@ -179,9 +326,18 @@ def question_generator(text_templates, variable_types, template_tokens, sql_temp
                         break
                     else:
                         random_poi = output[0]
-                elif 'mbr_limited' in v and poi_mbr is not None:
+                elif "mbr_limited" in v and poi_mbr is not None:
                     mbr_wkt = shapely.box(*poi_mbr).wkt
-                    output = run_sql_select(sql_no_ref.replace('TABLE2', 'pois').replace('MUST_HAVE', 'addr_state').replace('PREDICATE', "ST_Intersects(geometry, ST_GeomFromText('%s',4326)::geography) AND " % (mbr_wkt)), return_dict=True)
+                    output = run_sql_select(
+                        sql_no_ref.replace("TABLE2", "pois")
+                        .replace("MUST_HAVE", "addr_state")
+                        .replace(
+                            "PREDICATE",
+                            "ST_Intersects(geometry, "
+                            f"ST_GeomFromText('{mbr_wkt}',4326)::geography) AND ",
+                        ),
+                        return_dict=True,
+                    )
                     if len(output) == 0:
                         skip_iteration = True
                         break
@@ -195,8 +351,10 @@ def question_generator(text_templates, variable_types, template_tokens, sql_temp
                                 sub_category = random_poi[kk]
                                 break
 
-                elif 'multi_source' in v:
-                    select_sql = f'''
+                elif "multi_source" in v:
+                    knn_main_category = selected_entities["[1]"]["main_category"]
+                    knn_sub_category = selected_entities["[1]"]["sub_category"]
+                    select_sql = f"""
                     SELECT p.*
                     FROM pois p TABLESAMPLE SYSTEM (5)
                     JOIN LATERAL (
@@ -204,7 +362,7 @@ def question_generator(text_templates, variable_types, template_tokens, sql_temp
                     FROM pois n
                     WHERE n.id <> p.id
                         AND n.addr_state IS NOT NULL
-                        AND n.{selected_entities['[1]']['main_category']} ILIKE '{selected_entities['[1]']['sub_category']}'
+                        AND n.{knn_main_category} ILIKE '{knn_sub_category}'
                         AND n.wikidata IS NOT NULL
                     ORDER BY ST_Distance(p.geometry, n.geometry)
                     LIMIT 1
@@ -212,7 +370,7 @@ def question_generator(text_templates, variable_types, template_tokens, sql_temp
                     WHERE p.{main_category} ILIKE '{sub_category}'
                     AND p.addr_state IS NOT NULL
                     LIMIT 1;
-                    '''
+                    """
                     # print(select_sql)
                     output = run_sql_select(select_sql, return_dict=True)
                     # print('point with knn with wikidata: ', len(output))
@@ -221,9 +379,19 @@ def question_generator(text_templates, variable_types, template_tokens, sql_temp
                         break
                     else:
                         random_poi = output[0]
-                        ref_geo_wkt = shapely.to_wkt(shapely.from_wkb(random_poi['geometry']))
+                        ref_geo_wkt = shapely.to_wkt(
+                            shapely.from_wkb(random_poi["geometry"])
+                        )
                 else:
-                    select_sql = sql_no_ref.replace('TABLE2', 'pois').replace('MUST_HAVE', 'addr_state').replace('PREDICATE', "%s ILIKE '%s' AND " % (main_category, poi_category_to_sql_name(sub_category)))
+                    select_sql = (
+                        sql_no_ref.replace("TABLE2", "pois")
+                        .replace("MUST_HAVE", "addr_state")
+                        .replace(
+                            "PREDICATE",
+                            f"{main_category} ILIKE "
+                            f"'{poi_category_to_sql_name(sub_category)}' AND ",
+                        )
+                    )
                     # print(select_sql)
                     output = run_sql_select(select_sql, return_dict=True)
                     if len(output) == 0:
@@ -231,22 +399,41 @@ def question_generator(text_templates, variable_types, template_tokens, sql_temp
                         break
                     else:
                         random_poi = output[0]
-                        ref_geo_wkt = shapely.to_wkt(shapely.from_wkb(random_poi['geometry']))
-                display_name = random_poi['poi_name']
-                if 'addr_city' in random_poi:
-                    display_name += ', ' + random_poi['addr_city']
-                if 'addr_state' in random_poi:
-                    display_name += ', ' + random_poi['addr_state']
-                geo_wkt = shapely.to_wkt(shapely.from_wkb(random_poi['geometry']))
-                p = shapely.from_wkb(random_poi['geometry'])
-                poi_mbr = [min(poi_mbr[0], p.x), min(poi_mbr[1], p.y), max(poi_mbr[2], p.x), max(poi_mbr[3], p.y)]
-                random_poi['geometry'] = geo_wkt
-                selected_entities[k] = {'main_category': main_category, 'sub_category': sub_category, 'display_name': display_name, 'geo_wkt': geo_wkt, 'poi': random_poi}
-            elif 'region' in v:
-                predicate = ''
+                        ref_geo_wkt = shapely.to_wkt(
+                            shapely.from_wkb(random_poi["geometry"])
+                        )
+                display_name = random_poi["poi_name"]
+                if "addr_city" in random_poi:
+                    display_name += ", " + random_poi["addr_city"]
+                if "addr_state" in random_poi:
+                    display_name += ", " + random_poi["addr_state"]
+                geo_wkt = shapely.to_wkt(shapely.from_wkb(random_poi["geometry"]))
+                p = shapely.from_wkb(random_poi["geometry"])
+                poi_mbr = [
+                    min(poi_mbr[0], p.x),
+                    min(poi_mbr[1], p.y),
+                    max(poi_mbr[2], p.x),
+                    max(poi_mbr[3], p.y),
+                ]
+                random_poi["geometry"] = geo_wkt
+                selected_entities[k] = {
+                    "main_category": main_category,
+                    "sub_category": sub_category,
+                    "display_name": display_name,
+                    "geo_wkt": geo_wkt,
+                    "poi": random_poi,
+                }
+            elif "region" in v:
+                predicate = ""
                 # if 'mbr_limited' in v:
-                predicate =  " ST_Intersects(geometry, ST_GeomFromText('%s',4326)::geography) " % (geo_wkt)
-                ss = '''SELECT * FROM regions WHERE PREDICATE AND wikipedia IS NOT NULL LIMIT 1'''.replace('PREDICATE', predicate)
+                predicate = (
+                    " ST_Intersects(geometry, "
+                    f"ST_GeomFromText('{geo_wkt}',4326)::geography) "
+                )
+                ss = (
+                    "SELECT * FROM regions WHERE PREDICATE "
+                    "AND wikipedia IS NOT NULL LIMIT 1"
+                ).replace("PREDICATE", predicate)
                 output = run_sql_select(ss, return_dict=True)
                 # print(len(output))
                 if len(output) == 0:
@@ -254,43 +441,78 @@ def question_generator(text_templates, variable_types, template_tokens, sql_temp
                     break
                 random_region = output[0]
                 # print(random_region['wikipedia'])
-                geo_wkt = shapely.to_wkt(shapely.from_wkb(random_region['geometry']))
-                random_region['geometry'] = geo_wkt
-                selected_entities[k] = {'region_name': random_region['wikipedia'][3:], 'geo_wkt': geo_wkt, 'region': random_region}
-            elif 'park_lake' in v:
+                geo_wkt = shapely.to_wkt(shapely.from_wkb(random_region["geometry"]))
+                random_region["geometry"] = geo_wkt
+                selected_entities[k] = {
+                    "region_name": random_region["wikipedia"][3:],
+                    "geo_wkt": geo_wkt,
+                    "region": random_region,
+                }
+            elif "park_lake" in v:
                 __tmp = random.choice(list(park_lake_selector.keys()))
-                table = 'parks' if __tmp == 'parks' else 'lakes'
-                main_category = 'leisure' if table == 'parks' else __tmp
+                table = "parks" if __tmp == "parks" else "lakes"
+                main_category = "leisure" if table == "parks" else __tmp
                 sub_category = random.choice(list(park_lake_selector[__tmp]))
-                predicate = 'leisure IS NOT NULL AND ' if main_category == 'leisure' else " (waterway ILIKE '%s' OR water ILIKE '%s') AND " % (sub_category, sub_category)
-                predicate = predicate + ' ST_Area(geometry) > 0 AND '
-                output = run_sql_select(sql_no_ref.replace('TABLE2', table).replace('MUST_HAVE', 'wikipedia').replace('PREDICATE', predicate), return_dict=True)
+                if main_category == "leisure":
+                    predicate = "leisure IS NOT NULL AND "
+                else:
+                    predicate = (
+                        f" (waterway ILIKE '{sub_category}' "
+                        f"OR water ILIKE '{sub_category}') AND "
+                    )
+                predicate = predicate + " ST_Area(geometry) > 0 AND "
+                output = run_sql_select(
+                    sql_no_ref.replace("TABLE2", table)
+                    .replace("MUST_HAVE", "wikipedia")
+                    .replace("PREDICATE", predicate),
+                    return_dict=True,
+                )
                 if len(output) == 0:
                     skip_iteration = True
                     break
                 random_obj = output[0]
-                geo_wkt = shapely.to_wkt(shapely.from_wkb(random_obj['geometry']))
-                random_obj['geometry'] = geo_wkt
-                selected_entities[k] = {'park_name': random_obj['wikipedia'][3:], 'main_category': main_category, 'sub_category': sub_category, 'table': table, Word(table).singularize(): random_obj}
-            elif 'road_waterway' in v:
+                geo_wkt = shapely.to_wkt(shapely.from_wkb(random_obj["geometry"]))
+                random_obj["geometry"] = geo_wkt
+                selected_entities[k] = {
+                    "park_name": random_obj["wikipedia"][3:],
+                    "main_category": main_category,
+                    "sub_category": sub_category,
+                    "table": table,
+                    Word(table).singularize(): random_obj,
+                }
+            elif "road_waterway" in v:
                 __tmp = random.choice(list(road_waterway_selector.keys()))
-                table = 'roads' if __tmp == 'roads' else 'lakes'
-                main_category = 'highway' if table == 'roads' else __tmp
+                table = "roads" if __tmp == "roads" else "lakes"
+                main_category = "highway" if table == "roads" else __tmp
                 sub_category = random.choice(list(road_waterway_selector[__tmp]))
-                if main_category == 'highway' and not (sub_category[-3:] == 'way' or sub_category == 'road'):
-                    sub_category_label = sub_category + ' road'
+                if main_category == "highway" and not (
+                    sub_category[-3:] == "way" or sub_category == "road"
+                ):
+                    sub_category_label = sub_category + " road"
                 else:
                     sub_category_label = sub_category
-                predicate = "(road_name IS NOT NULL OR wikipedia IS NOT NULL) AND highway =  '%s' " % sub_category if main_category == 'highway' else "(lake_name IS NOT NULL OR wikipedia IS NOT NULL) AND (waterway = '%s' OR water = '%s') " % (sub_category, sub_category)
+                if main_category == "highway":
+                    predicate = (
+                        "(road_name IS NOT NULL OR wikipedia IS NOT NULL) "
+                        f"AND highway =  '{sub_category}' "
+                    )
+                else:
+                    predicate = (
+                        "(lake_name IS NOT NULL OR wikipedia IS NOT NULL) "
+                        f"AND (waterway = '{sub_category}' "
+                        f"OR water = '{sub_category}') "
+                    )
                 # predicate = predicate + ' ST_Length(geometry) > 0 AND '
-                ss = '''
+                ss = """
                 SELECT * FROM TABLE2
                 TABLESAMPLE SYSTEM(5)
                 WHERE PREDICATE
                 LIMIT 1;
-                '''
-                ss = ss.replace('TABLE2', table).replace('PREDICATE', predicate)
-                # # ss = sql_no_ref.replace('TABLE2', table).replace('MUST_HAVE', 'wikipedia').replace('PREDICATE', predicate)
+                """
+                ss = ss.replace("TABLE2", table).replace("PREDICATE", predicate)
+                # # ss = sql_no_ref.replace('TABLE2', table)
+                # #     .replace('MUST_HAVE', 'wikipedia')
+                # #     .replace('PREDICATE', predicate)
                 # # print(ss)
                 output = run_sql_select(ss, return_dict=True)
                 # print(sub_category, len(output))
@@ -298,48 +520,75 @@ def question_generator(text_templates, variable_types, template_tokens, sql_temp
                     skip_iteration = True
                     break
                 random_obj = output[0]
-                geo_wkt = shapely.to_wkt(shapely.from_wkb(random_obj['geometry']))
-                random_obj['geometry'] = geo_wkt
-                selected_entities[k] = {'main_category': main_category, 'sub_category': sub_category, 'sub_category_label': sub_category_label, 'table': table, Word(table).singularize(): random_obj}
-                # selected_entities[k] = {'main_category': main_category, 'sub_category': sub_category, 'sub_category_label': sub_category_label, 'table': table}
-            elif 'distance' in v:
-                distance = random.randint(1,200)
+                geo_wkt = shapely.to_wkt(shapely.from_wkb(random_obj["geometry"]))
+                random_obj["geometry"] = geo_wkt
+                selected_entities[k] = {
+                    "main_category": main_category,
+                    "sub_category": sub_category,
+                    "sub_category_label": sub_category_label,
+                    "table": table,
+                    Word(table).singularize(): random_obj,
+                }
+                # selected_entities[k] = {'main_category': main_category,
+                #     'sub_category': sub_category,
+                #     'sub_category_label': sub_category_label, 'table': table}
+            elif "distance" in v:
+                distance = random.randint(1, 200)
                 distance = (distance - (distance % 10)) * 1000
-                selected_entities[k] = {'distance': distance, 'text': '%d kilometers' % int(distance/1000.0)}
-            elif 'direction' in v:
+                selected_entities[k] = {
+                    "distance": distance,
+                    "text": f"{int(distance / 1000.0)} kilometers",
+                }
+            elif "direction" in v:
                 dir_desc, dir_sql = random.choice(direction_filters)
-                selected_entities[k] = {'direction_desc': dir_desc, 'direction_predicate': dir_sql}
+                selected_entities[k] = {
+                    "direction_desc": dir_desc,
+                    "direction_predicate": dir_sql,
+                }
         if skip_iteration:
             continue
         # print(selected_entities)
         t = random.choice(text_templates)
         sql = str(sql_template)
-        if "[1_type] = '[1]'" in sql_template and 'sub_category' in selected_entities:
-            if selected_entities['sub_category'] == 'restaurant' or selected_entities['sub_category'] == 'food':
-                sql = sql.replace("[1_type] = '[1]'","(amenity ILIKE 'fast_food' OR amenity ILIKE 'restaurant' OR amenity ILIKE 'food')")
-            elif selected_entities['sub_category'] == 'cafe' or selected_entities['sub_category'] == 'coffee_shop':
-                sql = sql.replace("[1_type] = '[1]'","(amenity ILIKE 'cafe' OR amenity ILIKE 'coffee_shop')")
+        if "[1_type] = '[1]'" in sql_template and "sub_category" in selected_entities:
+            if (
+                selected_entities["sub_category"] == "restaurant"
+                or selected_entities["sub_category"] == "food"
+            ):
+                sql = sql.replace(
+                    "[1_type] = '[1]'",
+                    "(amenity ILIKE 'fast_food' OR amenity ILIKE 'restaurant' "
+                    "OR amenity ILIKE 'food')",
+                )
+            elif (
+                selected_entities["sub_category"] == "cafe"
+                or selected_entities["sub_category"] == "coffee_shop"
+            ):
+                sql = sql.replace(
+                    "[1_type] = '[1]'",
+                    "(amenity ILIKE 'cafe' OR amenity ILIKE 'coffee_shop')",
+                )
         for tt in template_tokens:
             k, v = tt[0], tt[1]
             for _k in selected_entities:
                 if _k in v:
-                    _value = selected_entities[_k][v[v.find(' ')+1:]]
+                    _value = selected_entities[_k][v[v.find(" ") + 1 :]]
                     if k in sql:
-                        if 'sub_category' in v:
+                        if "sub_category" in v:
                             value = poi_category_to_sql_name(str(_value))
                         else:
                             value = str(_value)
-                        if 'name' in k:
+                        if "name" in k:
                             value = value.replace("'", "''")
                         sql = sql.replace(k, value)
                     if k in t:
-                        value = _value.replace('_', ' ')
-                        if 'append_an' in tt:
-                            an = 'an ' if value[0] in 'aeoiu' else 'a '
-                            if 'any [1]' in t:
-                                an = ''
+                        value = _value.replace("_", " ")
+                        if "append_an" in tt:
+                            an = "an " if value[0] in "aeoiu" else "a "
+                            if "any [1]" in t:
+                                an = ""
                             value = an + value
-                        elif 'pluralize' in tt:
+                        elif "pluralize" in tt:
                             value = Word(value).pluralize()
                         t = t.replace(k, value)
         # print(sql)
@@ -348,12 +597,18 @@ def question_generator(text_templates, variable_types, template_tokens, sql_temp
         # answers = []
         # try:
         _sql = sql
-        if main_category == 'highway':
-            predicate = "(road_name IS NOT NULL OR wikipedia IS NOT NULL) AND highway =  '%s' " % sub_category 
-            _sql = sql.replace('WHERE', 'WHERE %s AND ' % predicate)
-        elif main_category == 'waterway' or main_category == 'water':
-            predicate = "(lake_name IS NOT NULL OR wikipedia IS NOT NULL) AND (waterway = '%s' OR water = '%s') " % (sub_category, sub_category)
-            _sql = sql.replace('WHERE', 'WHERE %s AND ' % predicate)
+        if main_category == "highway":
+            predicate = (
+                "(road_name IS NOT NULL OR wikipedia IS NOT NULL) "
+                f"AND highway =  '{sub_category}' "
+            )
+            _sql = sql.replace("WHERE", f"WHERE {predicate} AND ")
+        elif main_category in ("waterway", "water"):
+            predicate = (
+                "(lake_name IS NOT NULL OR wikipedia IS NOT NULL) "
+                f"AND (waterway = '{sub_category}' OR water = '{sub_category}') "
+            )
+            _sql = sql.replace("WHERE", f"WHERE {predicate} AND ")
         answers = run_sql_select(_sql, return_dict=True)
         # print('answers size: ', len(answers))
         # except:
@@ -364,9 +619,19 @@ def question_generator(text_templates, variable_types, template_tokens, sql_temp
             matches = [rule for rule in matches if not is_bad_rule(rule)]
             t = language_tool_python.utils.correct(t, matches)
             for i in range(len(answers)):
-                if 'geometry' in answers[i]:
-                    answers[i]['geometry'] = shapely.to_wkt(shapely.from_wkb(answers[i]['geometry']))
-            generated_questions.append({'question': t, 'sql': sql, 'answers': answers, 'answer_type': answer_type, 'question_entities': selected_entities})
+                if "geometry" in answers[i]:
+                    answers[i]["geometry"] = shapely.to_wkt(
+                        shapely.from_wkb(answers[i]["geometry"])
+                    )
+            generated_questions.append(
+                {
+                    "question": t,
+                    "sql": sql,
+                    "answers": answers,
+                    "answer_type": answer_type,
+                    "question_entities": selected_entities,
+                }
+            )
             # print(len(generated_questions))
             if progress:
                 progress.update(1)
@@ -374,24 +639,26 @@ def question_generator(text_templates, variable_types, template_tokens, sql_temp
         progress.close()
     # print(generated_questions)
     return generated_questions
-                
+
 
 def save(questions, filename):
-    with open(output_folder + filename, 'w') as f:
-        for q in questions:
-            f.write(json.dumps(q)+'\n')
+    with open(output_folder + filename, "w") as f:
+        f.writelines(json.dumps(q) + "\n" for q in questions)
+
 
 # %%
-import requests
 
 SESSION = requests.Session()
-SESSION.headers.update({
-    # Put something real here (app name + contact). Wikimedia wants this.
-    "Accept": "application/json",
-    "User-Agent": "UCRPOIQuestionGenerator_Research/1.0 (contact:@ucr.edu)",
-})
+SESSION.headers.update(
+    {
+        # Put something real here (app name + contact). Wikimedia wants this.
+        "Accept": "application/json",
+        "User-Agent": "UCRPOIQuestionGenerator_Research/1.0 (contact:@ucr.edu)",
+    }
+)
 
-def get_wikipedia_url_from_wikidata_id(wikidata_id, lang = "en"):
+
+def get_wikipedia_url_from_wikidata_id(wikidata_id, lang="en"):
     time.sleep(10)
     url = "https://www.wikidata.org/w/api.php"
     params = {
@@ -413,53 +680,71 @@ def get_wikipedia_url_from_wikidata_id(wikidata_id, lang = "en"):
 
     title = site["title"].replace(" ", "_")
     return f"https://{lang}.wikipedia.org/wiki/{title}"
+
+
 # %%
 def get_wikipedia_info(wikipedia_url, wikidataid):
-    path = f'./wikipedia_cache/{wikidataid}.json'
+    path = f"./wikipedia_cache/{wikidataid}.json"
     if os.path.exists(path):
-        with open(path, 'r') as file:
+        with open(path) as file:
             try:
                 return json.loads(file.read())
-            except:
+            except (OSError, ValueError):
                 return None
-    if os.path.exists(path.replace('json', 'txt')):
+    if os.path.exists(path.replace("json", "txt")):
         return None
     response = requests.get(wikipedia_url)
-    with open(path.replace('json', 'txt'), 'w') as file:
-        file.write(response.text) 
+    with open(path.replace("json", "txt"), "w") as file:
+        file.write(response.text)
     try:
-        info = pd.read_html(StringIO(response.text), index_col=0, attrs={"class":"infobox vcard"})
-        j = {"data": info[0].to_dict()[info[0].columns[0]], "type" : "vcard"}
-        with open(path, 'w') as file:
+        info = pd.read_html(
+            StringIO(response.text), index_col=0, attrs={"class": "infobox vcard"}
+        )
+        j = {"data": info[0].to_dict()[info[0].columns[0]], "type": "vcard"}
+        with open(path, "w") as file:
             file.write(json.dumps(j, indent=2))
         return j
-    except Exception as e1:
-        print('e1', e1)
+    except (IndexError, OSError, SyntaxError, ValueError) as e1:
+        print("e1", e1)
         try:
-            info = pd.read_html(StringIO(response.text), index_col=0, attrs={"class":"infobox"})
-            j = {"data": info[0].to_dict()[info[0].columns[0]], "type" : "infobox"}
-            with open(path, 'w') as file:
+            info = pd.read_html(
+                StringIO(response.text), index_col=0, attrs={"class": "infobox"}
+            )
+            j = {"data": info[0].to_dict()[info[0].columns[0]], "type": "infobox"}
+            with open(path, "w") as file:
                 file.write(json.dumps(j, indent=2))
             return j
-        except Exception as e2:
-            print('e2', e2)
+        except (IndexError, OSError, SyntaxError, ValueError) as e2:
+            print("e2", e2)
             return None
 
-picked_featuress = {"park" : ["Architect", "Built", "Created"], 
-                    "museum" : ["Established", "Built", "Director", "Architect", "Founder", "Headquarters"],
-                    "zoo" : ["Date opened"],
-                    "hospital" : ["Opened", "Affiliated university", "Emergency department", "Helipad"],
-                    "aquarium" : ["Date opened", "Volume of largest tank"],
-                    "stadium" : ["Capacity", "Opened", "Construction", "Architect", "Former names"],
-                    "university" : ["Established", "Motto", "Mascot", "Nickname", "Former names"],
-                    "hotel" : ["Founded", "Number of locations"],
-                    "nature_reserve" : ["Established", "Nearest\xa0city"],
-                    "theme_park" : ["Founded", "Number of locations"],
-                    "golf_course" : ["Designed by", "Architect"],
-                    "attraction" : ["Opening date", "Built"]}
+
+picked_featuress = {
+    "park": ["Architect", "Built", "Created"],
+    "museum": [
+        "Established",
+        "Built",
+        "Director",
+        "Architect",
+        "Founder",
+        "Headquarters",
+    ],
+    "zoo": ["Date opened"],
+    "hospital": ["Opened", "Affiliated university", "Emergency department", "Helipad"],
+    "aquarium": ["Date opened", "Volume of largest tank"],
+    "stadium": ["Capacity", "Opened", "Construction", "Architect", "Former names"],
+    "university": ["Established", "Motto", "Mascot", "Nickname", "Former names"],
+    "hotel": ["Founded", "Number of locations"],
+    "nature_reserve": ["Established", "Nearest\xa0city"],
+    "theme_park": ["Founded", "Number of locations"],
+    "golf_course": ["Designed by", "Architect"],
+    "attraction": ["Opening date", "Built"],
+}
 
 picked_features_q_phrases = {
-    "Architect": "What is the name of the architect that designed the closest [1] from [2]?",
+    "Architect": (
+        "What is the name of the architect that designed the closest [1] from [2]?"
+    ),
     "Built": "When was the the nearest [1] from [2] built?",
     "Created": "Can you tell me when was the the closest [1] from [2] created?",
     "Established": "When was the nearest [1] from [2] established?",
@@ -468,11 +753,18 @@ picked_features_q_phrases = {
     "Headquarters": "Where is the headquarters of the nearest [1] from [2] located?",
     "Opened": "When was the nearest [1] from [2] first opened?",
     "Opening date": "On what date was the closest [1] from [2] opened?",
-    "Affiliated university": "What is the name of the university that is affiliated with the closest [1] from [2]?",
-    "Emergency department": "What type of emergency department is available at the nearest [1] from [2]?",
+    "Affiliated university": (
+        "What is the name of the university that is affiliated "
+        "with the closest [1] from [2]?"
+    ),
+    "Emergency department": (
+        "What type of emergency department is available at the nearest [1] from [2]?"
+    ),
     "Helipad": "Does the nearest [1] from [2] have a helpad?",
     "Date opened": "When was the nearest [1] from [2] opened?",
-    "Volume of largest tank": "What is the volume of the largest tank at the nearest [1] from [2]?",
+    "Volume of largest tank": (
+        "What is the volume of the largest tank at the nearest [1] from [2]?"
+    ),
     "Capacity": "How many spectators can the nearest [1] from [2] hold?",
     "Construction": "When was the nearest [1] from [2] constructed?",
     "Former names": "Can you tell me about a former name of the nearest [1] from [2]?",
@@ -480,7 +772,7 @@ picked_features_q_phrases = {
     "Mascot": "What is the mascot of the nearest [1] from [2]?",
     "Nickname": "What is the nickname of the closest [1] from [2]?",
     "Designed by": "Who designed the nearest [1] from [2]?",
-    "Nearest\xa0city": "What is the closest city from the nearest [1] from [2]?"
+    "Nearest\xa0city": "What is the closest city from the nearest [1] from [2]?",
 }
 
 picked_features_descriptors = {
@@ -505,20 +797,61 @@ picked_features_descriptors = {
     "Mascot": "the %s that has %s as its mascot",
     "Nickname": "the %s that has the nickname %s",
     "Designed by": "the %s that was designed by %s",
-    "Nearest\xa0city": "the %s that has %s as its neasrest city"
+    "Nearest\xa0city": "the %s that has %s as its neasrest city",
 }
 
 
 # %% [markdown]
 # # PART I: Range Templates
 
+
 # %%
 def verifier(template_tokens, selected_entities, answers):
-    if poi_category_to_sql_name(selected_entities['[1]']['sub_category']) not in ['viewpoint', 'attraction', 'museum', 'theme park', 'hotel', 'gallery', 'zoo', 'aquarium', 'art_gallery', 'cafe', 'restaurant', 'fast_food', 'university', 'hospital', 'coffee', 'park', 'golf_course', 'nature_reserve', 'stadium', 'garden', 'beach_resort']:
+    if poi_category_to_sql_name(selected_entities["[1]"]["sub_category"]) not in [
+        "viewpoint",
+        "attraction",
+        "museum",
+        "theme park",
+        "hotel",
+        "gallery",
+        "zoo",
+        "aquarium",
+        "art_gallery",
+        "cafe",
+        "restaurant",
+        "fast_food",
+        "university",
+        "hospital",
+        "coffee",
+        "park",
+        "golf_course",
+        "nature_reserve",
+        "stadium",
+        "garden",
+        "beach_resort",
+    ]:
         return False
-    if poi_category_to_sql_name(selected_entities['[3]']['sub_category']) not in ['aquarium', 'attraction', 'viewpoint', 'art_gallery', 'theme_park', 'museum', 'gallery', 'zoo', 'hotel', 'university', 'park', 'nature_reserve', 'garden', 'stadium', 'hospital']:
+    if poi_category_to_sql_name(selected_entities["[3]"]["sub_category"]) not in [
+        "aquarium",
+        "attraction",
+        "viewpoint",
+        "art_gallery",
+        "theme_park",
+        "museum",
+        "gallery",
+        "zoo",
+        "hotel",
+        "university",
+        "park",
+        "nature_reserve",
+        "garden",
+        "stadium",
+        "hospital",
+    ]:
         return False
-    if poi_category_to_sql_name(selected_entities['[3]']['sub_category']) == poi_category_to_sql_name(selected_entities['[1]']['sub_category']):
+    if poi_category_to_sql_name(
+        selected_entities["[3]"]["sub_category"]
+    ) == poi_category_to_sql_name(selected_entities["[1]"]["sub_category"]):
         return False
     if len(answers) == 0:
         return False
@@ -527,223 +860,387 @@ def verifier(template_tokens, selected_entities, answers):
 
 # %%
 variable_types = [
-    ('[1]', 'poi'),
-    ('[2]', 'distance'),
-    ('[3]', 'poi'),
+    ("[1]", "poi"),
+    ("[2]", "distance"),
+    ("[3]", "poi"),
 ]
 
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1]', '[1] sub_category', 'append_an'),
-    ('[2]', '[2] distance'),
-    ('[2_text]', '[2] text'),
-    ('[3]', '[3] display_name'),
-    ('[3_wkt]', '[3] geo_wkt'),
+    ("[1_type]", "[1] main_category"),
+    ("[1]", "[1] sub_category", "append_an"),
+    ("[2]", "[2] distance"),
+    ("[2_text]", "[2] text"),
+    ("[3]", "[3] display_name"),
+    ("[3_wkt]", "[3] geo_wkt"),
 ]
 
 
-
-
-template_sql = '''SELECT * FROM pois
+template_sql = """SELECT * FROM pois
 WHERE ST_DWithin(pois.geometry, ST_GeomFromText('[3_wkt]',4326)::geography, [2])
 AND [1_type] = '[1]';
-'''
+"""
 
 
 # %%
 # Output type: entity name
-text_templates =  [l.replace('[2]', '[2_text]').strip() for l in open('templates/range+name.txt','r').readlines()]
-answer_type = 'name'
+text_templates = [
+    line.replace("[2]", "[2_text]").strip() for line in open("templates/range+name.txt")
+]
+answer_type = "name"
 n = N
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'range+name.jsonl')
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "range+name.jsonl")
 
 # %%
 # Output type: location
-text_templates =  [l.replace('[2]', '[2_text]').strip() for l in open('templates/range+loc.txt','r').readlines()]
-answer_type = 'loc'
+text_templates = [
+    line.replace("[2]", "[2_text]").strip() for line in open("templates/range+loc.txt")
+]
+answer_type = "loc"
 n = N
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'range+loc.jsonl')
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "range+loc.jsonl")
 
 # %%
 # Output type: count
 
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1]', '[1] sub_category', 'pluralize'),
-    ('[2]', '[2] distance'),
-    ('[2_text]', '[2] text'),
-    ('[3]', '[3] display_name'),
-    ('[3_wkt]', '[3] geo_wkt'),
+    ("[1_type]", "[1] main_category"),
+    ("[1]", "[1] sub_category", "pluralize"),
+    ("[2]", "[2] distance"),
+    ("[2_text]", "[2] text"),
+    ("[3]", "[3] display_name"),
+    ("[3_wkt]", "[3] geo_wkt"),
 ]
 
-template_sql = '''SELECT COUNT(*)FROM pois
+template_sql = """SELECT COUNT(*)FROM pois
 WHERE ST_DWithin(pois.geometry, ST_GeomFromText('[3_wkt]',4326)::geography, [2])
 AND [1_type] = '[1]';
-'''
+"""
 
-text_templates =  [l.replace('[2]', '[2_text]').strip() for l in open('templates/range+count.txt','r').readlines()]
-answer_type = 'count'
+text_templates = [
+    line.replace("[2]", "[2_text]").strip()
+    for line in open("templates/range+count.txt")
+]
+answer_type = "count"
 n = N
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'range+count.jsonl')
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "range+count.jsonl")
 
 # %%
 # Filters: range
 # Output type: angle
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1]', '[1] sub_category', 'append_an'),
-    ('[2]', '[2] distance'),
-    ('[2_text]', '[2] text'),
-    ('[3]', '[3] display_name'),
-    ('[3_wkt]', '[3] geo_wkt'),
+    ("[1_type]", "[1] main_category"),
+    ("[1]", "[1] sub_category", "append_an"),
+    ("[2]", "[2] distance"),
+    ("[2_text]", "[2] text"),
+    ("[3]", "[3] display_name"),
+    ("[3_wkt]", "[3] geo_wkt"),
 ]
 
-template_sql = '''SELECT *, degrees(ST_Azimuth(ST_GeomFromText('[3_wkt]',4326)::geography, pois.geometry)) AS angle FROM pois
-WHERE ST_DWithin(pois.geometry, ST_GeomFromText('[3_wkt]',4326)::geography, [2])
-AND [1_type] = '[1]';
-'''
+template_sql = (
+    "SELECT *, degrees(ST_Azimuth(ST_GeomFromText('[3_wkt]',4326)::geography, "
+    "pois.geometry)) AS angle FROM pois\n"
+    "WHERE ST_DWithin(pois.geometry, ST_GeomFromText('[3_wkt]',4326)::geography, [2])\n"
+    "AND [1_type] = '[1]';\n"
+)
 
-text_templates =  [l.replace('[2]', '[2_text]').strip() for l in open('templates/range+angle.txt','r').readlines()]
-answer_type = 'angle'
+text_templates = [
+    line.replace("[2]", "[2_text]").strip()
+    for line in open("templates/range+angle.txt")
+]
+answer_type = "angle"
 n = N
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'range+angle.jsonl')
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "range+angle.jsonl")
 
 # %%
 # Filters: range
 # Output type: distance
 
-template_sql = '''SELECT *, ST_Distance(ST_GeomFromText('[3_wkt]',4326)::geography, pois.geometry) AS distance FROM pois
-WHERE ST_DWithin(pois.geometry, ST_GeomFromText('[3_wkt]',4326)::geography, [2])
-AND [1_type] = '[1]';
-'''
+template_sql = (
+    "SELECT *, ST_Distance(ST_GeomFromText('[3_wkt]',4326)::geography, "
+    "pois.geometry) AS distance FROM pois\n"
+    "WHERE ST_DWithin(pois.geometry, ST_GeomFromText('[3_wkt]',4326)::geography, [2])\n"
+    "AND [1_type] = '[1]';\n"
+)
 
-text_templates =  [l.replace('[2]', '[2_text]').strip() for l in open('templates/range+distance.txt','r').readlines()]
-answer_type = 'distance'
+text_templates = [
+    line.replace("[2]", "[2_text]").strip()
+    for line in open("templates/range+distance.txt")
+]
+answer_type = "distance"
 n = N
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'range+distance.jsonl')
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "range+distance.jsonl")
 
 # %%
 # Filters: range + non spatial filter
 # Output type: entity name
 
 
-text_templates =  [l.replace('[1]', '[1_filter]').replace('[2]', '[2_text]').strip() for l in open('templates/range:non_spat_filter+name.txt','r').readlines()]
+text_templates = [
+    line.replace("[1]", "[1_filter]").replace("[2]", "[2_text]").strip()
+    for line in open("templates/range:non_spat_filter+name.txt")
+]
 
 variable_types = [
-    ('[1]', 'poi_filter'),
-    ('[2]', 'distance'),
-    ('[3]', 'poi'),
+    ("[1]", "poi_filter"),
+    ("[2]", "distance"),
+    ("[3]", "poi"),
 ]
 
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1]', '[1] sub_category'),
-    ('[1_filter]', '[1] poi_filter_desc', 'append_an'),
-    ('[1_predicate]', '[1] poi_filter_sql'),
-    ('[2]', '[2] distance'),
-    ('[2_text]', '[2] text'),
-    ('[3]', '[3] display_name'),
-    ('[3_wkt]', '[3] geo_wkt')
+    ("[1_type]", "[1] main_category"),
+    ("[1]", "[1] sub_category"),
+    ("[1_filter]", "[1] poi_filter_desc", "append_an"),
+    ("[1_predicate]", "[1] poi_filter_sql"),
+    ("[2]", "[2] distance"),
+    ("[2_text]", "[2] text"),
+    ("[3]", "[3] display_name"),
+    ("[3_wkt]", "[3] geo_wkt"),
 ]
 
 
-template_sql = '''SELECT * FROM pois
+template_sql = """SELECT * FROM pois
 WHERE ST_DWithin(pois.geometry, ST_GeomFromText('[3_wkt]',4326)::geography, [2])
 AND [1_type] = '[1]'
 AND [1_predicate];
-'''
+"""
 
-answer_type = 'name'
+answer_type = "name"
 n = N
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'range:non_spat_filter+name.jsonl')
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "range:non_spat_filter+name.jsonl")
 
 # %%
 # Filters: range + non spatial filter
 # Output type: loc
 
-text_templates =  [l.replace('[1]', '[1_filter]').replace('[2]', '[2_text]').strip() for l in open('templates/range:non_spat_filter+loc.txt','r').readlines()]
-answer_type = 'loc'
+text_templates = [
+    line.replace("[1]", "[1_filter]").replace("[2]", "[2_text]").strip()
+    for line in open("templates/range:non_spat_filter+loc.txt")
+]
+answer_type = "loc"
 
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'range:non_spat_filter+loc.jsonl')
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "range:non_spat_filter+loc.jsonl")
 
 # %%
 # Filters: range + direction
 # Output type: name
 
 variable_types = [
-    ('[1]', 'poi'),
-    ('[2]', 'distance'),
-    ('[3]', 'poi'),
-    ('[4]', 'direction')
+    ("[1]", "poi"),
+    ("[2]", "distance"),
+    ("[3]", "poi"),
+    ("[4]", "direction"),
 ]
 
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1]', '[1] sub_category'),
-    ('[2]', '[2] distance'),
-    ('[2_text]', '[2] text'),
-    ('[3]', '[3] display_name'),
-    ('[3_wkt]', '[3] geo_wkt'),
-    ('[4]', '[4] direction_desc'),
-    ('[4_predicate]', '[4] direction_predicate')
+    ("[1_type]", "[1] main_category"),
+    ("[1]", "[1] sub_category"),
+    ("[2]", "[2] distance"),
+    ("[2_text]", "[2] text"),
+    ("[3]", "[3] display_name"),
+    ("[3_wkt]", "[3] geo_wkt"),
+    ("[4]", "[4] direction_desc"),
+    ("[4_predicate]", "[4] direction_predicate"),
 ]
 
 
+text_templates = [
+    line.replace("[2]", "[2_text]").strip()
+    for line in open("templates/range:direction+name.txt")
+]
 
-text_templates =  [l.replace('[2]', '[2_text]').strip() for l in open('templates/range:direction+name.txt','r').readlines()]
-
-template_sql = '''
+template_sql = """
 WITH origin AS  (SELECT ST_GeomFromText('[3_wkt]',4326)::geography AS geometry)
 SELECT * FROM pois, origin
 WHERE ST_DWithin(pois.geometry, ST_GeomFromText('[3_wkt]',4326)::geography, [2])
 AND [1_type] = '[1]'
 AND [4_predicate];
-'''
-answer_type = 'name'
+"""
+answer_type = "name"
 n = N
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'range:direction+name.jsonl')
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "range:direction+name.jsonl")
 
 # %%
 # Filters: range + direction
 # Output type: loc
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1]', '[1] sub_category', 'append_an'),
-    ('[2]', '[2] distance'),
-    ('[2_text]', '[2] text'),
-    ('[3]', '[3] display_name'),
-    ('[3_wkt]', '[3] geo_wkt'),
-    ('[4]', '[4] direction_desc'),
-    ('[4_predicate]', '[4] direction_predicate')
+    ("[1_type]", "[1] main_category"),
+    ("[1]", "[1] sub_category", "append_an"),
+    ("[2]", "[2] distance"),
+    ("[2_text]", "[2] text"),
+    ("[3]", "[3] display_name"),
+    ("[3_wkt]", "[3] geo_wkt"),
+    ("[4]", "[4] direction_desc"),
+    ("[4_predicate]", "[4] direction_predicate"),
 ]
 
-text_templates =  [l.replace('[2]', '[2_text]').strip() for l in open('templates/range:direction+loc.txt','r').readlines()]
+text_templates = [
+    line.replace("[2]", "[2_text]").strip()
+    for line in open("templates/range:direction+loc.txt")
+]
 
-answer_type = 'loc'
+answer_type = "loc"
 
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'range:direction+loc.jsonl')
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "range:direction+loc.jsonl")
 
 # %%
 # Filters: range + towards
 # Output type: name
 
+
 def verifier(template_tokens, selected_entities, answers):
-    if poi_category_to_sql_name(selected_entities['[1]']['sub_category']) not in ['viewpoint', 'attraction', 'museum', 'theme park', 'hotel', 'gallery', 'zoo', 'aquarium', 'art gallery', 'cafe', 'restaurant', 'fast_food', 'university', 'hospital', 'coffee', 'park', 'golf_course', 'nature_reserve', 'stadium', 'garden', 'beach_resort']:
+    if poi_category_to_sql_name(selected_entities["[1]"]["sub_category"]) not in [
+        "viewpoint",
+        "attraction",
+        "museum",
+        "theme park",
+        "hotel",
+        "gallery",
+        "zoo",
+        "aquarium",
+        "art gallery",
+        "cafe",
+        "restaurant",
+        "fast_food",
+        "university",
+        "hospital",
+        "coffee",
+        "park",
+        "golf_course",
+        "nature_reserve",
+        "stadium",
+        "garden",
+        "beach_resort",
+    ]:
         return False
-    if poi_category_to_sql_name(selected_entities['[3]']['sub_category']) not in ['aquarium', 'attraction', 'viewpoint', 'art_gallery', 'theme_park', 'museum', 'gallery', 'zoo', 'hotel', 'university', 'park', 'nature_reserve', 'garden', 'stadium', 'hospital']:
+    if poi_category_to_sql_name(selected_entities["[3]"]["sub_category"]) not in [
+        "aquarium",
+        "attraction",
+        "viewpoint",
+        "art_gallery",
+        "theme_park",
+        "museum",
+        "gallery",
+        "zoo",
+        "hotel",
+        "university",
+        "park",
+        "nature_reserve",
+        "garden",
+        "stadium",
+        "hospital",
+    ]:
         return False
-    if poi_category_to_sql_name(selected_entities['[4]']['sub_category']) not in ['aquarium', 'attraction', 'viewpoint', 'art_gallery', 'theme_park', 'museum', 'gallery', 'zoo', 'hotel', 'university', 'park', 'nature_reserve', 'garden', 'stadium', 'hospital']:
+    if poi_category_to_sql_name(selected_entities["[4]"]["sub_category"]) not in [
+        "aquarium",
+        "attraction",
+        "viewpoint",
+        "art_gallery",
+        "theme_park",
+        "museum",
+        "gallery",
+        "zoo",
+        "hotel",
+        "university",
+        "park",
+        "nature_reserve",
+        "garden",
+        "stadium",
+        "hospital",
+    ]:
         return False
-    if len(set([poi_category_to_sql_name(selected_entities['[1]']['sub_category']), poi_category_to_sql_name(selected_entities['[3]']['sub_category']), poi_category_to_sql_name(selected_entities['[4]']['sub_category'])])) < 3:
+    if (
+        len(
+            set(
+                [
+                    poi_category_to_sql_name(selected_entities["[1]"]["sub_category"]),
+                    poi_category_to_sql_name(selected_entities["[3]"]["sub_category"]),
+                    poi_category_to_sql_name(selected_entities["[4]"]["sub_category"]),
+                ]
+            )
+        )
+        < MIN_DISTINCT_CATEGORIES
+    ):
         return False
     if len(answers) == 0:
         return False
@@ -751,60 +1248,130 @@ def verifier(template_tokens, selected_entities, answers):
 
 
 variable_types = [
-    ('[2]', 'distance'),
-    ('[3]', 'poi'),
-    ('[4]', 'poi distance_limited'),
-    ('[1]', 'poi mbr_limited'),
+    ("[2]", "distance"),
+    ("[3]", "poi"),
+    ("[4]", "poi distance_limited"),
+    ("[1]", "poi mbr_limited"),
 ]
 
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1]', '[1] sub_category', ),
-    ('[2]', '[2] distance'),
-    ('[2_text]', '[2] text'),
-    ('[3]', '[3] display_name'),
-    ('[3_wkt]', '[3] geo_wkt'),
-    ('[4]', '[4] display_name'),
-    ('[4_wkt]', '[4] geo_wkt')
+    ("[1_type]", "[1] main_category"),
+    (
+        "[1]",
+        "[1] sub_category",
+    ),
+    ("[2]", "[2] distance"),
+    ("[2_text]", "[2] text"),
+    ("[3]", "[3] display_name"),
+    ("[3_wkt]", "[3] geo_wkt"),
+    ("[4]", "[4] display_name"),
+    ("[4_wkt]", "[4] geo_wkt"),
 ]
 
-template_sql = '''WITH
-    angle AS (SELECT degrees(ST_Azimuth(ST_GeomFromText('[3_wkt]',4326)::geography, ST_GeomFromText('[4_wkt]',4326)::geography)) AS value)
-SELECT * FROM pois,angle
-WHERE [1_type] = '[1]'
-AND ST_DWithin(pois.geometry, ST_GeomFromText('[3_wkt]',4326)::geography, [2])
-AND (degrees(ST_Azimuth(ST_GeomFromText('[3_wkt]',4326)::geography, pois.geometry)) BETWEEN angle.value - 22.5 AND angle.value + 22.5);
-'''
+template_sql = (
+    "WITH\n"
+    "    angle AS (SELECT degrees(ST_Azimuth(ST_GeomFromText('[3_wkt]',4326)"
+    "::geography,"
+    " ST_GeomFromText('[4_wkt]',4326)::geography)) AS value)\n"
+    "SELECT * FROM pois,angle\n"
+    "WHERE [1_type] = '[1]'\n"
+    "AND ST_DWithin(pois.geometry, ST_GeomFromText('[3_wkt]',4326)::geography, [2])\n"
+    "AND (degrees(ST_Azimuth(ST_GeomFromText('[3_wkt]',4326)::geography, "
+    "pois.geometry)) BETWEEN angle.value - 22.5 AND angle.value + 22.5);\n"
+)
 
 n = N
 
-text_templates =  [l.replace('[2]', '[2_text]').strip() for l in open('templates/range:towards+name.txt','r').readlines()]
+text_templates = [
+    line.replace("[2]", "[2_text]").strip()
+    for line in open("templates/range:towards+name.txt")
+]
 
-answer_type = 'name'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'range:towards+name.jsonl')
+answer_type = "name"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "range:towards+name.jsonl")
 
 # %%
 # Filters: range + towards
 # Output type: loc
 
 
-text_templates =  [l.replace('[2]', '[2_text]').strip() for l in open('templates/range:towards+loc.txt','r').readlines()]
+text_templates = [
+    line.replace("[2]", "[2_text]").strip()
+    for line in open("templates/range:towards+loc.txt")
+]
 
-answer_type = 'loc'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'range:towards+loc.jsonl')
+answer_type = "loc"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "range:towards+loc.jsonl")
 
 # %% [markdown]
 # # KNN Templates
 
+
 # %%
 def verifier(template_tokens, selected_entities, answers):
-    if poi_category_to_sql_name(selected_entities['[1]']['sub_category']) not in ['viewpoint', 'attraction', 'museum', 'theme_park', 'hotel', 'gallery', 'zoo', 'aquarium', 'art_gallery', 'cafe', 'restaurant', 'fast_food', 'university', 'hospital', 'coffee', 'park', 'golf_course', 'nature_reserve', 'stadium', 'garden', 'beach_resort']:
+    if poi_category_to_sql_name(selected_entities["[1]"]["sub_category"]) not in [
+        "viewpoint",
+        "attraction",
+        "museum",
+        "theme_park",
+        "hotel",
+        "gallery",
+        "zoo",
+        "aquarium",
+        "art_gallery",
+        "cafe",
+        "restaurant",
+        "fast_food",
+        "university",
+        "hospital",
+        "coffee",
+        "park",
+        "golf_course",
+        "nature_reserve",
+        "stadium",
+        "garden",
+        "beach_resort",
+    ]:
         return False
-    if poi_category_to_sql_name(selected_entities['[2]']['sub_category']) not in ['aquarium', 'attraction', 'viewpoint', 'art_gallery', 'theme_park', 'museum', 'gallery', 'zoo', 'hotel', 'university', 'park', 'nature_reserve', 'garden', 'stadium', 'hospital']:
+    if poi_category_to_sql_name(selected_entities["[2]"]["sub_category"]) not in [
+        "aquarium",
+        "attraction",
+        "viewpoint",
+        "art_gallery",
+        "theme_park",
+        "museum",
+        "gallery",
+        "zoo",
+        "hotel",
+        "university",
+        "park",
+        "nature_reserve",
+        "garden",
+        "stadium",
+        "hospital",
+    ]:
         return False
-    if poi_category_to_sql_name(selected_entities['[2]']['sub_category']) == poi_category_to_sql_name(selected_entities['[1]']['sub_category']):
+    if poi_category_to_sql_name(
+        selected_entities["[2]"]["sub_category"]
+    ) == poi_category_to_sql_name(selected_entities["[1]"]["sub_category"]):
         return False
     if len(answers) == 0:
         return False
@@ -812,307 +1379,522 @@ def verifier(template_tokens, selected_entities, answers):
 
 
 variable_types = [
-    ('[1]', 'poi'),
-    ('[2]', 'poi'),
+    ("[1]", "poi"),
+    ("[2]", "poi"),
 ]
 
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1]', '[1] sub_category'),
-    ('[2]', '[2] display_name'),
-    ('[2_wkt]', '[2] geo_wkt'),
+    ("[1_type]", "[1] main_category"),
+    ("[1]", "[1] sub_category"),
+    ("[2]", "[2] display_name"),
+    ("[2_wkt]", "[2] geo_wkt"),
 ]
 
 
-
-
-template_sql = '''SELECT * FROM pois
+template_sql = """SELECT * FROM pois
 WHERE [1_type] = '[1]'
 ORDER BY  geometry <-> ST_GeomFromText('[2_wkt]',4326)::geography ASC
 LIMIT 1;
-'''
+"""
 
 n = N
 
 
+# %%
+text_templates = [line.strip() for line in open("templates/knn+name.txt")]
+
+answer_type = "name"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "knn+name.jsonl")
 
 # %%
-text_templates =  [l.strip() for l in open('templates/knn+name.txt','r').readlines()]
+text_templates = [line.strip() for line in open("templates/knn+loc.txt")]
 
-answer_type = 'name'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'knn+name.jsonl')
-
-# %%
-text_templates =  [l.strip() for l in open('templates/knn+loc.txt','r').readlines()]
-
-answer_type = 'loc'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'knn+loc.jsonl')
+answer_type = "loc"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "knn+loc.jsonl")
 
 
 # %%
 
 variable_types = [
-    ('[1]', 'poi'),
-    ('[2]', 'poi'),
+    ("[1]", "poi"),
+    ("[2]", "poi"),
 ]
 
-template_sql = '''SELECT * FROM pois
+template_sql = """SELECT * FROM pois
 WHERE [1_type] = '[1]'
 ORDER BY  geometry <-> ST_GeomFromText('[2_wkt]',4326)::geography ASC
 LIMIT 1;
-'''
-text_templates =  [l.strip() for l in open('templates/knn+name.txt','r').readlines()]
+"""
+text_templates = [line.strip() for line in open("templates/knn+name.txt")]
 
-answer_type = 'name'
-# type 1: append another question at the end, asking about attribute extracted from wikipedia
+answer_type = "name"
+# type 1: append another question at the end,
+# asking about attribute extracted from wikipedia
 questions = []
-while len(questions) < 150:
-    question = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, 1, True)[0]
-    answer = question['answers'][0]
-    sub_category = ''
-    if 'leisure' in answer:
-        sub_category = answer['leisure']
-    elif 'amenity' in answer:
-        sub_category = answer['amenity']
-    elif 'tourism' in answer:
-        sub_category = answer['tourism']
+while len(questions) < MULTI_SOURCE_TARGET_COUNT:
+    question = question_generator(
+        text_templates,
+        variable_types,
+        template_tokens,
+        template_sql,
+        answer_type,
+        verifier,
+        1,
+        True,
+    )[0]
+    answer = question["answers"][0]
+    sub_category = ""
+    if "leisure" in answer:
+        sub_category = answer["leisure"]
+    elif "amenity" in answer:
+        sub_category = answer["amenity"]
+    elif "tourism" in answer:
+        sub_category = answer["tourism"]
     if sub_category not in picked_featuress:
         continue
-    if 'wikidata' not in answer:
-        print('no wikidata id')
+    if "wikidata" not in answer:
+        print("no wikidata id")
         continue
     wikipedia_url = None
     try:
-        wikipedia_url = get_wikipedia_url_from_wikidata_id(answer['wikidata'])
-    except Exception as e:
-        print('no wikipedia url')
+        wikipedia_url = get_wikipedia_url_from_wikidata_id(answer["wikidata"])
+    except requests.RequestException as e:
+        print("no wikipedia url")
         print(e)
         continue
-    if wikipedia_url == None:
+    if wikipedia_url is None:
         continue
-    info = get_wikipedia_info(wikipedia_url, answer['wikidata'])
-    if info == None:
-        print('info is none')
+    info = get_wikipedia_info(wikipedia_url, answer["wikidata"])
+    if info is None:
+        print("info is none")
         continue
-    possible_values = list(set(info['data'].keys()) & set(picked_features_q_phrases.keys()))
+    possible_values = list(
+        set(info["data"].keys()) & set(picked_features_q_phrases.keys())
+    )
     if len(possible_values) == 0:
-        print('no possible values')
+        print("no possible values")
         continue
     selected_key = random.choice(possible_values)
-    multi_source_answer = info['data'][selected_key]
+    multi_source_answer = info["data"][selected_key]
     multi_source_q_phrase = picked_features_q_phrases[selected_key]
-    question['question'] = multi_source_q_phrase.replace('[1]', question['question_entities']['[1]']['sub_category']).replace('[2]', question['question_entities']['[2]']['display_name'])
-    question['answers'][0]['multi_source_answer'] = str(multi_source_answer)
-    question['answers'][0]['multi_source_attribute'] = selected_key
-    question['answers'][0]['multi_source_long_answer'] = question['answers'][0]['poi_name'] + ' ' + selected_key + ': ' + str(multi_source_answer)
+    question["question"] = multi_source_q_phrase.replace(
+        "[1]", question["question_entities"]["[1]"]["sub_category"]
+    ).replace("[2]", question["question_entities"]["[2]"]["display_name"])
+    question["answers"][0]["multi_source_answer"] = str(multi_source_answer)
+    question["answers"][0]["multi_source_attribute"] = selected_key
+    question["answers"][0]["multi_source_long_answer"] = (
+        question["answers"][0]["poi_name"]
+        + " "
+        + selected_key
+        + ": "
+        + str(multi_source_answer)
+    )
     questions.append(question)
-    print('Questions count: ' + str(len(questions)))
-save(questions, 'knn+name+multi_source1.jsonl')
+    print("Questions count: " + str(len(questions)))
+save(questions, "knn+name+multi_source1.jsonl")
 
 # %%
-# type 2: replace the name of the anchoring entity with one of its attributes from wikipedia
-template_sql = '''SELECT * FROM pois
+# type 2: replace the name of the anchoring entity
+# with one of its attributes from wikipedia
+template_sql = """SELECT * FROM pois
 WHERE [1_type] = '[1]'
 ORDER BY  geometry <-> ST_GeomFromText('[2_wkt]',4326)::geography ASC
 LIMIT 1;
-'''
+"""
 
 variable_types = [
-    ('[1]', 'poi'),
-    ('[2]', 'poi'),
+    ("[1]", "poi"),
+    ("[2]", "poi"),
 ]
 
-text_templates =  [l.strip() for l in open('templates/knn+name.txt','r').readlines()]
+text_templates = [line.strip() for line in open("templates/knn+name.txt")]
 
-answer_type = 'name'
+answer_type = "name"
 
 questions = []
-while len(questions) < 150:
-    question = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, 1, disable_progress=True)[0]
-    answer = question['answers'][0]
-    sub_category = question['question_entities']['[2]']['sub_category']
-    display_name = question['question_entities']['[2]']['display_name']
-    poi_name = question['question_entities']['[2]']['poi']['poi_name']
-    wikidata = None if 'wikidata' not in question['question_entities']['[2]']['poi'] else question['question_entities']['[2]']['poi']['wikidata']
+while len(questions) < MULTI_SOURCE_TARGET_COUNT:
+    question = question_generator(
+        text_templates,
+        variable_types,
+        template_tokens,
+        template_sql,
+        answer_type,
+        verifier,
+        1,
+        disable_progress=True,
+    )[0]
+    answer = question["answers"][0]
+    sub_category = question["question_entities"]["[2]"]["sub_category"]
+    display_name = question["question_entities"]["[2]"]["display_name"]
+    poi_name = question["question_entities"]["[2]"]["poi"]["poi_name"]
+    wikidata = (
+        None
+        if "wikidata" not in question["question_entities"]["[2]"]["poi"]
+        else question["question_entities"]["[2]"]["poi"]["wikidata"]
+    )
     if sub_category not in picked_featuress:
-        print('sub category not accepted')
+        print("sub category not accepted")
         continue
-    if wikidata == None:
-        print('no wikidata id')
+    if wikidata is None:
+        print("no wikidata id")
     wikipedia_url = get_wikipedia_url_from_wikidata_id(wikidata)
-    if wikipedia_url == None:
-        print('no wikipedia url')
+    if wikipedia_url is None:
+        print("no wikipedia url")
         continue
     info = get_wikipedia_info(wikipedia_url, wikidata)
-    if info == None:
-        print('no wikipedia info')
+    if info is None:
+        print("no wikipedia info")
         continue
     # break
-    possible_values = list(set(info['data'].keys()) & set(picked_features_descriptors.keys()))
+    possible_values = list(
+        set(info["data"].keys()) & set(picked_features_descriptors.keys())
+    )
     # print(set(info['data'].keys()), possible_values)
     if len(possible_values) == 0:
-        print('no possible values')
+        print("no possible values")
         continue
     selected_key = random.choice(possible_values)
-    multi_source_attribute = str(info['data'][selected_key])
-    ob = multi_source_attribute.find('(')
+    multi_source_attribute = str(info["data"][selected_key])
+    ob = multi_source_attribute.find("(")
     if ob != -1:
         multi_source_attribute = multi_source_attribute[:ob]
-    ob = multi_source_attribute.find('[')
+    ob = multi_source_attribute.find("[")
     if ob != -1:
         multi_source_attribute = multi_source_attribute[:ob]
-    ob = multi_source_attribute.find(';')
+    ob = multi_source_attribute.find(";")
     if ob != -1:
         multi_source_attribute = multi_source_attribute[:ob]
-    if selected_key in ['Built', 'Created', 'Established']:
+    if selected_key in ["Built", "Created", "Established"]:
         try:
             multi_source_attribute = parse(multi_source_attribute, fuzzy=True).year
-        except Exception as e:
+        except (OverflowError, TypeError, ValueError) as e:
             print(e)
             continue
-    multi_source_discriptor = picked_features_descriptors[selected_key] % (sub_category.replace('_', ' '), str(multi_source_attribute))
-    new_display_name = display_name.replace(poi_name + ',', multi_source_discriptor + ' in')
-    print(display_name, '##' , new_display_name)
-    question['question'] = question['question'].replace(display_name, new_display_name)
+    multi_source_discriptor = picked_features_descriptors[selected_key] % (
+        sub_category.replace("_", " "),
+        str(multi_source_attribute),
+    )
+    new_display_name = display_name.replace(
+        poi_name + ",", multi_source_discriptor + " in"
+    )
+    print(display_name, "##", new_display_name)
+    question["question"] = question["question"].replace(display_name, new_display_name)
     questions.append(question)
-    print('Questions count: ' + str(len(questions)))
-save(questions, 'knn+name+multi_source2.jsonl')
+    print("Questions count: " + str(len(questions)))
+save(questions, "knn+name+multi_source2.jsonl")
 
 # %%
 
 # %%
-text_templates =  [l.strip() for l in open('templates/knn+distance.txt','r').readlines()]
+text_templates = [line.strip() for line in open("templates/knn+distance.txt")]
 
-template_sql = '''SELECT *, ST_Distance(geometry, ST_GeomFromText('[2_wkt]',4326)::geography)  AS distance  FROM pois
-WHERE [1_type] = '[1]'
-ORDER BY geometry <-> ST_GeomFromText('[2_wkt]',4326)::geography ASC
-LIMIT 1;
-'''
+template_sql = (
+    "SELECT *, ST_Distance(geometry, ST_GeomFromText('[2_wkt]',4326)::geography)  "
+    "AS distance  FROM pois\n"
+    "WHERE [1_type] = '[1]'\n"
+    "ORDER BY geometry <-> ST_GeomFromText('[2_wkt]',4326)::geography ASC\n"
+    "LIMIT 1;\n"
+)
 
-answer_type = 'distance'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'knn+distance.jsonl')
+answer_type = "distance"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "knn+distance.jsonl")
 
 
 # %%
-text_templates =  [l.strip() for l in open('templates/knn+angle.txt','r').readlines()]
+text_templates = [line.strip() for line in open("templates/knn+angle.txt")]
 
-template_sql = '''SELECT *, degrees(ST_Azimuth(ST_GeomFromText('[2_wkt]',4326)::geography, pois.geometry)) AS angle  FROM pois
-WHERE [1_type] = '[1]'
-ORDER BY geometry <-> ST_GeomFromText('[2_wkt]',4326)::geography ASC
-LIMIT 1;
-'''
+template_sql = (
+    "SELECT *, degrees(ST_Azimuth(ST_GeomFromText('[2_wkt]',4326)::geography, "
+    "pois.geometry)) AS angle  FROM pois\n"
+    "WHERE [1_type] = '[1]'\n"
+    "ORDER BY geometry <-> ST_GeomFromText('[2_wkt]',4326)::geography ASC\n"
+    "LIMIT 1;\n"
+)
 
-answer_type = 'angle'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'knn+angle.jsonl')
+answer_type = "angle"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "knn+angle.jsonl")
 
 
 # %%
 variable_types = [
-    ('[1]', 'poi_filter'),
-    ('[2]', 'poi'),
+    ("[1]", "poi_filter"),
+    ("[2]", "poi"),
 ]
 
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1]', '[1] sub_category'),
-    ('[1_filter]', '[1] poi_filter_desc'),
-    ('[1_predicate]', '[1] poi_filter_sql'),
-    ('[2]', '[2] display_name'),
-    ('[2_wkt]', '[2] geo_wkt'),
+    ("[1_type]", "[1] main_category"),
+    ("[1]", "[1] sub_category"),
+    ("[1_filter]", "[1] poi_filter_desc"),
+    ("[1_predicate]", "[1] poi_filter_sql"),
+    ("[2]", "[2] display_name"),
+    ("[2_wkt]", "[2] geo_wkt"),
 ]
 
 
-
-
-template_sql = '''SELECT * FROM pois
+template_sql = """SELECT * FROM pois
 WHERE [1_type] = '[1]'
 AND [1_predicate]
 ORDER BY geometry <-> ST_GeomFromText('[2_wkt]',4326)::geography ASC
 LIMIT 1;
-'''
+"""
 
 n = N
 
-text_templates =  [l.replace('[1]', '[1_filter]').strip() for l in open('templates/knn:non_spat_filter+name.txt','r').readlines()]
+text_templates = [
+    line.replace("[1]", "[1_filter]").strip()
+    for line in open("templates/knn:non_spat_filter+name.txt")
+]
 
-answer_type = 'name'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'knn:non_spat_filter+name.jsonl')
+answer_type = "name"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "knn:non_spat_filter+name.jsonl")
 
 
 # %%
-text_templates =  [l.replace('[1]', '[1_filter]').strip() for l in open('templates/knn:non_spat_filter+loc.txt','r').readlines()]
+text_templates = [
+    line.replace("[1]", "[1_filter]").strip()
+    for line in open("templates/knn:non_spat_filter+loc.txt")
+]
 
-answer_type = 'loc'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'knn:non_spat_filter+loc.jsonl')
+answer_type = "loc"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "knn:non_spat_filter+loc.jsonl")
 
 
 # %%
 def verifier(template_tokens, selected_entities, answers):
-    if poi_category_to_sql_name(selected_entities['[1]']['sub_category']) not in ['viewpoint', 'attraction', 'museum', 'theme park', 'hotel', 'gallery', 'zoo', 'aquarium', 'art gallery', 'cafe', 'restaurant', 'fast_food', 'university', 'hospital', 'coffee', 'park', 'golf_course', 'nature_reserve', 'stadium', 'garden', 'beach_resort']:
+    if poi_category_to_sql_name(selected_entities["[1]"]["sub_category"]) not in [
+        "viewpoint",
+        "attraction",
+        "museum",
+        "theme park",
+        "hotel",
+        "gallery",
+        "zoo",
+        "aquarium",
+        "art gallery",
+        "cafe",
+        "restaurant",
+        "fast_food",
+        "university",
+        "hospital",
+        "coffee",
+        "park",
+        "golf_course",
+        "nature_reserve",
+        "stadium",
+        "garden",
+        "beach_resort",
+    ]:
         return False
-    if poi_category_to_sql_name(selected_entities['[2]']['sub_category']) not in ['aquarium', 'attraction', 'viewpoint', 'art_gallery', 'theme_park', 'museum', 'gallery', 'zoo', 'hotel', 'university', 'park', 'nature_reserve', 'garden', 'stadium', 'hospital']:
+    if poi_category_to_sql_name(selected_entities["[2]"]["sub_category"]) not in [
+        "aquarium",
+        "attraction",
+        "viewpoint",
+        "art_gallery",
+        "theme_park",
+        "museum",
+        "gallery",
+        "zoo",
+        "hotel",
+        "university",
+        "park",
+        "nature_reserve",
+        "garden",
+        "stadium",
+        "hospital",
+    ]:
         return False
-    if poi_category_to_sql_name(selected_entities['[1]']['sub_category']) == poi_category_to_sql_name(selected_entities['[2]']['sub_category']):
+    if poi_category_to_sql_name(
+        selected_entities["[1]"]["sub_category"]
+    ) == poi_category_to_sql_name(selected_entities["[2]"]["sub_category"]):
         return False
     if len(answers) == 0:
         return False
     return True
 
-variable_types = [
-    ('[1]', 'poi'),
-    ('[2]', 'poi'),
-    ('[3]', 'direction')
-]
+
+variable_types = [("[1]", "poi"), ("[2]", "poi"), ("[3]", "direction")]
 
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1]', '[1] sub_category', ),
-    ('[2]', '[2] display_name'),
-    ('[2_wkt]', '[2] geo_wkt'),
-    ('[3]', '[3] direction_desc'),
-    ('[3_predicate]', '[3] direction_predicate')
+    ("[1_type]", "[1] main_category"),
+    (
+        "[1]",
+        "[1] sub_category",
+    ),
+    ("[2]", "[2] display_name"),
+    ("[2_wkt]", "[2] geo_wkt"),
+    ("[3]", "[3] direction_desc"),
+    ("[3_predicate]", "[3] direction_predicate"),
 ]
 
-template_sql = '''
+template_sql = """
 WITH origin AS (SELECT ST_GeomFromText('[2_wkt]',4326)::geography AS geometry)
 SELECT * FROM pois,origin
 WHERE pois.[1_type] = '[1]'
 AND [3_predicate]
 ORDER BY pois.geometry <-> origin.geometry ASC
 LIMIT 1;
-'''
+"""
 
 
-text_templates =  [l.strip() for l in open('templates/knn:direction+name.txt','r').readlines()]
+text_templates = [line.strip() for line in open("templates/knn:direction+name.txt")]
 
-answer_type = 'name'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'knn:direction+name.jsonl')
+answer_type = "name"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "knn:direction+name.jsonl")
 
 
 # %%
-text_templates =  [l.strip() for l in open('templates/knn:direction+loc.txt','r').readlines()]
+text_templates = [line.strip() for line in open("templates/knn:direction+loc.txt")]
 
-answer_type = 'loc'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'knn:direction+loc.jsonl')
+answer_type = "loc"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "knn:direction+loc.jsonl")
 
 
 # %%
 def verifier(template_tokens, selected_entities, answers):
-    if poi_category_to_sql_name(selected_entities['[1]']['sub_category']) not in ['viewpoint', 'attraction', 'museum', 'theme park', 'hotel', 'gallery', 'zoo', 'aquarium', 'art gallery', 'cafe', 'restaurant', 'fast_food', 'university', 'hospital', 'coffee', 'park', 'golf_course', 'nature_reserve', 'stadium', 'garden', 'beach_resort']:
+    if poi_category_to_sql_name(selected_entities["[1]"]["sub_category"]) not in [
+        "viewpoint",
+        "attraction",
+        "museum",
+        "theme park",
+        "hotel",
+        "gallery",
+        "zoo",
+        "aquarium",
+        "art gallery",
+        "cafe",
+        "restaurant",
+        "fast_food",
+        "university",
+        "hospital",
+        "coffee",
+        "park",
+        "golf_course",
+        "nature_reserve",
+        "stadium",
+        "garden",
+        "beach_resort",
+    ]:
         return False
-    if poi_category_to_sql_name(selected_entities['[2]']['sub_category']) not in ['aquarium', 'attraction', 'viewpoint', 'art_gallery', 'theme_park', 'museum', 'gallery', 'zoo', 'hotel', 'university', 'park', 'nature_reserve', 'garden', 'stadium', 'hospital']:
+    if poi_category_to_sql_name(selected_entities["[2]"]["sub_category"]) not in [
+        "aquarium",
+        "attraction",
+        "viewpoint",
+        "art_gallery",
+        "theme_park",
+        "museum",
+        "gallery",
+        "zoo",
+        "hotel",
+        "university",
+        "park",
+        "nature_reserve",
+        "garden",
+        "stadium",
+        "hospital",
+    ]:
         return False
-    if poi_category_to_sql_name(selected_entities['[3]']['sub_category']) not in ['aquarium', 'attraction', 'viewpoint', 'art_gallery', 'theme_park', 'museum', 'gallery', 'zoo', 'hotel', 'university', 'park', 'nature_reserve', 'garden', 'stadium', 'hospital']:
+    if poi_category_to_sql_name(selected_entities["[3]"]["sub_category"]) not in [
+        "aquarium",
+        "attraction",
+        "viewpoint",
+        "art_gallery",
+        "theme_park",
+        "museum",
+        "gallery",
+        "zoo",
+        "hotel",
+        "university",
+        "park",
+        "nature_reserve",
+        "garden",
+        "stadium",
+        "hospital",
+    ]:
         return False
-    if len(set([poi_category_to_sql_name(selected_entities['[1]']['sub_category']), poi_category_to_sql_name(selected_entities['[2]']['sub_category']), poi_category_to_sql_name(selected_entities['[3]']['sub_category'])])) < 3:
+    if (
+        len(
+            set(
+                [
+                    poi_category_to_sql_name(selected_entities["[1]"]["sub_category"]),
+                    poi_category_to_sql_name(selected_entities["[2]"]["sub_category"]),
+                    poi_category_to_sql_name(selected_entities["[3]"]["sub_category"]),
+                ]
+            )
+        )
+        < MIN_DISTINCT_CATEGORIES
+    ):
         return False
     if len(answers) == 0:
         return False
@@ -1120,42 +1902,65 @@ def verifier(template_tokens, selected_entities, answers):
 
 
 variable_types = [
-    ('[2]', 'poi'),
-    ('[3]', 'poi distance_limited'),
-    ('[1]', 'poi mbr_limited'),
+    ("[2]", "poi"),
+    ("[3]", "poi distance_limited"),
+    ("[1]", "poi mbr_limited"),
 ]
 
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1]', '[1] sub_category', ),
-    ('[2]', '[2] display_name'),
-    ('[2_wkt]', '[2] geo_wkt'),
-    ('[3]', '[3] display_name'),
-    ('[3_wkt]', '[3] geo_wkt')
+    ("[1_type]", "[1] main_category"),
+    (
+        "[1]",
+        "[1] sub_category",
+    ),
+    ("[2]", "[2] display_name"),
+    ("[2_wkt]", "[2] geo_wkt"),
+    ("[3]", "[3] display_name"),
+    ("[3_wkt]", "[3] geo_wkt"),
 ]
 
-template_sql = '''WITH
-    angle AS (SELECT degrees(ST_Azimuth(ST_GeomFromText('[2_wkt]',4326)::geography, ST_GeomFromText('[3_wkt]',4326)::geography)) AS value)
-SELECT * FROM pois,angle
-WHERE [1_type] = '[1]'
-AND (degrees(ST_Azimuth(ST_GeomFromText('[2_wkt]',4326)::geography, pois.geometry)) BETWEEN angle.value - 22.5 AND angle.value + 22.5)
-ORDER BY pois.geometry <-> ST_GeomFromText('[2_wkt]',4326)::geography ASC
-LIMIT 1;
-'''
+template_sql = (
+    "WITH\n"
+    "    angle AS (SELECT degrees(ST_Azimuth(ST_GeomFromText('[2_wkt]',4326)"
+    "::geography,"
+    " ST_GeomFromText('[3_wkt]',4326)::geography)) AS value)\n"
+    "SELECT * FROM pois,angle\n"
+    "WHERE [1_type] = '[1]'\n"
+    "AND (degrees(ST_Azimuth(ST_GeomFromText('[2_wkt]',4326)::geography, "
+    "pois.geometry)) BETWEEN angle.value - 22.5 AND angle.value + 22.5)\n"
+    "ORDER BY pois.geometry <-> ST_GeomFromText('[2_wkt]',4326)::geography ASC\n"
+    "LIMIT 1;\n"
+)
 
 
-text_templates =  [l.strip() for l in open('templates/knn:towards+name.txt','r').readlines()]
+text_templates = [line.strip() for line in open("templates/knn:towards+name.txt")]
 
-answer_type = 'name'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'knn:towards+name.jsonl')
+answer_type = "name"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "knn:towards+name.jsonl")
 
 # %%
-text_templates =  [l.strip() for l in open('templates/knn:towards+loc.txt','r').readlines()]
+text_templates = [line.strip() for line in open("templates/knn:towards+loc.txt")]
 
-answer_type = 'loc'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'knn:towards+loc.jsonl')
+answer_type = "loc"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "knn:towards+loc.jsonl")
 
 # %% [markdown]
 # # Topological Templates
@@ -1163,126 +1968,188 @@ save(questions, 'knn:towards+loc.jsonl')
 # %%
 # Intersects + Count
 
+
 def verifier(template_tokens, selected_entities, answers):
-    if selected_entities['[1]']['sub_category'] not in ['viewpoint', 'attraction', 'museum', 'theme park', 'hotel', 'gallery', 'zoo', 'aquarium', 'art gallery', 'cafe', 'restaurant', 'fast food restaurant', 'university', 'hospital', 'coffee shop', 'park', 'golf course', 'nature reserve', 'stadium', 'garden', 'beach resort']:
+    if selected_entities["[1]"]["sub_category"] not in [
+        "viewpoint",
+        "attraction",
+        "museum",
+        "theme park",
+        "hotel",
+        "gallery",
+        "zoo",
+        "aquarium",
+        "art gallery",
+        "cafe",
+        "restaurant",
+        "fast food restaurant",
+        "university",
+        "hospital",
+        "coffee shop",
+        "park",
+        "golf course",
+        "nature reserve",
+        "stadium",
+        "garden",
+        "beach resort",
+    ]:
         return False
     if len(answers) == 0:
         return False
-    elif answers[0]['count'] == 0:
+    elif answers[0]["count"] == 0:
         return False
     return True
 
+
 variable_types = [
-    ('[1]', 'poi'),
-    ('[2]', 'region'),
+    ("[1]", "poi"),
+    ("[2]", "region"),
 ]
 
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1]', '[1] sub_category', 'pluralize'),
-    ('[2]', '[2] region_name'),
-    ('[2_wkt]', '[2] geo_wkt'),
+    ("[1_type]", "[1] main_category"),
+    ("[1]", "[1] sub_category", "pluralize"),
+    ("[2]", "[2] region_name"),
+    ("[2_wkt]", "[2] geo_wkt"),
 ]
 
 
-
-
-template_sql = '''SELECT COUNT(*) FROM pois
+template_sql = """SELECT COUNT(*) FROM pois
 WHERE [1_type] = '[1]'
 AND ST_Intersects(pois.geometry, ST_GeomFromText('[2_wkt]',4326))
-'''
+"""
 
 n = N
 
-text_templates =  [l.strip() for l in open('templates/intersects+count.txt','r').readlines()]
+text_templates = [line.strip() for line in open("templates/intersects+count.txt")]
 
-answer_type = 'count'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'intersects+count.jsonl')
+answer_type = "count"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "intersects+count.jsonl")
 
 
 # %%
 # Intersects + area max
 
+
 def verifier(template_tokens, selected_entities, answers):
     # print(selected_entities)
-    if selected_entities['[1]']['sub_category'] not in ["bay", "harbour", "lake", "reservoir"] and selected_entities['[1]']['main_category'] != 'leisure':
+    if (
+        selected_entities["[1]"]["sub_category"]
+        not in ["bay", "harbour", "lake", "reservoir"]
+        and selected_entities["[1]"]["main_category"] != "leisure"
+    ):
         return False
     if len(answers) == 0:
         return False
     return True
 
+
 variable_types = [
-    ('[1]', 'park_lake'),
-    ('[2]', 'region'),
+    ("[1]", "park_lake"),
+    ("[2]", "region"),
 ]
 
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1_table]', '[1] table'),
-    ('[1]', '[1] sub_category'),
-    ('[2]', '[2] region_name'),
-    ('[2_wkt]', '[2] geo_wkt'),
+    ("[1_type]", "[1] main_category"),
+    ("[1_table]", "[1] table"),
+    ("[1]", "[1] sub_category"),
+    ("[2]", "[2] region_name"),
+    ("[2_wkt]", "[2] geo_wkt"),
 ]
 
 
-
-
-template_sql = '''SELECT *, ST_Area([1_table].geometry::geography) AS computed_area FROM [1_table]
-WHERE [1_type] = '[1]'
-AND ST_Intersects([1_table].geometry::geography, ST_GeomFromText('[2_wkt]',4326)::geography)
-ORDER BY computed_area DESC
-LIMIT 1;
-'''
+template_sql = (
+    "SELECT *, ST_Area([1_table].geometry::geography) AS computed_area "
+    "FROM [1_table]\n"
+    "WHERE [1_type] = '[1]'\n"
+    "AND ST_Intersects([1_table].geometry::geography, "
+    "ST_GeomFromText('[2_wkt]',4326)::geography)\n"
+    "ORDER BY computed_area DESC\n"
+    "LIMIT 1;\n"
+)
 
 n = N
 
-text_templates =  [l.strip() for l in open('templates/intersects:area_max+name.txt','r').readlines()]
+text_templates = [
+    line.strip() for line in open("templates/intersects:area_max+name.txt")
+]
 
-answer_type = 'name'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'intersects:area_max+name.jsonl')
+answer_type = "name"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "intersects:area_max+name.jsonl")
 
 
 # %%
 def verifier(template_tokens, selected_entities, answers):
     # print(selected_entities)
-    if selected_entities['[1]']['sub_category'] not in ["bay", "harbour", "lake", "reservoir"] and selected_entities['[1]']['main_category'] != 'leisure':
+    if (
+        selected_entities["[1]"]["sub_category"]
+        not in ["bay", "harbour", "lake", "reservoir"]
+        and selected_entities["[1]"]["main_category"] != "leisure"
+    ):
         return False
     if len(answers) == 0:
         return False
-    if 'area' not in answers[0] or answers[0]['area'] == 0:
+    if "area" not in answers[0] or answers[0]["area"] == 0:
         return False
     return True
 
+
 variable_types = [
-    ('[1]', 'park_lake'),
-    ('[2]', 'region'),
+    ("[1]", "park_lake"),
+    ("[2]", "region"),
 ]
 
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1_table]', '[1] table'),
-    ('[1]', '[1] sub_category', 'pluralize'),
-    ('[2]', '[2] region_name'),
-    ('[2_wkt]', '[2] geo_wkt'),
+    ("[1_type]", "[1] main_category"),
+    ("[1_table]", "[1] table"),
+    ("[1]", "[1] sub_category", "pluralize"),
+    ("[2]", "[2] region_name"),
+    ("[2_wkt]", "[2] geo_wkt"),
 ]
 
 
-
-
-template_sql = '''SELECT SUM(ST_Area([1_table].geometry::geography)) AS area FROM [1_table]
-WHERE [1_type] = '[1]'
-AND ST_Intersects([1_table].geometry::geography, ST_GeomFromText('[2_wkt]',4326)::geography)
-'''
+template_sql = (
+    "SELECT SUM(ST_Area([1_table].geometry::geography)) AS area FROM [1_table]\n"
+    "WHERE [1_type] = '[1]'\n"
+    "AND ST_Intersects([1_table].geometry::geography, "
+    "ST_GeomFromText('[2_wkt]',4326)::geography)\n"
+)
 
 n = N
 
-text_templates =  [l.strip() for l in open('templates/intersects:area_total+area.txt','r').readlines()]
+text_templates = [
+    line.strip() for line in open("templates/intersects:area_total+area.txt")
+]
 
-answer_type = 'area'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'intersects:area_total+area.jsonl')
+answer_type = "area"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "intersects:area_total+area.jsonl")
 
 
 # %%
@@ -1293,82 +2160,108 @@ save(questions, 'intersects:area_total+area.jsonl')
 
 def verifier(template_tokens, selected_entities, answers):
     # print(selected_entities)
-    # if selected_entities['[1]']['sub_category'] not in ["bay", "harbour", "lake", "reservoir"] and selected_entities['[1]']['main_category'] != 'leisure':
+    # if selected_entities['[1]']['sub_category'] not in ["bay", "harbour", "lake",
+    #     "reservoir"] and selected_entities['[1]']['main_category'] != 'leisure':
     #     return False
     if len(answers) == 0:
         return False
     # print(answers[0])
-    if not ('wikipedia' in answers[0] or 'lake_name' in answers[0] or 'road_name' in answers[0]):
+    if not (
+        "wikipedia" in answers[0]
+        or "lake_name" in answers[0]
+        or "road_name" in answers[0]
+    ):
         return False
     # if 'length' not in answers[0] or answers[0]['length'] == 0:
     #     return False
     return True
 
+
 variable_types = [
-    ('[1]', 'road_waterway'),
-    ('[2]', 'region'),
+    ("[1]", "road_waterway"),
+    ("[2]", "region"),
 ]
 
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1_table]', '[1] table'),
-    ('[1]', '[1] sub_category_label'),
-    ('[2]', '[2] region_name'),
-    ('[2_wkt]', '[2] geo_wkt'),
+    ("[1_type]", "[1] main_category"),
+    ("[1_table]", "[1] table"),
+    ("[1]", "[1] sub_category_label"),
+    ("[2]", "[2] region_name"),
+    ("[2_wkt]", "[2] geo_wkt"),
 ]
 
 
-
-
-template_sql = '''SELECT * FROM [1_table]
+template_sql = """SELECT * FROM [1_table]
 WHERE [1_type] = '[1]'
 AND ST_Intersects([1_table].geometry, ST_GeomFromText('[2_wkt]',4326)::geography)
 ORDER BY ST_Length([1_table].geometry) DESC
 LIMIT 1;
-'''
+"""
 
 n = N
 
-text_templates =  [l.strip() for l in open('templates/intersects:length_max+name.txt','r').readlines()]
+text_templates = [
+    line.strip() for line in open("templates/intersects:length_max+name.txt")
+]
 
-answer_type = 'name'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'intersects:length_max+name.jsonl')
+answer_type = "name"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "intersects:length_max+name.jsonl")
+
 
 # %%
 def verifier(template_tokens, selected_entities, answers):
     if len(answers) == 0:
         return False
-    if 'length' not in answers[0] or answers[0]['length'] == 0:
+    if "length" not in answers[0] or answers[0]["length"] == 0:
         return False
     return True
 
+
 variable_types = [
-    ('[1]', 'road_waterway'),
-    ('[2]', 'region'),
+    ("[1]", "road_waterway"),
+    ("[2]", "region"),
 ]
 
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1_table]', '[1] table'),
-    ('[1]', '[1] sub_category_label', 'pluralize'),
-    ('[2]', '[2] region_name'),
-    ('[2_wkt]', '[2] geo_wkt'),
+    ("[1_type]", "[1] main_category"),
+    ("[1_table]", "[1] table"),
+    ("[1]", "[1] sub_category_label", "pluralize"),
+    ("[2]", "[2] region_name"),
+    ("[2_wkt]", "[2] geo_wkt"),
 ]
 
 
-
-
-template_sql = '''SELECT SUM(ST_Length([1_table].geometry::geography)) AS length FROM [1_table]
-WHERE [1_type] = '[1]'
-AND ST_Intersects([1_table].geometry::geography, ST_GeomFromText('[2_wkt]',4326)::geography);
-'''
+template_sql = (
+    "SELECT SUM(ST_Length([1_table].geometry::geography)) AS length "
+    "FROM [1_table]\n"
+    "WHERE [1_type] = '[1]'\n"
+    "AND ST_Intersects([1_table].geometry::geography, "
+    "ST_GeomFromText('[2_wkt]',4326)::geography);\n"
+)
 
 n = N
 
-text_templates =  [l.strip() for l in open('templates/intersects:length_total+length.txt','r').readlines()]
+text_templates = [
+    line.strip() for line in open("templates/intersects:length_total+length.txt")
+]
 
-answer_type = 'length'
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n)
-save(questions, 'intersects:length_total+length.jsonl')
-
+answer_type = "length"
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)
+save(questions, "intersects:length_total+length.jsonl")

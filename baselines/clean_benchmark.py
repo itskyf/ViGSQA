@@ -21,7 +21,6 @@ Usage:
 import argparse
 import json
 import math
-import os
 import re
 from collections import defaultdict
 from glob import glob
@@ -37,32 +36,54 @@ QUESTIONS_DIR = ROOT / "selected_questions"
 BENCHMARK_DIR = ROOT / "benchmark"
 
 TYPES_ORDERED = [
-    "range+name", "range:non_spat_filter+name", "range:direction+name", "range:towards+name",
-    "knn+name", "knn:non_spat_filter+name", "knn+name+multi_source1", "knn+name+multi_source2",
-    "knn:direction+name", "knn:towards+name", "intersects:area_max+name", "intersects:length_max+name",
-    "range+loc", "range:non_spat_filter+loc", "range:direction+loc", "range:towards+loc",
-    "knn+loc", "knn:non_spat_filter+loc", "knn:direction+loc", "knn:towards+loc",
-    "range+angle", "knn+angle",
-    "range+count", "intersects+count",
-    "range+distance", "knn+distance",
-    "intersects:area_total+area", "intersects:length_total+length",
+    "range+name",
+    "range:non_spat_filter+name",
+    "range:direction+name",
+    "range:towards+name",
+    "knn+name",
+    "knn:non_spat_filter+name",
+    "knn+name+multi_source1",
+    "knn+name+multi_source2",
+    "knn:direction+name",
+    "knn:towards+name",
+    "intersects:area_max+name",
+    "intersects:length_max+name",
+    "range+loc",
+    "range:non_spat_filter+loc",
+    "range:direction+loc",
+    "range:towards+loc",
+    "knn+loc",
+    "knn:non_spat_filter+loc",
+    "knn:direction+loc",
+    "knn:towards+loc",
+    "range+angle",
+    "knn+angle",
+    "range+count",
+    "intersects+count",
+    "range+distance",
+    "knn+distance",
+    "intersects:area_total+area",
+    "intersects:length_total+length",
 ]
 TYPE_LABELS = {t: f"T{i}" for i, t in enumerate(TYPES_ORDERED, 1)}
 
 RELEVANT_SCORES = {
-    "count":    ["relative_error", "attempted"],
-    "area":     ["relative_error", "attempted"],
-    "length":   ["relative_error", "attempted"],
+    "count": ["relative_error", "attempted"],
+    "area": ["relative_error", "attempted"],
+    "length": ["relative_error", "attempted"],
     "distance": ["relative_error", "attempted"],
-    "name":     ["P", "R", "F1", "attempted"],
-    "loc":      ["P", "R", "F1", "distance_error", "attempted"],
-    "angle":    ["P", "R", "F1", "angle_error", "attempted"],
+    "name": ["P", "R", "F1", "attempted"],
+    "loc": ["P", "R", "F1", "distance_error", "attempted"],
+    "angle": ["P", "R", "F1", "angle_error", "attempted"],
 }
 
-DB_PARAMS = dict(host="localhost", dbname="osm_ca", user="postgres", password="postgres", port=5432)
+DB_PARAMS = dict(
+    host="localhost", dbname="osm_ca", user="postgres", password="postgres", port=5432
+)
 
 
 # ── Database ────────────────────────────────────────────────────────────────
+
 
 def make_conn():
     return psycopg.connect(**DB_PARAMS, row_factory=dict_row)
@@ -70,18 +91,22 @@ def make_conn():
 
 def run_sql(sql: str, conn, timeout_ms: int = 600_000) -> dict:
     cur = conn.cursor()
-    cur.execute("SET statement_timeout = %d" % timeout_ms)
+    cur.execute(f"SET statement_timeout = {timeout_ms}")
     try:
         cur.execute(sql)
-    except Exception as e:
+    except psycopg.Error as e:
         conn.rollback()
         return {"output": [], "error": str(e)}
     rows = cur.fetchall()
     cur.close()
-    return {"output": [{k: row[k] for k in row if row[k] is not None} for row in rows], "error": ""}
+    return {
+        "output": [{k: row[k] for k in row if row[k] is not None} for row in rows],
+        "error": "",
+    }
 
 
 # ── Question loading ─────────────────────────────────────────────────────────
+
 
 def load_questions() -> list:
     files = sorted(glob(str(QUESTIONS_DIR / "*.jsonl")))
@@ -103,6 +128,7 @@ def load_questions() -> list:
 
 
 # ── JSON block extraction (mirrors baselines.py) ─────────────────────────────
+
 
 def _flatten(array):
     if isinstance(array, list) and any(isinstance(i, list) for i in array):
@@ -127,9 +153,17 @@ def extract_json_blocks(text: str, idx=0) -> list:
             s = p2.sub(lambda m: m.group().replace(",", ""), s)
             s = p3.sub("", s)
             s = p4.sub("}", s)
-            s = (s.replace("\\'", "'").replace("\\&", "&")
-                  .replace(": integer", ": null").replace(" * ", ""))
-            s = re.sub(r"(\d[\d\s]*)(?:\s*\+\s*[\d\s\+]+)", lambda m: m.group(1).replace(" ", ""), s)
+            s = (
+                s.replace("\\'", "'")
+                .replace("\\&", "&")
+                .replace(": integer", ": null")
+                .replace(" * ", "")
+            )
+            s = re.sub(
+                r"(\d[\d\s]*)(?:\s*\+\s*[\d\s\+]+)",
+                lambda m: m.group(1).replace(" ", ""),
+                s,
+            )
             s = re.sub(r"\b\d[\d\s]*\b", lambda m: m.group(0).replace(" ", ""), s)
             if p5.search(s):
                 s = p5.sub("},\n{", s)
@@ -148,6 +182,7 @@ def extract_json_blocks(text: str, idx=0) -> list:
 
 # ── Baseline answer discovery ────────────────────────────────────────────────
 
+
 def discover_labels(root: Path, selected_models=None) -> list[str]:
     all_labels = []
     for p in sorted(root.glob("*_text_eval.csv")):
@@ -161,7 +196,9 @@ def discover_labels(root: Path, selected_models=None) -> list[str]:
     print(f"  Available labels: {all_labels}")
     ordered = []
     for m in selected_models:
-        matched = [l for l in all_labels if l == m or l.startswith(m + "_")]
+        matched = [
+            label for label in all_labels if label == m or label.startswith(m + "_")
+        ]
         if not matched:
             print(f"  WARNING: no labels found for model '{m}'")
         ordered.extend(matched)
@@ -187,14 +224,18 @@ def load_scores(labels: list, root: Path) -> dict:
         text_scores = {}
         for _, row in text_df.iterrows():
             d = row.to_dict()
-            text_scores[int(row["id"])] = {k: d[k] for k in d if k not in ("type", "id")}
+            text_scores[int(row["id"])] = {
+                k: d[k] for k in d if k not in ("type", "id")
+            }
 
         json_scores = {}
         for _, row in parsed_df.iterrows():
             d = row.to_dict()
             otype = _get_output_type(str(d.get("type", "")))
             keep = RELEVANT_SCORES.get(otype, []) if otype else []
-            json_scores[int(row["id"])] = {k: d[k] for k in d if k not in ("type", "id") and k in keep}
+            json_scores[int(row["id"])] = {
+                k: d[k] for k in d if k not in ("type", "id") and k in keep
+            }
 
         result[label] = {"text": text_scores, "json": json_scores}
     return result
@@ -203,7 +244,8 @@ def load_scores(labels: list, root: Path) -> dict:
 def load_answer_cache(labels: list, root: Path) -> dict:
     """
     Returns {label: {"text": {qid: str}, "json": {qid: str}}}
-    Looks in cache/{model_name}/{step}.json where step is direct_answer / sql_answer / rag_answer.
+    Looks in cache/{model_name}/{step}.json where step is direct_answer /
+    sql_answer / rag_answer.
     """
     result = {}
     for label in labels:
@@ -217,16 +259,18 @@ def load_answer_cache(labels: list, root: Path) -> dict:
                 break
 
         step_map = {
-            "direct":   ("direct_answer",   "direct_json_parse"),
-            "text2sql": ("sql_answer",       "sql_json_parse"),
-            "rag":      ("rag_answer",       "rag_json_parse"),
-            "shuffled": ("shuffled_answer",  "shuffled_json_parse"),
+            "direct": ("direct_answer", "direct_json_parse"),
+            "text2sql": ("sql_answer", "sql_json_parse"),
+            "rag": ("rag_answer", "rag_json_parse"),
+            "shuffled": ("shuffled_answer", "shuffled_json_parse"),
         }
-        ans_step, json_step = step_map.get(prefix, ("direct_answer", "direct_json_parse"))
+        ans_step, json_step = step_map.get(
+            prefix, ("direct_answer", "direct_json_parse")
+        )
 
         cache_dir = root / "cache" / model
 
-        def _load_step(step):
+        def _load_step(step, cache_dir=cache_dir):
             p = cache_dir / f"{step}.json"
             if not p.exists():
                 return {}
@@ -243,7 +287,10 @@ def load_answer_cache(labels: list, root: Path) -> dict:
 
 # ── Verification ─────────────────────────────────────────────────────────────
 
-def run_sql_answers(sql: str, expected_answers: list, conn) -> tuple[list | None, str | None]:
+
+def run_sql_answers(
+    sql: str, expected_answers: list, conn
+) -> tuple[list | None, str | None]:
     """
     Run the stored SQL and return (fresh_rows, error_or_warning).
 
@@ -274,10 +321,18 @@ def run_sql_answers(sql: str, expected_answers: list, conn) -> tuple[list | None
             return None, f"Scalar key '{scalar_key}' missing from result"
         try:
             if not math.isclose(float(actual_val), float(expected_val), rel_tol=1e-5):
-                return None, f"Scalar mismatch for '{scalar_key}': expected {expected_val}, got {actual_val}"
+                return (
+                    None,
+                    f"Scalar mismatch for '{scalar_key}': "
+                    f"expected {expected_val}, got {actual_val}",
+                )
         except (TypeError, ValueError):
             if actual_val != expected_val:
-                return None, f"Scalar mismatch for '{scalar_key}': expected {expected_val}, got {actual_val}"
+                return (
+                    None,
+                    f"Scalar mismatch for '{scalar_key}': "
+                    f"expected {expected_val}, got {actual_val}",
+                )
 
     # For ID-based answers: SQL output is authoritative (stale-predicate bug may have
     # produced a subset); return fresh rows so caller can overwrite q["answers"]
@@ -310,7 +365,10 @@ def verify_geo_wkts(question_entities: dict, sql: str, conn) -> list[str]:
         if expected_wkt not in sql:
             continue
 
-        for subkey, table, id_col in [("poi", "pois", "osm_id"), ("region", "regions", "id")]:
+        for subkey, table, id_col in [
+            ("poi", "pois", "osm_id"),
+            ("region", "regions", "id"),
+        ]:
             if subkey not in entity or not isinstance(entity[subkey], dict):
                 continue
             record_id = entity[subkey].get(id_col)
@@ -318,32 +376,49 @@ def verify_geo_wkts(question_entities: dict, sql: str, conn) -> list[str]:
                 continue
             safe_wkt = expected_wkt.replace("'", "''")
             # Use ST_DWithin with 1-metre tolerance to handle shapely's 6-decimal-place
-            # rounding (~0.1 m max error). Works for both POINTs and POLYGON/MULTIPOLYGON.
+            # rounding (~0.1 m max error). Works for both POINTs and
+            # POLYGON/MULTIPOLYGON.
             r = run_sql(
                 f"SELECT "
-                f"  ST_DWithin(geometry, ST_GeomFromText('{safe_wkt}', 4326)::geography, 1) AS match, "
+                f"  ST_DWithin(geometry, "
+                f"ST_GeomFromText('{safe_wkt}', 4326)::geography, 1) AS match, "
                 f"  ST_AsText(geometry::geometry) AS db_wkt "
                 f"FROM {table} WHERE {id_col} = {record_id} LIMIT 1",
-                conn, 5_000,
+                conn,
+                5_000,
             )
             if r["error"]:
                 errors.append(
-                    f"geo_wkt DB query error for {key} ({id_col}={record_id}): {r['error']}"
+                    f"geo_wkt DB query error for {key} "
+                    f"({id_col}={record_id}): {r['error']}"
                 )
                 break
             if not r["output"]:
-                errors.append(f"No DB record for {table}.{id_col}={record_id} (entity {key})")
+                errors.append(
+                    f"No DB record for {table}.{id_col}={record_id} (entity {key})"
+                )
                 break
             row = r["output"][0]
             if not row.get("match"):
                 db_wkt = row.get("db_wkt", "")
                 tqdm.write(f"    [DEBUG] entity {key} ({table}.{id_col}={record_id})")
-                tqdm.write(f"    [DEBUG] stored WKT ({len(expected_wkt)} chars): {expected_wkt[:120]}…")
-                tqdm.write(f"    [DEBUG] DB WKT     ({len(db_wkt)} chars): {db_wkt[:120]}…")
-                tqdm.write(f"    [DEBUG] stored geom_type: {expected_wkt.split('(')[0].strip()}")
-                tqdm.write(f"    [DEBUG] DB geom_type:     {db_wkt.split('(')[0].strip()}")
+                tqdm.write(
+                    f"    [DEBUG] stored WKT "
+                    f"({len(expected_wkt)} chars): {expected_wkt[:120]}…"
+                )
+                tqdm.write(
+                    f"    [DEBUG] DB WKT     ({len(db_wkt)} chars): {db_wkt[:120]}…"
+                )
+                tqdm.write(
+                    f"    [DEBUG] stored geom_type: "
+                    f"{expected_wkt.split('(')[0].strip()}"
+                )
+                tqdm.write(
+                    f"    [DEBUG] DB geom_type:     {db_wkt.split('(')[0].strip()}"
+                )
                 errors.append(
-                    f"geo_wkt mismatch for {key}: stored WKT does not intersect DB geometry "
+                    f"geo_wkt mismatch for {key}: "
+                    f"stored WKT does not intersect DB geometry "
                     f"({table}.{id_col}={record_id})"
                 )
             break
@@ -352,6 +427,7 @@ def verify_geo_wkts(question_entities: dict, sql: str, conn) -> list[str]:
 
 # ── Entity / question cleaning ───────────────────────────────────────────────
 
+
 def clean_entities(obj: dict, q_type: str) -> dict:
     out = {}
     for k, v in obj.items():
@@ -359,8 +435,15 @@ def clean_entities(obj: dict, q_type: str) -> dict:
             out[k] = {
                 k2: v[k2]
                 for k2 in v
-                if k2 in ("main_category", "sub_category", "poi_filter_desc",
-                           "poi_filter_sql", "sub_category_label", "table")
+                if k2
+                in (
+                    "main_category",
+                    "sub_category",
+                    "poi_filter_desc",
+                    "poi_filter_sql",
+                    "sub_category_label",
+                    "table",
+                )
             }
         else:
             out[k] = v
@@ -379,6 +462,7 @@ def clean_question(text: str, q_type: str) -> str:
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
+
 
 def main():
     args = parse_args()
@@ -402,7 +486,7 @@ def main():
     answers = load_answer_cache(labels, ROOT)
 
     # Apply renames: map original label → display name used as key in output JSON
-    label_display = {l: renames.get(l, l) for l in labels}
+    label_display = {label: renames.get(label, label) for label in labels}
 
     conn = make_conn() if not args.skip_verify else None
 
@@ -423,7 +507,9 @@ def main():
             if conn and not args.skip_verify:
                 fresh_rows, err = run_sql_answers(q["sql"], q["answers"], conn)
                 if err:
-                    verify_errors.append({"id": q["id"], "type": q["type"], "error": err})
+                    verify_errors.append(
+                        {"id": q["id"], "type": q["type"], "error": err}
+                    )
                     tqdm.write(f"  [VERIFY FAIL] q{q['id']} ({q['type']}): {err}")
                 elif fresh_rows is not None:
                     q["answers"] = fresh_rows
@@ -432,7 +518,9 @@ def main():
             if conn and args.verify_geo_wkts and "question_entities" in q:
                 geo_errs = verify_geo_wkts(q["question_entities"], q["sql"], conn)
                 for ge in geo_errs:
-                    verify_errors.append({"id": q["id"], "type": q["type"], "error": ge})
+                    verify_errors.append(
+                        {"id": q["id"], "type": q["type"], "error": ge}
+                    )
                     tqdm.write(f"  [GEO FAIL] q{q['id']} ({q['type']}): {ge}")
                     tqdm.write(f"    question: {q.get('question', '')[:120]}")
                     tqdm.write(f"    sql:      {q['sql'][:200]}")
@@ -464,7 +552,9 @@ def main():
                         "scores": scores[label]["text"].get(qid, {}),
                     },
                     "parsed": {
-                        "answer": extract_json_blocks(json_answer, qid) if json_answer else [],
+                        "answer": extract_json_blocks(json_answer, qid)
+                        if json_answer
+                        else [],
                         "scores": scores[label]["json"].get(qid, {}),
                     },
                 }
@@ -495,24 +585,34 @@ def main():
 def parse_args():
     parser = argparse.ArgumentParser(description="Build clean benchmark directory")
     parser.add_argument(
-        "--out-dir", default=str(BENCHMARK_DIR),
+        "--out-dir",
+        default=str(BENCHMARK_DIR),
         help="Output directory (default: ./benchmark)",
     )
     parser.add_argument(
-        "--skip-verify", action="store_true",
+        "--skip-verify",
+        action="store_true",
         help="Skip SQL correctness verification",
     )
     parser.add_argument(
-        "--verify-geo-wkts", action="store_true",
+        "--verify-geo-wkts",
+        action="store_true",
         help="Also verify geo_wkt values match the database geometries",
     )
     parser.add_argument(
-        "--models", nargs="*", default=None,
-        help="Filter labels by model prefix (e.g. gpt4o sonnet4.6). Default: all discovered.",
+        "--models",
+        nargs="*",
+        default=None,
+        help="Filter labels by model prefix (e.g. gpt4o sonnet4.6). "
+        "Default: all discovered.",
     )
     parser.add_argument(
-        "--rename", nargs="*", default=None, metavar="OLD=NEW",
-        help="Rename labels in output keys (e.g. ministral-3:14b-cloud_shuffled=shuffled).",
+        "--rename",
+        nargs="*",
+        default=None,
+        metavar="OLD=NEW",
+        help="Rename labels in output keys "
+        "(e.g. ministral-3:14b-cloud_shuffled=shuffled).",
     )
     return parser.parse_args()
 
