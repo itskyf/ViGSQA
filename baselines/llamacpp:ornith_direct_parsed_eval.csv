@@ -1,0 +1,9 @@
+attempted,P,R,F1,relative_error,type,id
+False,0.0,0.0,0.0,1.0,knn+distance,knn+distance-001
+False,0.0,0.0,0.0,1.0,knn+loc,knn+loc-001
+True,0.0,0.0,0.0,1.0,knn+name,knn+name-001
+False,0.0,0.0,0.0,1.0,knn:direction+name,knn:direction+name-001
+True,0.0,0.0,0.0,1.0,range+count,range+count-001
+False,0.0,0.0,0.0,1.0,range+loc,range+loc-001
+True,0.0,0.0,0.0,1.0,range+name,range+name-001
+True,0.0,0.0,0.0,1.0,range:direction+name,range:direction+name-001
