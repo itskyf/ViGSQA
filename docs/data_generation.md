@@ -8,7 +8,7 @@ VN-GeoQA contains 800 Vietnamese geospatial questions generated automatically fr
 
 ## Pipeline
 
-```
+```text
 OSM Vietnam (.pbf)
        │
        ▼
@@ -29,29 +29,72 @@ OSM Vietnam (.pbf)
 
 ## Step 1 — Database Setup
 
+Local (PostGIS runs in the `compose.yaml` container; tools come from pixi):
+
 ```bash
-bash setup_vn.sh
+podman compose up -d
+pixi run bash scripts/install_dependencies.sh
+pixi run bash scripts/init_database.sh
+pixi run bash scripts/download_osm.sh    # ~312 MB Geofabrik extract
+pixi run bash scripts/import_osm.sh
 ```
 
-Downloads Vietnam OSM data (~100 MB) from Geofabrik and loads into PostGIS:
+In Google Colab the same `scripts/*.sh` are run as-is: `install_dependencies.sh`
+apt-installs the packages and starts the local PostgreSQL service instead.
+
+Connection is configured through the standard libpq variables
+(`PGHOST`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGPORT`; defaults
+`127.0.0.1` / `osm_vn` / `postgres` / `postgres` / `5432`), shared by the
+scripts, `generator_vi.py`, and psql.
 
 | Table/View | Content |
 |-----------|---------|
-| `pois` | Points of interest (amenity, tourism, shop, leisure) |
-| `roads` | Named roads and highways |
-| `parks` | Parks, gardens, nature reserves |
-| `lakes` | Water bodies and waterways |
+| `planet_osm_point` | POI nodes (amenity, tourism, shop, leisure) via `scripts/osm_poi.lua` |
+| `pois` | View over `planet_osm_point` exposing `id, poi_name, amenity, tourism, shop, leisure, geometry, geo_wkt` |
 
-Default DB params: `host=localhost dbname=osm_vn user=postgres password=postgres port=5432`
+The `geometry` column name is intentional: the upstream GS-QA schema and the
+text2sql prompts hard-code `pois.geometry`.
 
 ---
 
 ## Step 2 — Question Generation
 
+Datasets are versioned under `data/<version>/questions_vi/` with
+`generator/questions_vi` as a symlink to the current version, so code and
+notebooks keep using the familiar path. `data/` is **not tracked by git**
+(`.gitignore`): the frozen dataset is published as a public GitHub Release
+asset and restored by:
+
+1. `./scripts/restore_dataset.sh` — downloads, unpacks, and sha256-verifies
+   `data/v1.0.0/questions_vi` (idempotent; needs only `curl` + `unzip`), or
+2. running the pipeline above against the **pinned snapshot** and regenerating
+   with the pinned seed. `download_osm.sh` defaults to the moving
+   `vietnam-latest.osm.pbf` (for producing new versions) — to reproduce
+   `v1.0.0`, pin the dated Geofabrik archive recorded in the MANIFEST:
+
+   ```bash
+   OSM_URL=https://download.geofabrik.de/asia/vietnam-260825.osm.pbf ./scripts/download_osm.sh
+   pixi run bash scripts/init_database.sh && pixi run bash scripts/import_osm.sh
+   # from the repo root (--output is resolved from the current directory):
+   pixi run python generator/generator_vi.py --seed 42 --count 100 --output data/v1.0.0/questions_vi
+   ```
+
+   Regeneration needs the running database and the pinned PBF; the Release
+   asset needs neither.
+
+Either way, verify integrity against the sha256 table in
+`docs/plans/T01-dataset-quality.md`. To publish a new version, generate into a
+new directory, verify, update the MANIFEST, then repoint the symlink:
+
 ```bash
 cd generator
-python generator_vi.py --output questions_vi/ --count 100
+python generator_vi.py --seed 42 --count 100 --output ../data/v1.0.1/questions_vi
+# verify, update MANIFEST, then: ln -sfn ../data/v1.0.1/questions_vi questions_vi
 ```
+
+The seed pins both the Python sampling and the per-call
+`TABLESAMPLE ... REPEATABLE` seeds, so regeneration against the same imported
+database is byte-identical (see the MANIFEST in the dataset directory).
 
 ### How It Works
 
@@ -67,7 +110,7 @@ Each question type follows a fixed SQL template. The generator:
 
 One question surface per line, with placeholders:
 
-```
+```text
 Cho biết [1_type] gần [3] nhất là gì.
 [1_type] nào gần [3] nhất hiện tại?
 Bạn có biết [1_type] gần [3] nhất là gì không?
@@ -80,14 +123,19 @@ Bạn có biết [1_type] gần [3] nhất là gì không?
 ## Step 3 — Quality Verification
 
 ```bash
-python verify_vi.py --input questions_vi/ --spot-check 0.05
+python verify_vi.py --input questions_vi/ --spot-check 0.05 --seed 42
 ```
 
-Checks:
-- Answer exists in DB (re-executes SQL)
-- Question contains Vietnamese characters and is plausible length
-- No duplicate questions within a type
-- Coordinates within Vietnam bounding box (lat 8–24, lon 100–110)
+Automated checks (DB-free, per record):
+
+- NFC normalization, no unreplaced `[N]` placeholders, plausible length
+- Anchor POI excluded from its own answer set (SQL predicate + answer ids/geometries)
+- No `LIMIT` without `ORDER BY` (nondeterministic answer subsets)
+- Stable `{type}-NNN` id, record type matches the filename, no duplicate questions
+- `question == question_surfaces.full`; Vietnamese surface consistency; name sanity
+
+Stored answers are additionally re-executed against PostGIS at freeze time
+(see the `validation` block in `questions_vi/MANIFEST.json`).
 
 ---
 
@@ -113,16 +161,22 @@ Each `questions_vi/<type>.jsonl` — 100 lines, one JSON object per line:
 
 ```json
 {
+  "id": "knn+name-001",
   "question": "Bể bơi gần [anchor] nhất là gì?",
+  "question_surfaces": {"full": "<question>", "stripped": "<diacritics-stripped>"},
   "type": "knn+name",
-  "sql": "SELECT poi_name, geo_wkt FROM pois ORDER BY geometry <-> (...) LIMIT 1",
+  "sql": "SELECT id, geo_wkt, poi_name FROM pois WHERE ... AND id <> <anchor> ORDER BY geometry <-> ... LIMIT 1",
   "answers": [
-    {"poi_name": "[result name]", "geo_wkt": "POINT(106.xx 21.xx)"}
+    {"id": 123, "poi_name": "[result name]", "geo_wkt": "POINT(106.xx 21.xx)"}
   ],
   "answer_type": "name",
-  "question_entities": ["[anchor]"]
+  "question_entities": {"[1]": {"main_category": "...", "sub_category": "..."}, "[2]": {"poi_name": "[anchor]", "geo_wkt": "..."}}
 }
 ```
+
+List-type questions (`range+name`, `range+loc`, `range:direction+name`) store the
+**full result set** ordered by distance to the anchor, with the anchor itself
+excluded.
 
 Field variations by type:
 
