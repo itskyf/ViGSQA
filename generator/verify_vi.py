@@ -12,6 +12,11 @@ Vietnamese GeoQA verification pipeline — 3 layers:
     d) Diacritic surface consistency (full vs stripped differ where expected)
     e) OSM name sanity (entity names contain at least one Vietnamese-range char
        OR standard ASCII — not garbled encoding)
+    f) Anchor exclusion: SQL must exclude the anchor POI id, and no answer may
+       carry the excluded id or the anchor entity's geometry
+    g) Determinism: no LIMIT unless the statement also has ORDER BY
+    h) Record identity: stable `{type}-NNN` id present; type matches filename
+    i) Surfaces: question equals question_surfaces.full; no duplicate questions
 
   Layer 3 — Human spot-check sample:
     Stratified 5% sample per template type, printed as TSV for annotators.
@@ -22,34 +27,41 @@ Usage:
     python verify_vi.py --input questions_vi/ --all
     python verify_vi.py --input questions_vi/ --spot-check 0.05
 """
+
 import argparse
 import json
-import unicodedata
+import random
 import re
 import sys
-import random
-from pathlib import Path
+import unicodedata
 from dataclasses import dataclass, field
-
+from pathlib import Path
 
 # ── Layer 2 checks ───────────────────────────────────────────────────────────
+
 
 def check_nfc(text: str) -> bool:
     return unicodedata.normalize("NFC", text) == text
 
+
 def check_no_placeholders(text: str) -> bool:
     return not re.search(r"\[[\d\w]+\]", text)
+
 
 def check_length(text: str, min_chars: int = 10, max_chars: int = 300) -> bool:
     return min_chars <= len(text) <= max_chars
 
+
 def check_diacritic_surfaces(full: str, stripped: str) -> bool:
     # stripped must differ from full IF full contains Vietnamese diacritics
-    vn_chars = re.compile(r"[àáảãạăắặẳẵằâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđÀÁẢÃẠĂẮẶẲẴẰÂẤẦẨẪẬÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴĐ]")
+    vn_chars = re.compile(
+        r"[àáảãạăắặẳẵằâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđÀÁẢÃẠĂẮẶẲẴẰÂẤẦẨẪẬÈÉẺẼẸÊẾỀỂỄỆÌÍỈĨỊÒÓỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÙÚỦŨỤƯỨỪỬỮỰỲÝỶỸỴĐ]"
+    )
     has_diacritics = bool(vn_chars.search(full))
     if has_diacritics:
         return full != stripped
     return True  # no diacritics → trivially ok
+
 
 def check_osm_name(name: str) -> bool:
     if not name:
@@ -62,6 +74,23 @@ def check_osm_name(name: str) -> bool:
         return False
     return len(name.strip()) > 0
 
+
+# Matches the anchor-exclusion predicate the generators emit, e.g. `id <> 123`
+# or `p.osm_id <> 123`.
+ANCHOR_EXCLUSION_RE = re.compile(r"\b(?:p\.)?(?:osm_id|id)\s*<>\s*(\d+)")
+
+
+def excluded_anchor_ids(sql: str) -> set[str]:
+    """Anchor POI ids the SQL excludes (empty set when no exclusion exists)."""
+    return {m.group(1) for m in ANCHOR_EXCLUSION_RE.finditer(sql)}
+
+
+def check_limit_ordered(sql: str) -> bool:
+    """A LIMIT must be backed by ORDER BY, otherwise the stored subset is planner-dependent."""
+    s = sql.upper()
+    return "LIMIT" not in s or "ORDER BY" in s
+
+
 @dataclass
 class CheckResult:
     question_id: int
@@ -72,7 +101,7 @@ class CheckResult:
     warnings: list[str] = field(default_factory=list)
 
 
-def run_layer2(entry: dict, idx: int) -> CheckResult:
+def run_layer2(entry: dict, idx: int, expected_type: str | None = None) -> CheckResult:
     q = entry.get("question", "")
     qtype = entry.get("type", "unknown")
     surfaces = entry.get("question_surfaces", {})
@@ -112,6 +141,47 @@ def run_layer2(entry: dict, idx: int) -> CheckResult:
     if "SELECT" not in sql.upper() or "FROM" not in sql.upper():
         failures.append("SQL_MALFORMED: missing SELECT or FROM")
 
+    # anchor exclusion: the anchor POI must not be able to answer its own question
+    excluded = excluded_anchor_ids(sql)
+    if not excluded:
+        failures.append(
+            "SQL_NO_ANCHOR_EXCLUSION: anchor POI can appear in its own answers"
+        )
+    for ans in answers:
+        if str(ans.get("id", "")) in excluded:
+            failures.append(
+                f"SELF_ANCHOR: answer id {ans.get('id')} equals the excluded anchor id"
+            )
+    anchor_wkts = {
+        v.get("geo_wkt")
+        for v in entities.values()
+        if isinstance(v, dict) and v.get("geo_wkt")
+    }
+    for ans in answers:
+        if ans.get("geo_wkt") in anchor_wkts:
+            failures.append(
+                "SELF_ANCHOR_WKT: answer geometry equals the anchor entity geometry"
+            )
+
+    # determinism: a bare LIMIT stores an arbitrary subset of the true answers
+    if not check_limit_ordered(sql):
+        failures.append("LIMIT_WITHOUT_ORDER_BY: answer subset is nondeterministic")
+
+    # stable record identity and type/filename agreement
+    qid = entry.get("id")
+    if not isinstance(qid, str) or not re.fullmatch(
+        rf"{re.escape(qtype)}-\d{{3}}", qid
+    ):
+        failures.append(f"BAD_QUESTION_ID: expected '{qtype}-NNN', got {qid!r}")
+    if expected_type is not None and qtype != expected_type:
+        failures.append(
+            f"TYPE_MISMATCH: record type {qtype!r} != filename type {expected_type!r}"
+        )
+
+    # the two surfaces must agree with the canonical question
+    if full != q:
+        failures.append("SURFACE_MISMATCH: question != question_surfaces.full")
+
     # empty answers
     if not answers:
         warnings.append("EMPTY_ANSWERS: no answer rows")
@@ -122,13 +192,14 @@ def run_layer2(entry: dict, idx: int) -> CheckResult:
 
 # ── Layer 3 spot-check sampler ───────────────────────────────────────────────
 
+
 def spot_check_sample(entries: list[dict], rate: float = 0.05) -> list[dict]:
     """Stratified sample by template type."""
     by_type: dict[str, list] = {}
     for e in entries:
         by_type.setdefault(e.get("type", "unknown"), []).append(e)
     sample = []
-    for qtype, group in by_type.items():
+    for group in by_type.values():
         k = max(1, int(len(group) * rate))
         sample.extend(random.sample(group, min(k, len(group))))
     return sample
@@ -140,11 +211,16 @@ def print_spot_check_tsv(sample: list[dict]):
         q = e.get("question", "")
         qtype = e.get("type", "")
         ans = e.get("answers", [{}])
-        ans_name = ans[0].get("poi_name") or ans[0].get("road_name") or str(ans[0])[:60] if ans else ""
-        print(f"{i}\t{qtype}\t{q}\t{ans_name}\t")
+        ans_name = (
+            ans[0].get("poi_name") or ans[0].get("road_name") or str(ans[0])[:60]
+            if ans
+            else ""
+        )
+        print(f"{e.get('id', i)}\t{qtype}\t{q}\t{ans_name}\t")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
+
 
 def load_jsonl(path: Path) -> list[dict]:
     entries = []
@@ -161,9 +237,17 @@ def verify_file(path: Path, spot_rate: float = 0.0) -> tuple[int, int]:
     passed = 0
     failed = 0
     fail_log = []
+    seen_questions: set[str] = set()
 
     for i, entry in enumerate(entries):
-        result = run_layer2(entry, i)
+        result = run_layer2(entry, i, expected_type=path.stem)
+        if entry.get("question") in seen_questions:
+            result.failures.append(
+                "DUPLICATE: identical question text earlier in this file"
+            )
+            result.passed = False
+        else:
+            seen_questions.add(entry.get("question", ""))
         if result.passed:
             passed += 1
         else:
@@ -172,6 +256,12 @@ def verify_file(path: Path, spot_rate: float = 0.0) -> tuple[int, int]:
         if result.warnings:
             for w in result.warnings:
                 print(f"  WARN [{i}] {w}", file=sys.stderr)
+
+    if len(entries) != 100:
+        print(
+            f"  WARN: {path.name}: expected 100 records, found {len(entries)}",
+            file=sys.stderr,
+        )
 
     print(f"\n{path.name}: {passed} passed / {failed} failed / {len(entries)} total")
 
@@ -183,7 +273,7 @@ def verify_file(path: Path, spot_rate: float = 0.0) -> tuple[int, int]:
 
     if spot_rate > 0:
         sample = spot_check_sample(entries, spot_rate)
-        print(f"\n── Spot-check sample ({spot_rate*100:.0f}%, n={len(sample)}) ──")
+        print(f"\n── Spot-check sample ({spot_rate * 100:.0f}%, n={len(sample)}) ──")
         print_spot_check_tsv(sample)
 
     return passed, failed
@@ -191,11 +281,25 @@ def verify_file(path: Path, spot_rate: float = 0.0) -> tuple[int, int]:
 
 def main():
     parser = argparse.ArgumentParser(description="Verify Vietnamese GeoQA data")
-    parser.add_argument("--input", required=True, help="JSONL file or directory of JSONL files")
-    parser.add_argument("--all", action="store_true", help="Process all .jsonl files in directory")
-    parser.add_argument("--spot-check", type=float, default=0.0,
-                        help="Fraction for human spot-check TSV output (e.g. 0.05)")
+    parser.add_argument(
+        "--input", required=True, help="JSONL file or directory of JSONL files"
+    )
+    parser.add_argument(
+        "--all", action="store_true", help="Process all .jsonl files in directory"
+    )
+    parser.add_argument(
+        "--spot-check",
+        type=float,
+        default=0.0,
+        help="Fraction for human spot-check TSV output (e.g. 0.05)",
+    )
+    parser.add_argument(
+        "--seed", type=int, help="Seed for reproducible spot-check sampling"
+    )
     args = parser.parse_args()
+
+    if args.seed is not None:
+        random.seed(args.seed)
 
     p = Path(args.input)
     total_pass, total_fail = 0, 0
