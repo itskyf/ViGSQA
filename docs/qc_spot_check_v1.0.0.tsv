@@ -1,0 +1,81 @@
+id	type	question	expected_answer	annotation
+knn+distance-082	knn+distance	Khoảng cách đến nhà nghỉ gần nhất từ Nhà hàng Yumi là bao nhiêu?	Nhà a Thận HN	
+knn+distance-015	knn+distance	Cách Bưu điện Bình Châu bao xa thì có siêu thị gần nhất?	Mini Mart	
+knn+distance-004	knn+distance	sân vận động gần Hoa Việt Hotel nhất cách Hoa Việt Hotel bao nhiêu km?	sân vận động xã Tân Thanh (điểm tại xã kháng nhật cũ)	
+knn+distance-095	knn+distance	Từ vị trí chùa Nam Trường đến trường đại học gần nhất là bao xa?	VIỆN HÀN LÂM KHOA HỌC VÀ CÔNG NGHỆ VN	
+knn+distance-036	knn+distance	Khoảng cách đến sân vận động gần phi nga nhất là bao nhiêu?	Nhà Thi Đấu ĐH Bách Khoa Tp.HCM	
+knn+distance-032	knn+distance	tiệm bánh gần nhất với Ngọc Sương cách bao xa?	Hùng Hà	
+knn+distance-029	knn+distance	Cho biết khoảng cách từ Sacombank đến bể bơi gần nhất.	Catba Papillon Garden Bungalows & Resort	
+knn+distance-018	knn+distance	Cách CaPhe Fantasy bao xa thì có sân vận động gần nhất?	Sân vận động Cẩm Lệ	
+knn+distance-014	knn+distance	quán cà phê gần Ngã Ba Phú Tài nhất cách Ngã Ba Phú Tài bao nhiêu km?	Olympic	
+knn+distance-087	knn+distance	Từ Nội thất Vietmay Depot đến điểm tham quan gần nhất là bao xa?	Song Ngu Farm	
+knn+loc-095	knn+loc	Bạn có thể cho tôi biết siêu thị gần Trường phổ thông Kiên Lương nhất ở đâu không?	Chợ Ba Chúc	
+knn+loc-070	knn+loc	Vị trí của siêu thị gần Bưu điện Huyện Long Điền nhất như thế nào?	Go!	
+knn+loc-012	knn+loc	nhà nghỉ gần Trường tiểu học Lý Thường Kiệt nhất nằm tại địa chỉ nào?	O.M.E hostel	
+knn+loc-076	knn+loc	Bạn có biết bể bơi gần Thanh binh nhất ở đâu không?	Hồ Bơi Phù Đổng	
+knn+loc-055	knn+loc	siêu thị gần Hủ Tiếu Nam Vang nhất nằm tại địa chỉ nào?	Siêu thị laptop Á Châu	
+knn+loc-005	knn+loc	nhà hàng gần Pizza Thao Nguyen nhất nằm tại địa chỉ nào?	Buffet korea	
+knn+loc-004	knn+loc	Cho tôi biết vị trí của tiệm bánh gần Nghĩa Hằng nhất.	Thu Anh Bakery Như Quỳnh	
+knn+loc-028	knn+loc	sân vận động gần nhất tính từ Holiday Sapa Hotel nằm ở vị trí nào?	sân vận động xã Tân Thanh (điểm tại xã kháng nhật cũ)	
+knn+loc-030	knn+loc	Bạn có thể chỉ đường đến công viên gần Bamboo Sapa Hotel nhất không?	Alpine Coaster Sapa	
+knn+loc-065	knn+loc	Vị trí chính xác của tiệm bánh gần Tipsy pub n' bistro nhất là gì?	La Boulangerie Francaise	
+knn+name-078	knn+name	siêu thị nào ở gần vị trí homestay nhất?	WinMart	
+knn+name-004	knn+name	Bạn có biết trường học nào gần Thu Luyen hotel (Nhà Nghỉ Thu Luyến) nhất không?	Van Son Junior Secondary School - Trường học cơ sổ xã Vân Son	
+knn+name-072	knn+name	cửa hàng tiện lợi nào gần vị trí Thanh Quyên nhất?	Sapa Mart	
+knn+name-026	knn+name	phòng khám nào gần G7 Mart nhất hiện tại?	Phòng khám đa khoa Việt Nhật	
+knn+name-092	knn+name	phòng triển lãm nào gần Hủ Tiếu Nam Vang nhất?	Phòng Trưng Bày Chloe	
+knn+name-084	knn+name	siêu thị nào gần Cửa Hàng Bánh Tôm Hồ Tây nhất?	Siêu Thị Hàng Đức	
+knn+name-090	knn+name	Bạn có thể chỉ cho tôi khách sạn gần Nội thất Vietmay Depot nhất không?	Khách Sạn Tân Vạn Xuân	
+knn+name-070	knn+name	nhà hàng nào ở gần vị trí Nhà Hàng Dê Minh Tâm nhất?	Com	
+knn+name-054	knn+name	Gần Cafe - billard dkclub nhất có trường học nào không?	TTLTDH Trường Minh	
+knn+name-029	knn+name	chợ gần Thu Luyen hotel (Nhà Nghỉ Thu Luyến) nhất là cái nào vậy?	Chợ Hữu Quan	
+knn:direction+name-058	knn:direction+name	Về hướng đông từ Mỳ Cay Itada, trung tâm thể thao nào gần nhất?	Billiards 124	
+knn:direction+name-076	knn:direction+name	khách sạn nào gần nhất với CaPhe Fantasy theo hướng tây bắc?	nhà nghỉ tạm	
+knn:direction+name-036	knn:direction+name	Về phía nam của Bamboo Sapa Hotel, khách sạn nào gần nhất?	Sapa Lodge	
+knn:direction+name-001	knn:direction+name	quán cà phê nào gần Bưu điện Huyện Long Điền nhất khi đi về hướng tây nam?	Giải khát 1719	
+knn:direction+name-098	knn:direction+name	tiệm bánh nào gần nhất với Bách Hóa Thảo Nguyên theo hướng tây?	Ngọc Ngân	
+knn:direction+name-021	knn:direction+name	Đi từ Cửa Hàng Bia Hơi Hà Nội theo hướng tây, phòng khám nào gần nhất?	Phú thọ	
+knn:direction+name-090	knn:direction+name	tiệm bánh gần nhất ở phía đông bắc của Holiday Sapa Hotel là gì?	Bao yen bakery	
+knn:direction+name-055	knn:direction+name	cửa hàng điện tử gần Hoa Bien Hotel nhất theo hướng tây là gì?	Điện Lạnh Lưu Sức	
+knn:direction+name-044	knn:direction+name	bưu điện gần nhất ở phía đông nam của Cafe Cốc Cốc là gì?	Bưu điện Tỉnh Bến Tre	
+knn:direction+name-020	knn:direction+name	nhà nghỉ nào gần nhất với CafeSac Mau theo hướng đông nam?	Rom Casa Hostel	
+range+count-028	range+count	trung tâm thể thao trong phạm vi 20 km từ Khách Sạn Ngọc Vàng có bao nhiêu cái?	{'count': 19}	
+range+count-098	range+count	Bao nhiêu chợ nằm trong vòng 20 km kể từ SV cafe?	{'count': 3}	
+range+count-044	range+count	Bao nhiêu tiệm bánh tồn tại trong phạm vi 5 km từ Bảo Tàng TMA?	{'count': 1}	
+range+count-014	range+count	Số lượng công viên cách Royal View Hotel trong khoảng 3 km là bao nhiêu?	{'count': 1}	
+range+count-012	range+count	Có bao nhiêu tiệm bánh trong vòng 10 km từ Công An Quận Bình Thạnh?	{'count': 95}	
+range+count-049	range+count	Tổng số lượng sân vận động trong vòng 10 km từ Khách Sạn Ngọc Vàng là bao nhiêu?	{'count': 2}	
+range+count-013	range+count	Số lượng bệnh viện cách Cafe - billard dkclub trong khoảng 2 km là bao nhiêu?	{'count': 12}	
+range+count-046	range+count	Có tất cả bao nhiêu công viên trong bán kính 5 km từ Cục Gạch Quán?	{'count': 6}	
+range+count-045	range+count	Số lượng trung tâm thể thao cách Oasis Restaurant trong khoảng 10 km là bao nhiêu?	{'count': 8}	
+range+count-078	range+count	Có tất cả mấy cửa hàng tiện lợi trong phạm vi 1 km từ Khách Sạn Ngọc Vàng?	{'count': 13}	
+range+loc-034	range+loc	Tìm địa điểm bảo tàng trong bán kính 3 km từ Khách Sạn Ngọc Vàng.	Vân Đường Phủ (Nhà cụ Vương Hồng Sển)	
+range+loc-006	range+loc	Địa điểm khách sạn trong bán kính 10 km từ Tiểu học Tân Phú Thạnh 2 ở chỗ nào?	Khu nghĩ dưỡng Sinh thái Tây Đô	
+range+loc-094	range+loc	Cho biết địa điểm bưu điện trong vòng 1 km từ Hủ Tiếu Nam Vang.	Bưu điện Mậu Thân	
+range+loc-059	range+loc	Tìm địa điểm cửa hàng tiện lợi trong bán kính 3 km từ SV cafe.	Circle K	
+range+loc-069	range+loc	Vị trí phòng triển lãm nào trong phạm vi 3 km từ Banana Leaf?	Phan Kim Chi Art Gallery	
+range+loc-016	range+loc	Địa chỉ chính xác nhà hàng nào trong phạm vi 3 km từ Thu Luyen hotel (Nhà Nghỉ Thu Luyến)?	Hai Hang restaurant (Nhà hàng Hải Hàng)	
+range+loc-049	range+loc	Chỉ giúp tôi vị trí điểm tham quan trong phạm vi 20 km từ Oasis Restaurant.	Lang nghe truong son	
+range+loc-011	range+loc	bưu điện nào cách Cửa Hàng Bánh Tôm Hồ Tây trong vòng 10 km và nó ở đâu?	Bưu Điện Yên Phụ	
+range+loc-071	range+loc	Địa điểm đồn công an trong bán kính 1 km từ Cafe Trung Nguyên ở chỗ nào?	Trụ Sở Công An - Phường Cầu Kho	
+range+loc-038	range+loc	Cho tôi biết vị trí siêu thị nào trong vòng 20 km từ Phở Bắc Hải.	Co.op Xtra	
+range+name-081	range+name	Tìm giúp tôi sân vận động trong bán kính 10 km từ CaPhe Fantasy.	Sân vận động Cẩm Lệ	
+range+name-080	range+name	Bạn có thể gợi ý cửa hàng tiện lợi gần Bamboo Sapa Hotel, trong vòng 50 km không?	Sapa Mart	
+range+name-047	range+name	sân vận động nào nằm trong bán kính 50 km xung quanh CafeSac Mau?	Sân vận động Cẩm Lệ	
+range+name-074	range+name	Bạn có gợi ý quán cà phê nào cách Bamboo Sapa Hotel dưới 10 km không?	Ca Phê Bao Câ	
+range+name-025	range+name	Gợi ý cho tôi bảo tàng trong phạm vi 50 km từ Lotteria.	Bảo Tàng FITO	
+range+name-091	range+name	cửa hàng tiện lợi nào trong bán kính 2 km từ Quán Chay Chay Corner mà bạn biết?	bồi bửu	
+range+name-009	range+name	Cho tôi biết nhà thuốc nào trong vòng 3 km từ QUấn bún riêu Đền Lừ.	Nhà thuốc số 5 Long Tâm	
+range+name-006	range+name	Cho biết bảo tàng trong phạm vi 2 km từ Trường tiểu học Lý Thường Kiệt.	BẢO TÀNG TƯ NHÂN GỐM CỔ GÒ SÀNH VIJAYA - CHAMPA - BÌNH ĐỊNH	
+range+name-085	range+name	cơ sở tôn giáo nào trong phạm vi 50 km của Sân vận động Huyện Kiến Thụy?	Chùa Cao Thiên	
+range+name-030	range+name	Tìm giúp tôi siêu thị trong bán kính 5 km từ Homie Coffee.	Go! Hypermarket	
+range:direction+name-099	range:direction+name	Về hướng nam, cửa hàng điện tử nào trong vòng 5 km từ NhaUyen Coffee?	F.Studio	
+range:direction+name-038	range:direction+name	bể bơi nào trong bán kính 10 km từ Yaourt bờ sông ở phía đông?	Happy Chill House	
+range:direction+name-011	range:direction+name	Có khách sạn nào cách Oasis Restaurant trong vòng 20 km theo hướng tây bắc không?	Gia * Poseidon	
+range:direction+name-030	range:direction+name	Có sân vận động nào trong vòng 20 km từ Phở Bắc Hải theo hướng tây bắc không?	Sân Vận Động Đạt Đức	
+range:direction+name-013	range:direction+name	Có tiệm bánh nào cách Bamboo Sapa Hotel trong vòng 5 km theo hướng đông không?	Bao yen bakery	
+range:direction+name-049	range:direction+name	Đi từ Homie Coffee theo hướng đông, có tiệm bánh nào trong vòng 50 km không?	Đồng Triếng	
+range:direction+name-036	range:direction+name	nhà nghỉ nào trong bán kính 50 km từ Công Viên Sông Đà ở phía tây bắc?	Nhà khách K9	
+range:direction+name-059	range:direction+name	Đi từ Holiday Sapa Hotel theo hướng bắc, có nhà nghỉ nào trong vòng 50 km không?	Nhà nghỉ Nhật Sapa Central	
+range:direction+name-082	range:direction+name	nhà nghỉ trong phạm vi 50 km từ chùa Nam Trường hướng tây bắc là gì?	Hue Amazing Homestay	
+range:direction+name-047	range:direction+name	Đi từ Cafe - billard dkclub theo hướng tây bắc, có khách sạn nào trong vòng 5 km không?	Hợp Thành 3	
