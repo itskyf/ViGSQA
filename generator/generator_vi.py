@@ -507,7 +507,7 @@ def generate_poi_type(type_str: str, tid: str, n: int = 100) -> list[dict]:
                     f"WITH origin AS (SELECT {geom_4326}::geography AS geom),\n"
                     f"angle AS (SELECT degrees(ST_Azimuth(origin.geom, "
                     f"ST_GeomFromText('{towards['geo_wkt']}',4326)"
-                    ") AS value FROM origin)\n"
+                    ")) AS value FROM origin)\n"
                 )
                 from_clause = "FROM pois, origin, angle"
         else:
@@ -579,7 +579,9 @@ def generate_poi_type(type_str: str, tid: str, n: int = 100) -> list[dict]:
                         "id": r.get("id"),
                         "geo_wkt": r.get("geo_wkt"),
                         "poi_name": r.get("poi_name"),
-                        "angle": round(float(r["angle"]), 1),
+                        # % 360 after rounding: 359.96 must not round up to 360
+                        # (azimuths are [0,360); 360 would break angle errors).
+                        "angle": round(float(r["angle"]), 1) % 360,
                     }
                     for r in rows
                 ]

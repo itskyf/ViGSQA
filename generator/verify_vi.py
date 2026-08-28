@@ -307,10 +307,13 @@ def spot_check_sample(entries: list[dict], rate: float = 0.05) -> list[dict]:
 
 
 def print_spot_check_tsv(sample: list[dict]):
-    print("id\ttid\ttype\tquestion\texpected_answer\tannotation")
+    """One row per sampled question: full record fields an annotator needs to
+    check that the SQL actually answers the Vietnamese question."""
+    print("id\ttid\ttype\tquestion\tsql\texpected_answer\tannotation")
     for i, e in enumerate(sample):
         q = e.get("question", "")
         qtype = e.get("type", "")
+        sql = e.get("sql", "").replace("\t", " ").replace("\n", " ")
         ans = e.get("answers", [{}])
         ans_name = (
             ans[0].get("poi_name")
@@ -321,7 +324,9 @@ def print_spot_check_tsv(sample: list[dict]):
             if ans
             else ""
         )
-        print(f"{e.get('id', i)}\t{e.get('tid', '')}\t{qtype}\t{q}\t{ans_name}\t")
+        print(
+            f"{e.get('id', i)}\t{e.get('tid', '')}\t{qtype}\t{q}\t{sql}\t{ans_name}\t"
+        )
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
