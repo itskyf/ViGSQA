@@ -1,5 +1,7 @@
 # VN-GeoQA Baseline Evaluation Report
 
+> **ARCHIVED — PRE-FREEZE RESULTS.** These numbers predate the v1.0.0 benchmark freeze (superseded candidate dataset) and are **not valid benchmark evidence**. Official results come from fresh runs against the frozen benchmark (T03).
+
 **Dataset:** VN-GeoQA — 800 Vietnamese geospatial questions, 8 types × 100 questions each  
 **Database:** OpenStreetMap Vietnam (PostGIS, `osm_vn`)  
 **Date:** 2026-08-20
@@ -174,6 +176,7 @@ Both text2sql runs show att = 600/800. The 200 unattempted questions are the `kn
 | Qwen3.5-27B | text2sql | pending | — |
 
 **Key takeaways:**
+
 1. Database grounding (text2sql) is essential — direct baseline is near-zero for all models
 2. Gemma-4-26B and Qwen3.5-9B are tied overall but have complementary strengths by query type
 3. Location types (knn+loc, range+loc) need a post-processing fix to extract coordinates before answer generation

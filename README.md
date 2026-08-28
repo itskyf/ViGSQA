@@ -7,37 +7,50 @@ This fork adds **VN-GeoQA**, a Vietnamese-language geospatial QA benchmark built
 | | VN-GeoQA |
 |--|--|
 | Language | Vietnamese |
-| Questions | 800 (100 × 8 types) |
-| Database | OSM Vietnam (PostGIS `osm_vn`) |
-| Dataset | [`generator/questions_vi/`](generator/questions_vi/) |
-| Baselines | direct, text2sql (llamacpp / Ollama) |
-| Results | [`baselines/REPORT_VN_GEOQA.md`](baselines/REPORT_VN_GEOQA.md) |
+| Version | **v1.0.0 (frozen)** — [`data/v1.0.0/questions_vi/MANIFEST.json`](data/v1.0.0/questions_vi/MANIFEST.json) |
+| Questions | 800 (100 × 8 types), stable `{type}-NNN` ids |
+| Source | Geofabrik `vietnam-260825.osm.pbf` (sha256 in MANIFEST) → PostGIS `osm_vn` |
+| Database | OSM Vietnam (PostGIS `osm_vn` + llama.cpp via [`compose.yaml`](compose.yaml)) |
+| Dataset | `data/v1.0.0/questions_vi/` — **not in git** by design; restore with `scripts/restore_dataset.sh` (public GitHub Release asset, sha256-verified) or regenerate with seed 42. Symlinked at `generator/questions_vi/` |
+| QC | automated checks 800/800 + human review of an 80-record seeded sample |
+| Baselines | direct, text2sql — llama.cpp OpenAI-compatible `/v1` via `langchain-openai` |
+| Results | [`baselines/REPORT_VN_GEOQA.md`](baselines/REPORT_VN_GEOQA.md) *(archived, pre-freeze)* |
+
+Generation is reproducible: `python generator/generator_vi.py --seed 42 --count 100` against the imported snapshot regenerates the dataset byte-identically; seed, command, snapshot hash, and validation evidence are recorded in the MANIFEST. Range questions store the **full** answer set ordered by distance (GS-QA range semantics: multiple valid answers).
 
 **Full Vietnamese documentation: [README_VI.md](README_VI.md)**
 
 Docs:
+
 - [docs/data_generation.md](docs/data_generation.md) — pipeline, templates, output format
-- [docs/results.md](docs/results.md) — all baseline results and analysis
+- [docs/results.md](docs/results.md) — baseline results and analysis *(archived, pre-freeze)*
 
 Quick start:
+
 ```bash
-bash setup_vn.sh   # install PostGIS + load OSM Vietnam data
-pip install -r baselines/requirements.txt
-python baselines/baselines_vi.py --model ollama:<model> --baseline text2sql
+podman compose up -d                              # PostGIS + llama.cpp (or run on Google Colab)
+pixi run bash scripts/restore_dataset.sh          # frozen benchmark v1.0.0 from the public release
+pixi run bash scripts/install_dependencies.sh     # tools (Colab: apt + local PostgreSQL)
+pixi run bash scripts/init_database.sh
+# evaluation must use the pinned snapshot (never vietnam-latest):
+OSM_URL=https://download.geofabrik.de/asia/vietnam-260825.osm.pbf \
+  pixi run bash scripts/download_osm.sh           # ~312 MB Geofabrik Vietnam extract
+pixi run bash scripts/import_osm.sh
+pixi run python baselines/baselines_vi.py --model llamacpp:ornith --baseline text2sql --mode smoke
 ```
 
 ---
 
 ### Abstract
 
-Recent advances in Large Language Models (LLMs) have led to dramatic improvements in question answering (QA). 
-To address the challenge of evaluating QA systems, standardized benchmarks have been introduced. 
+Recent advances in Large Language Models (LLMs) have led to dramatic improvements in question answering (QA).
+To address the challenge of evaluating QA systems, standardized benchmarks have been introduced.
 This work focuses on the problem of geospatial QA, where a large collection of geospatial data is available in the form of a spatial database or other forms.
-There is limited work on creating or evaluating geospatial QA systems. This work has various limitations including a small number of questions, reliance on a knowledge graph, limited geospatial operators, and no complex reasoning. 
-We present GS-QA, an extensible geospatial QA benchmark with 2800 question-answer pairs on top of Open Street Maps (OSM) and Wikipedia data, covering various spatial objects, predicates, and answer types. 
-A key feature of GS-QA is that some of the questions require combining information from multiple sources, e.g.,  geospatial information from OSM and other information from Wikipedia. 
-GS-QA includes a comprehensive evaluation methodology that combines text-based QA measures with geospatial-specific measures. 
-We implemented various LLM-based geospatial QA baselines, using combinations of LLMs, retrieval, and structured querying. 
+There is limited work on creating or evaluating geospatial QA systems. This work has various limitations including a small number of questions, reliance on a knowledge graph, limited geospatial operators, and no complex reasoning.
+We present GS-QA, an extensible geospatial QA benchmark with 2800 question-answer pairs on top of Open Street Maps (OSM) and Wikipedia data, covering various spatial objects, predicates, and answer types.
+A key feature of GS-QA is that some of the questions require combining information from multiple sources, e.g., geospatial information from OSM and other information from Wikipedia.
+GS-QA includes a comprehensive evaluation methodology that combines text-based QA measures with geospatial-specific measures.
+We implemented various LLM-based geospatial QA baselines, using combinations of LLMs, retrieval, and structured querying.
 Our results show that existing solutions have very low accuracy, which warrants more research in this direction.
 
 ## Features
@@ -59,13 +72,15 @@ Our results show that existing solutions have very low accuracy, which warrants 
 ## Installation
 
 1. Clone the repository:
-   ```
+
+   ```text
    git clone https://github.com/MajidSas/GS-QA
    cd GS-QA
    ```
 
 2. Install Python dependencies:
-   ```
+
+   ```text
    pip install -r ./generator/requirements.txt
    pip install -r ./baselines/requirements.txt
    ```
@@ -73,36 +88,39 @@ Our results show that existing solutions have very low accuracy, which warrants 
 3. Set up PostgreSQL with PostGIS:
    - Ensure PostgreSQL is installed on your system
    - Install PostGIS extension:
-     ```
+
+     ```text
      CREATE EXTENSION postgis;
      ```
+
    - Create a database and configure connection parameters in the config file
 
 4. Install Ollama and get OpenAI API token
 
-Ollama is only required for evaluating the baselines: https://ollama.com
+Ollama is only required for evaluating the baselines: <https://ollama.com>
 
 OpenAI API is required to evaluate GPT4o.
 
 The scripts can be easily modified for any model, and are based on LangChain.
 
-
 ### Benchmark Data
 
-The benchmark questions are located in the `benchmark/` directory. The folder contains 28 directories, one for each question type. Inside each directory there are 100 folders, one for each question. Inside each of these folders, there are two JSON files, one for the question itself and one for the answers we obtaiend from our baselines.
+> **Removed from this fork's working tree:** the upstream English `benchmark/` tree (28 × 100 questions, ~168 MB) is deleted at the freeze commit but remains in the inherited history (fork base `tien02/nlp-ck`), so it is recoverable with `git checkout base/main -- benchmark` or regenerable via `baselines/clean_benchmark.py`. The Vietnamese benchmark (`data/v1.0.0/questions_vi/`) is kept out of git by design (see the table above for restore paths). The English data can be regenerated with `baselines/clean_benchmark.py` from the upstream GS-QA artifacts (see "Question Generation" below and the upstream repo). The schema documentation below still describes those upstream English files.
+
+The upstream benchmark questions were located in the `benchmark/` directory. The folder contains 28 directories, one for each question type. Inside each directory there are 100 folders, one for each question. Inside each of these folders, there are two JSON files, one for the question itself and one for the answers we obtaiend from our baselines.
 
 The `question.json` files have the following general schema:
 
 - `"question"`: contains the question text.
 - `"sql"`: the sql query used to get the answers from our reference database.
 - `"answer_type"`: proivdes the answer type for each template.
-- `"answers"`: an array of objects, with schema depending on the question type. 
-   * For entity name (T1-T11, except T7), the answers are in an attribute that ends with the suffix `"_name"`, e.g. `"poi_name"`.
-   * For the first type of multihop questions (T7), it is `"multihop_answer"`, and the type is `"multihop_attribute"`.
-   * For the location (T12-T20), the attribute is `"geometry"`, which needs to be geocoded if evaluating on address and not location coordinates.
-   * For the direction (T21,T22), the attribute is `"angle"`.
-   * For other output types it is under `"count"`, `"distance"`, `"length"`, `"area"`.
-   For non-aggregate answers, the entire record is stored in addition to the answer attribute.
+- `"answers"`: an array of objects, with schema depending on the question type.
+  - For entity name (T1-T11, except T7), the answers are in an attribute that ends with the suffix `"_name"`, e.g. `"poi_name"`.
+  - For the first type of multihop questions (T7), it is `"multihop_answer"`, and the type is `"multihop_attribute"`.
+  - For the location (T12-T20), the attribute is `"geometry"`, which needs to be geocoded if evaluating on address and not location coordinates.
+  - For the direction (T21,T22), the attribute is `"angle"`.
+  - For other output types it is under `"count"`, `"distance"`, `"length"`, `"area"`.
+  For non-aggregate answers, the entire record is stored in addition to the answer attribute.
 - `"question_entities"`: stores the objects that were used to create the question such as the anchoring points or the region. This can be helpful for more advanced evaluation.
 - `"id"`: a unique identifier for each question in the benchmark.
 - `"type"`: a unique identifier for each template, which includes the names of predicates and output type.
@@ -113,14 +131,15 @@ The `question.json` files have the following general schema:
 
 To run the question generation script, first we need to setup the database.
 
-First, download our data from: https://drive.google.com/drive/folders/1pz895-lpGAaNJXz2mzjnB7SAgWwD0Uag?usp=share_link
+First, download our data from: <https://drive.google.com/drive/folders/1pz895-lpGAaNJXz2mzjnB7SAgWwD0Uag?usp=share_link>
 
-We obtained this data using this tool: https://bitbucket.org/bdlabucr/osmx/src/master/
-With the source: https://www.geofabrik.de/data/download.html
+We obtained this data using this tool: <https://bitbucket.org/bdlabucr/osmx/src/master/>
+With the source: <https://www.geofabrik.de/data/download.html>
 We only downloaded the data of the US. You can obtain data over a different region or a more recent copy.
 
 The data must be in geojson format, with the following folder structure:
-```
+
+```text
 - osm_extract:
 -- lakes
 -- parks
@@ -130,6 +149,7 @@ The data must be in geojson format, with the following folder structure:
 ```
 
 Once the data is ready, and a database in PostgresQL is created, we can use the folloing scripts to create the tables and insert the data into the database:
+
 - "pois_processor.py"
 - "regions_processor.py"
 - "roads_processor.py"
@@ -137,7 +157,8 @@ Once the data is ready, and a database in PostgresQL is created, we can use the 
 - "lakes_processor.py"
 
 In all of these scripts, you will need to update your database connection information. Modify the connection lines:
-```
+
+```text
 conn = psycopg2.connect(
       host = 'localhost',
       dbname = 'database_name',
@@ -155,60 +176,84 @@ To modify the text templates, such as changing the language of the questions, yo
 
 ```python
 variable_types = [
-    ('[1]', 'poi'),
-    ('[2]', 'distance'),
-    ('[3]', 'poi'),
-] # determines for which cateogory of values these parameters are populated all text version of this template must contain all three parameters
+    ("[1]", "poi"),
+    ("[2]", "distance"),
+    ("[3]", "poi"),
+]  # determines for which cateogory of values these parameters are populated all text version of this template must contain all three parameters
 
 template_tokens = [
-    ('[1_type]', '[1] main_category'),
-    ('[1]', '[1] sub_category', 'append_an'), # for this question [1] is preprended with `a` or `an` to make the question grammatically correct
-    ('[2]', '[2] distance'), 
-    ('[2_text]', '[2] text'), # we differntiate between the distance number in meters and the text which is appended by the unit in kilometers
-    ('[3]', '[3] display_name'), # this populates it with the display_name of the poi
-    ('[3_wkt]', '[3] geo_wkt'), # this one populates the geometry of the poi in the SQL template
-] # 
+    ("[1_type]", "[1] main_category"),
+    (
+        "[1]",
+        "[1] sub_category",
+        "append_an",
+    ),  # for this question [1] is preprended with `a` or `an` to make the question grammatically correct
+    ("[2]", "[2] distance"),
+    (
+        "[2_text]",
+        "[2] text",
+    ),  # we differntiate between the distance number in meters and the text which is appended by the unit in kilometers
+    ("[3]", "[3] display_name"),  # this populates it with the display_name of the poi
+    (
+        "[3_wkt]",
+        "[3] geo_wkt",
+    ),  # this one populates the geometry of the poi in the SQL template
+]  #
 
 
-template_sql = '''SELECT * FROM pois
+template_sql = """SELECT * FROM pois
 WHERE ST_DWithin(pois.geometry, ST_GeomFromText('[3_wkt]',4326)::geography, [2])
 AND [1_type] = '[1]';
-'''
-text_templates =  [l.replace('[2]', '[2_text]').strip() for l in open('templates/range+name.txt','r').readlines()]
-answer_type = 'name'
+"""
+text_templates = [
+    l.replace("[2]", "[2_text]").strip()
+    for l in open("templates/range+name.txt", "r").readlines()
+]
+answer_type = "name"
 n = N
-questions = question_generator(text_templates, variable_types, template_tokens, template_sql, answer_type, verifier, n) # this function will generate the questions
+questions = question_generator(
+    text_templates,
+    variable_types,
+    template_tokens,
+    template_sql,
+    answer_type,
+    verifier,
+    n,
+)  # this function will generate the questions
 # if new types of entities are used the question_generator function will need to be modified to support them
-save(questions, 'range+name.jsonl') # saves the questiosn one in JSON format one per line
+save(
+    questions, "range+name.jsonl"
+)  # saves the questiosn one in JSON format one per line
 ```
 
 Finally, the notebook `./generator/question_selector.ipynb` is used to filter the questions based on our criteria and select 100 questions from each template. Further, we manually evaluated this final set of questions that are included in the benchmark.
 
 ### Baselines and evaluation
 
-The folder `./baselines/` contains multiple scripts to run and evaluate the baselines. See `./baselines/run_baselines.sh` for usage. The baselines require OLLAMA to be setup and also OpenAI and Anthropic API keys to evaluate their models. 
+The folder `./baselines/` contains multiple scripts to run and evaluate the baselines. See `./baselines/run_baselines.sh` for usage. The baselines require OLLAMA to be setup and also OpenAI and Anthropic API keys to evaluate their models.
 
 The questions can be read using the following code:
+
 ```python
 from glob import glob
 import json
-files = glob('../benchmark/**/question.json', recursive=True)
+
+files = glob("../benchmark/**/question.json", recursive=True)
 questions = []
 for path in files:
-    with open(path, 'r') as file:
-      question = json.loads(file.read())
-      questions.append(question)
+    with open(path, "r") as file:
+        question = json.loads(file.read())
+        questions.append(question)
 ```
 
 Running the remainder of the script will generate two files one for full text evaluation and one for parsed evaluation. The file `./baselines/evaluate.py` contains the evaluation functions that we proposed.
 
 ## Citation
 
-```
+```text
 [Paper under review will be added later]
 ```
 
-
 ## Contact
 
-For questions or feedback, please open an issue or contact msaee007@ucr.edu
+For questions or feedback, please open an issue or contact <msaee007@ucr.edu>

@@ -14,7 +14,7 @@ VN-GeoQA is a Vietnamese geospatial question-answering benchmark derived from Op
 
 Downloaded Vietnam OSM extract from Geofabrik:
 
-```
+```text
 vietnam-latest.osm.pbf  (~312 MB)
 ```
 
@@ -81,7 +81,8 @@ Key issue: `planet_osm_point.way` is SRID 3857. All geography operations require
 Translated all 26 GS-QA template types into Vietnamese, stored in `generator/templates_vi/*.txt`. Each file contains 20–30 paraphrase variants per template type. Placeholders use `[1]`, `[2]`, `[3]`, `[4]`.
 
 Example (`knn+name.txt`):
-```
+
+```text
 [1] nào gần [2] nhất?
 [1] gần nhất với [2] là gì?
 Tìm [1] gần [2] nhất giúp tôi với.
@@ -125,11 +126,13 @@ Generator implements 8 spatial query types:
 **Reference POI sampling:** Uses `TABLESAMPLE SYSTEM(2)` on `planet_osm_point` base table directly — `TABLESAMPLE` cannot be applied to views or materialized views.
 
 **KNN operator:** Uses PostGIS `<->` KNN operator on SRID 3857 geometry for ordering, then converts results to WGS84:
+
 ```sql
 ORDER BY p.way <-> ST_Transform(ST_GeomFromText(ref_wkt, 4326), 3857)
 ```
 
 **Range queries:** Use `ST_DWithin` with `::geography` cast for metre-accurate distance:
+
 ```sql
 ST_DWithin(geometry, ST_GeomFromText(ref_wkt, 4326)::geography, radius_m)
 ```
@@ -148,6 +151,7 @@ ST_DWithin(geometry, ST_GeomFromText(ref_wkt, 4326)::geography, radius_m)
 | tây nam (SW) | Y < lat AND X < lon |
 
 **Text normalization:**
+
 - All OSM names fetched from DB are NFC-normalized before insertion into templates
 - `strip_diacritics()` generates a diacritic-free surface form for search/indexing — handles `Đ/đ` explicitly since NFKD decomposition does not strip them
 
@@ -158,6 +162,7 @@ Three-layer verification:
 **Layer 1 — SQL execution** (automatic during generation): Every SQL in every record was executed against the live PostGIS DB to produce the answer. Answers are not heuristic — they are the actual DB result.
 
 **Layer 2 — Automated text checks per record:**
+
 - Question string is NFC-normalized
 - No unreplaced placeholders (`[1]`, `[2]`, etc.) remain
 - Question length between 10 and 300 characters
@@ -166,11 +171,11 @@ Three-layer verification:
 
 **Layer 3 — Human spot-check TSV:** 5% sample printed as tab-separated table with `question`, `expected_answer`, and blank `annotation` column for manual review.
 
-```
+```text
 python3 verify_vi.py --input questions_vi/ --spot-check 0.05
 ```
 
-**Result: 800/800 passed (100%)**
+#### Result: 800/800 passed (100%)
 
 ---
 
@@ -236,7 +241,7 @@ Each line in `generator/questions_vi/*.jsonl` is a JSON object:
 
 ## Files
 
-```
+```text
 GS-QA/
 ├── DATA_CREATION.md             # This document
 └── generator/
