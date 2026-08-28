@@ -24,6 +24,14 @@ baselines/address_cache/
 # Jupyter
 .ipynb_checkpoints/
 
+# Python environments
+.venv/
+
+# OSM downloads and per-machine import state (see questions_vi/MANIFEST.json for provenance)
+*.osm.pbf
+.osm_vn_source
+.osm_vn_fileinfo
+
 # Model weights
 *.gguf
 *.bin
@@ -39,3 +47,9 @@ Thumbs.db
 
 # APM dependencies
 apm_modules/
+
+# Markdown lint cache
+.rumdl_cache/
+
+# datasets live outside git (synced via rclone to Google Drive)
+data/

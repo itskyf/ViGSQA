@@ -1,6 +1,7 @@
 [tools]
 "aqua:Kampfkarren/selene" = "latest"
 "conda:docker-compose" = "latest"
+"github:Cactusinhand/filter-repo-rs" = "latest"
 "github:microsoft/apm" = "latest"
 pixi = "latest"
 rumdl = "latest"
