@@ -32,20 +32,28 @@ OSM Vietnam (.pbf)
 Local (PostGIS runs in the `compose.yaml` container; tools come from pixi):
 
 ```bash
-podman compose up -d
-pixi run bash scripts/install_dependencies.sh
-pixi run bash scripts/init_database.sh
-pixi run bash scripts/download_osm.sh    # ~312 MB Geofabrik extract
-pixi run bash scripts/import_osm.sh
+export PGHOST=127.0.0.1 PGPORT=5432 PGDATABASE=osm_vn
+export PGUSER=postgres PGPASSWORD=postgres
+./scripts/install_dependencies.sh
+podman compose up -d postgres
+./scripts/init_database.sh
+./scripts/download_osm.sh    # ~312 MB Geofabrik extract
+./scripts/import_osm.sh
 ```
 
-In Google Colab the same `scripts/*.sh` are run as-is: `install_dependencies.sh`
-apt-installs the packages and starts the local PostgreSQL service instead.
+`install_dependencies.sh` only installs or verifies dependencies. In Google
+Colab it uses apt for PostgreSQL/PostGIS and the required import tools; service
+startup and database initialization are separate steps. The course notebook
+runs the PostgreSQL/OSM workflow independently from llama.cpp and waits for
+both branches before exploration or experiments. After bootstrap, bounded
+readiness and PostGIS checks use psycopg3; `psql` is used only where Colab
+already provides it or container execution is simpler.
 
-Connection is configured through the standard libpq variables
-(`PGHOST`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGPORT`; defaults
-`127.0.0.1` / `osm_vn` / `postgres` / `postgres` / `5432`), shared by the
-scripts, `generator_vi.py`, and psql.
+Connection is configured by `PostgresSettings` through the standard libpq
+variables (`PGHOST`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGPORT`; defaults
+`127.0.0.1` / `osm_vn` / `postgres` / `postgres` / `5432`). The notebook
+exports these values for compose and the shell scripts; manual shell runs must
+export them as shown above.
 
 | Table/View | Content |
 |-----------|---------|
@@ -68,15 +76,16 @@ asset and restored by:
 1. `./scripts/restore_dataset.sh` — downloads, unpacks, and sha256-verifies
    `data/v1.0.0/questions_vi` (idempotent; needs only `curl` + `unzip`), or
 2. running the pipeline above against the **pinned snapshot** and regenerating
-   with the pinned seed. `download_osm.sh` defaults to the moving
-   `vietnam-latest.osm.pbf` (for producing new versions) — to reproduce
-   `v1.0.0`, pin the dated Geofabrik archive recorded in the MANIFEST:
+   with the pinned seed. `download_osm.sh` downloads the pinned
+   `vietnam-260825.osm.pbf` snapshot:
 
    ```bash
-   OSM_URL=https://download.geofabrik.de/asia/vietnam-260825.osm.pbf ./scripts/download_osm.sh
-   pixi run bash scripts/init_database.sh && pixi run bash scripts/import_osm.sh
+   export PGHOST=127.0.0.1 PGPORT=5432 PGDATABASE=osm_vn
+   export PGUSER=postgres PGPASSWORD=postgres
+   ./scripts/download_osm.sh
+   ./scripts/init_database.sh && ./scripts/import_osm.sh
    # from the repo root (--output is resolved from the current directory):
-   pixi run python generator/generator_vi.py --seed 42 --count 100 --output data/v1.0.0/questions_vi
+   python generator/generator_vi.py --seed 42 --count 100 --output data/v1.0.0/questions_vi
    ```
 
    Regeneration needs the running database and the pinned PBF; the Release

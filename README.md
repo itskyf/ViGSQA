@@ -27,17 +27,9 @@ Docs:
 
 Quick start:
 
-```bash
-podman compose up -d                              # PostGIS + llama.cpp (or run on Google Colab)
-pixi run bash scripts/restore_dataset.sh          # frozen benchmark v1.0.0 from the public release
-pixi run bash scripts/install_dependencies.sh     # tools (Colab: apt + local PostgreSQL)
-pixi run bash scripts/init_database.sh
-# evaluation must use the pinned snapshot (never vietnam-latest):
-OSM_URL=https://download.geofabrik.de/asia/vietnam-260825.osm.pbf \
-  pixi run bash scripts/download_osm.sh           # ~312 MB Geofabrik Vietnam extract
-pixi run bash scripts/import_osm.sh
-pixi run python baselines/baselines_vi.py --model llamacpp:ornith --baseline text2sql --mode smoke
-```
+Open and run `main.ipynb` in the local notebook environment or Google Colab.
+
+The notebook starts two independent bootstrap branches and waits for both before coursework begins. Locally, `compose.yaml` owns PostgreSQL/PostGIS and llama.cpp; on Colab, apt supplies PostgreSQL/PostGIS and the official llama.cpp installer is used only when needed. Dependency installation, service startup/readiness, database initialization, and the pinned OSM import remain separate idempotent steps. Post-bootstrap checks and notebook queries use psycopg3.
 
 ---
 
@@ -67,7 +59,7 @@ Our results show that existing solutions have very low accuracy, which warrants 
 - Python 3.8+
 - PostgreSQL with PostGIS extension enabled
 - Dependencies listed in `requirements.txt`
-- Ollama 0.6.1 with LLAMA 3.2 (ID: a80c4f17acd5)
+- llama.cpp serving `ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M` (provided by compose locally; installed by the notebook on Colab)
 
 ## Installation
 
@@ -95,9 +87,7 @@ Our results show that existing solutions have very low accuracy, which warrants 
 
    - Create a database and configure connection parameters in the config file
 
-4. Install Ollama and get OpenAI API token
-
-Ollama is only required for evaluating the baselines: <https://ollama.com>
+4. Start llama.cpp through the notebook bootstrap (or the local compose service).
 
 OpenAI API is required to evaluate GPT4o.
 

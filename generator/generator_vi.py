@@ -10,16 +10,12 @@ import os
 import random
 import unicodedata
 
-import psycopg2
+import psycopg
 from tqdm import tqdm
 
-DB_CONFIG = {
-    "host": os.getenv("PGHOST", "127.0.0.1"),
-    "dbname": os.getenv("PGDATABASE", "osm_vn"),
-    "user": os.getenv("PGUSER", "postgres"),
-    "password": os.getenv("PGPASSWORD", "postgres"),
-    "port": int(os.getenv("PGPORT", "5432")),
-}
+from vigsqa.settings import PostgresSettings
+
+DB_CONFIG = PostgresSettings().connection_kwargs()
 
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates_vi")
 
@@ -142,7 +138,7 @@ REF_SQL = """
 
 # ── DB helpers ───────────────────────────────────────────────────────────────
 def run_sql(sql: str) -> list[dict]:
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg.connect(**DB_CONFIG)
     cur = conn.cursor()
     cur.execute(sql)
     cols = [d[0] for d in cur.description]
@@ -187,7 +183,7 @@ def get_ref() -> dict | None:
             return None
         r["poi_name"] = nfc(r["poi_name"])
         return r
-    except (psycopg2.Error, KeyError, IndexError, TypeError):
+    except (psycopg.Error, KeyError, IndexError, TypeError):
         return None
 
 
@@ -225,7 +221,7 @@ def generate_knn_name(n=100) -> list[dict]:
             ORDER BY geometry <-> {geom_4326}::geography LIMIT 1;"""
         try:
             targets = run_sql(sql)
-        except (psycopg2.Error, IndexError, KeyError):
+        except (psycopg.Error, IndexError, KeyError):
             fails += 1
             continue
         if not targets:
@@ -279,7 +275,7 @@ def generate_knn_loc(n=100) -> list[dict]:
             ORDER BY geometry <-> {geom_4326}::geography LIMIT 1;"""
         try:
             targets = run_sql(sql)
-        except (psycopg2.Error, IndexError, KeyError):
+        except (psycopg.Error, IndexError, KeyError):
             fails += 1
             continue
         if not targets:
@@ -336,7 +332,7 @@ def generate_knn_distance(n=100) -> list[dict]:
             ORDER BY geometry <-> {geom_4326}::geography LIMIT 1;"""
         try:
             targets = run_sql(sql)
-        except (psycopg2.Error, IndexError, KeyError):
+        except (psycopg.Error, IndexError, KeyError):
             fails += 1
             continue
         if not targets:
@@ -406,7 +402,7 @@ def generate_knn_direction_name(n=100) -> list[dict]:
             LIMIT 1;"""
         try:
             targets = run_sql(sql)
-        except (psycopg2.Error, IndexError, KeyError):
+        except (psycopg.Error, IndexError, KeyError):
             fails += 1
             continue
         if not targets:
@@ -466,7 +462,7 @@ def generate_range_name(n=100) -> list[dict]:
             ORDER BY geometry <-> {geom_4326}::geography;"""
         try:
             targets = run_sql(sql)
-        except (psycopg2.Error, IndexError, KeyError):
+        except (psycopg.Error, IndexError, KeyError):
             fails += 1
             continue
         if not targets:
@@ -526,7 +522,7 @@ def generate_range_loc(n=100) -> list[dict]:
             ORDER BY geometry <-> {geom_4326}::geography;"""
         try:
             targets = run_sql(sql)
-        except (psycopg2.Error, IndexError, KeyError):
+        except (psycopg.Error, IndexError, KeyError):
             fails += 1
             continue
         if not targets:
@@ -585,7 +581,7 @@ def generate_range_count(n=100) -> list[dict]:
               AND id <> {ref["id"]};"""
         try:
             rows = run_sql(sql)
-        except (psycopg2.Error, IndexError, KeyError):
+        except (psycopg.Error, IndexError, KeyError):
             fails += 1
             continue
         count = rows[0].get("count", 0) if rows else 0
@@ -653,7 +649,7 @@ def generate_range_direction_name(n=100) -> list[dict]:
             ORDER BY p.way <-> ST_Transform({geom_4326},3857);"""
         try:
             targets = run_sql(sql)
-        except (psycopg2.Error, IndexError, KeyError):
+        except (psycopg.Error, IndexError, KeyError):
             fails += 1
             continue
         if not targets:

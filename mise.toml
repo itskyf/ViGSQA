@@ -3,6 +3,7 @@
 "conda:docker-compose" = "latest"
 "github:microsoft/apm" = "latest"
 pixi = "latest"
+ruff = "latest"
 rumdl = "latest"
 shellcheck = "latest"
 shfmt = "latest"

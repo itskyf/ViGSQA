@@ -32,4 +32,7 @@ An earlier internal freeze (2026-08-27) of the identical question bytes carried 
 
 ## Regeneration
 
-`OSM_URL=https://download.geofabrik.de/asia/vietnam-260825.osm.pbf ./scripts/download_osm.sh && ./scripts/init_database.sh && ./scripts/import_osm.sh`, then the command above from the repo root. `vietnam-latest` never reproduces a frozen version.
+Export the `PostgresSettings` defaults (`PGHOST=127.0.0.1`, `PGPORT=5432`,
+`PGDATABASE=osm_vn`, `PGUSER=postgres`, `PGPASSWORD=postgres`), then run the
+pinned download, initialization, and import scripts followed by the command
+above from the repo root. `vietnam-latest` never reproduces a frozen version.

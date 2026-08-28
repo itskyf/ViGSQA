@@ -10,28 +10,28 @@ Patches baselines.py at runtime:
   - build_model    → llamacpp:<tag> routes to ChatOpenAI against llama.cpp /v1
 
 Usage (same flags as baselines.py):
-  python baselines_vi.py --model llamacpp:ornith --baseline direct --mode smoke
-  python baselines_vi.py --model llamacpp:ornith --baseline text2sql --mode full
+  python baselines_vi.py \
+    --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M \
+    --baseline direct --mode smoke
+  python baselines_vi.py \
+    --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M \
+    --baseline text2sql --mode full
 """
 
-import importlib as _importlib
-import json as _json
-import os as _os
-import re as _re
+import importlib
+import json
+import os
+import re
 import sys
 from pathlib import Path
 
-import evaluate as _ev
+import evaluate
+import psycopg
 from langchain_openai import ChatOpenAI
-from shapely import from_wkt as _from_wkt
+from shapely import from_wkt
 
-import baselines as _b
-
-try:
-    import psycopg2 as _pg
-except ImportError:
-    # Optional: only used by the _loc_from_db fallback lookup.
-    _pg = None
+import baselines
+from vigsqa.settings import PostgresSettings
 
 ROOT = Path(__file__).parent
 
@@ -46,29 +46,29 @@ MATCH_REL_TOLERANCE = 0.1
 
 # ── Import and patch baselines ────────────────────────────────────────────────
 # 1. Vietnamese questions directory
-_b.QUESTIONS_DIR = ROOT.parent / "generator" / "questions_vi"
+baselines.QUESTIONS_DIR = ROOT.parent / "generator" / "questions_vi"
 
 # 2. Vietnamese PostGIS database (same PG* env convention as scripts/*.sh)
-_b.DB_PARAMS = dict(
-    host=_os.getenv("PGHOST", "127.0.0.1"),
-    dbname=_os.getenv("PGDATABASE", "osm_vn"),
-    user=_os.getenv("PGUSER", "postgres"),
-    password=_os.getenv("PGPASSWORD", "postgres"),
-    port=int(_os.getenv("PGPORT", "5432")),
-)
+baselines.DB_PARAMS = PostgresSettings().connection_kwargs()
 
 # 3. Separate cache so Vietnamese runs don't collide with English cache
-_b.CACHE_DIR = ROOT / "cache_vi"
-_b.CACHE_DIR.mkdir(exist_ok=True)
+baselines.CACHE_DIR = ROOT / "cache_vi"
+baselines.CACHE_DIR.mkdir(exist_ok=True)
 
 # 4. Vietnamese prompts (direct + text2sql)
-_b.PROMPT_FILES["direct_answer"] = ROOT / "baseline_prompts" / "direct_answer_vi.txt"
-_b.PROMPT_FILES["direct_json_parse"] = (
+baselines.PROMPT_FILES["direct_answer"] = (
+    ROOT / "baseline_prompts" / "direct_answer_vi.txt"
+)
+baselines.PROMPT_FILES["direct_json_parse"] = (
     ROOT / "baseline_prompts" / "direct_json_parse_vi.txt"
 )
-_b.PROMPT_FILES["sql_generate"] = ROOT / "baseline_prompts" / "text2sql_generate_vi.txt"
-_b.PROMPT_FILES["sql_answer"] = ROOT / "baseline_prompts" / "text2sql_answer_vi.txt"
-_b.PROMPT_FILES["sql_json_parse"] = (
+baselines.PROMPT_FILES["sql_generate"] = (
+    ROOT / "baseline_prompts" / "text2sql_generate_vi.txt"
+)
+baselines.PROMPT_FILES["sql_answer"] = (
+    ROOT / "baseline_prompts" / "text2sql_answer_vi.txt"
+)
+baselines.PROMPT_FILES["sql_json_parse"] = (
     ROOT / "baseline_prompts" / "text2sql_json_parse_vi.txt"
 )
 
@@ -76,7 +76,7 @@ _b.PROMPT_FILES["sql_json_parse"] = (
 # VN-GeoQA answers use:
 #   geo_wkt  (WKT string) instead of geometry
 #   dist_km  (float, kilometres) instead of distance (metres)
-_orig_get_osm_value = _ev.get_osm_value
+_orig_get_osm_value = evaluate.get_osm_value
 
 
 def _vn_get_osm_value(json_obj, value_label):
@@ -84,7 +84,7 @@ def _vn_get_osm_value(json_obj, value_label):
         wkt = json_obj.get("geometry") or json_obj.get("geo_wkt")
         if not wkt:
             return None
-        point = _from_wkt(wkt).centroid
+        point = from_wkt(wkt).centroid
         return {"lon": point.x, "lat": point.y}
 
     if value_label == "distance":
@@ -107,11 +107,11 @@ def _vn_get_osm_value(json_obj, value_label):
     return _orig_get_osm_value(json_obj, value_label)
 
 
-_ev.get_osm_value = _vn_get_osm_value
+evaluate.get_osm_value = _vn_get_osm_value
 
 # baselines.py calls importlib.reload(evaluate_mod) inside main(), which resets
 # our patch. Intercept reload to re-apply the patch every time evaluate is reloaded.
-_orig_reload = _importlib.reload
+_orig_reload = importlib.reload
 
 
 def _reload_with_patch(module):
@@ -121,7 +121,7 @@ def _reload_with_patch(module):
     return result
 
 
-_importlib.reload = _reload_with_patch
+importlib.reload = _reload_with_patch
 
 # ── Patch evaluate_answers for VN-GeoQA ──────────────────────────────────────
 # Two fixes:
@@ -130,17 +130,14 @@ _importlib.reload = _reload_with_patch
 #   2. count/distance text eval: num2words() produces English words; Vietnamese
 #      model outputs digits — compare as digits instead.
 
-_orig_evaluate_answers = _b.evaluate_answers
+_orig_evaluate_answers = baselines.evaluate_answers
 
 
 def _loc_from_db(poi_name: str):
     """Look up POI centroid lon/lat by name in the VN PostGIS DB."""
-    # psycopg2 is optional; without it there is simply no DB fallback.
-    if _pg is None:
-        return None
     try:
-        conn = _pg.connect(**_b.DB_PARAMS)
-        conn.set_session(readonly=True)
+        conn = psycopg.connect(**baselines.DB_PARAMS)
+        conn.read_only = True
         cur = conn.cursor()
         cur.execute(
             "SELECT ST_X(ST_Centroid(geometry::geometry)), "
@@ -151,7 +148,7 @@ def _loc_from_db(poi_name: str):
         row = cur.fetchone()
         conn.close()
         return {"lon": float(row[0]), "lat": float(row[1])} if row else None
-    except (_pg.Error, TypeError, ValueError):
+    except (psycopg.Error, TypeError, ValueError):
         return None
 
 
@@ -174,10 +171,10 @@ def _vn_evaluate_answers(
         if _a == "--baseline" and _j + 1 < len(sys.argv):
             _baseline_arg = sys.argv[_j + 1]
     if "text2sql" in _baseline_arg or _baseline_arg == "all":
-        _exec_path = _b.CACHE_DIR / _model_arg / "sql_exec.json"
+        _exec_path = baselines.CACHE_DIR / _model_arg / "sql_exec.json"
         if _exec_path.exists():
             try:
-                for item in _json.load(open(_exec_path)):
+                for item in json.load(open(_exec_path)):
                     exec_by_id[item["id"]] = item.get("records", [])
             except (KeyError, OSError, ValueError):
                 pass
@@ -229,7 +226,7 @@ def _vn_evaluate_answers(
                 # Matches patterns like "10.123, 106.456" or "106.456 10.123"
                 if pred_loc is None:
                     text = answers[i].get("content", "")
-                    coords = _re.findall(r"(-?\d{1,3}\.\d{3,})", text)
+                    coords = re.findall(r"(-?\d{1,3}\.\d{3,})", text)
                     if len(coords) >= MIN_COORDS_FOR_PAIR:
                         nums = [float(c) for c in coords[:4]]
                         # Heuristic: lat in [8, 24], lon in [100, 110] for Vietnam
@@ -262,7 +259,7 @@ def _vn_evaluate_answers(
         if "count" in qtype or "distance" in qtype:
             mkey = "count" if "count" in qtype else "distance"
             text_answer = answers[i].get("content", "")
-            pred_nums = [int(n) for n in _re.findall(r"\b\d+\b", text_answer)]
+            pred_nums = [int(n) for n in re.findall(r"\b\d+\b", text_answer)]
             if not pred_nums:
                 continue
             for ans in q["answers"]:
@@ -289,21 +286,22 @@ def _vn_evaluate_answers(
     return text_eval, parsed_eval
 
 
-_b.evaluate_answers = _vn_evaluate_answers
+baselines.evaluate_answers = _vn_evaluate_answers
 
 # ── Model routing: llama.cpp via its OpenAI-compatible /v1 endpoint ──────────
-# Model name syntax:  llamacpp:<tag>   e.g.  --model llamacpp:ornith
+# Model name syntax:  llamacpp:<tag>
+# Example: --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M
 # The server (compose service or Colab llama-server) applies the GGUF's own
 # chat template, so no per-model prompt formatting lives here.
 # Reads LLAMACPP_URL env var (default http://localhost:8080).
 
-_orig_build_model = _b.build_model
+_orig_build_model = baselines.build_model
 
 
 def _build_model_vi(model_name: str):
     if model_name.startswith("llamacpp:"):
         tag = model_name[len("llamacpp:") :]
-        base_url = _os.environ.get("LLAMACPP_URL", "http://localhost:8080")
+        base_url = os.environ.get("LLAMACPP_URL", "http://localhost:8080")
         return ChatOpenAI(
             model=tag,
             base_url=f"{base_url}/v1",
@@ -314,9 +312,9 @@ def _build_model_vi(model_name: str):
     return _orig_build_model(model_name)
 
 
-_b.build_model = _build_model_vi
-_b.build_parser_model = _build_model_vi
+baselines.build_model = _build_model_vi
+baselines.build_parser_model = _build_model_vi
 
 # ── Run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    _b.main()
+    baselines.main()

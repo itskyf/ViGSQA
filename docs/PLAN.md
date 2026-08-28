@@ -13,7 +13,7 @@ ViGSQA extends GS-QA to Vietnamese OSM data and investigates whether database gr
 | ID | Goal | Status | Current state |
 | --- | --- | --- | --- |
 | T01 | Establish a trustworthy Vietnamese benchmark | `done` | `v1.0.0` frozen (2026-08-28) from the pinned `vietnam-260825` snapshot, seed 42, 800/800 verified, jsonl byte-identical to the prior freeze so its 80/80 human QC carries over. Published as the `data-v1.0.0` GitHub Release asset; restored by `scripts/restore_dataset.sh`. |
-| T02 | Make the whole experiment runnable end-to-end | `in_progress` | Local smoke passed end-to-end (2026-08-28): both baselines, 8 questions, string ids, read-only SQL, notebook executed fully in smoke mode (integration evidence only). Remaining: the same smoke on Colab from a fresh clone (exit criterion). |
+| T02 | Make the whole experiment runnable end-to-end | `in_progress` | One notebook cell now runs the independent llama.cpp and PostgreSQL/OSM branches behind a readiness barrier; the local immediate rerun passed, and the H2/H3 coursework outline is restored. `scripts/check_postgres.py` was deleted: readiness comes from compose `--wait`/`service postgresql start`, and the POI count check is inlined in `bootstrap_postgres.sh` (38223 POIs verified locally). Downstream coursework code and the fresh-Colab smoke remain. |
 | T03 | Measure correctly and establish official baselines | `planned` | Validate metric semantics per answer type (best-match against full gold candidate sets), then run and report the official full 800-question comparison on the frozen benchmark. |
 | T04 | Improve what the frozen baselines fail at | `planned` | Select the intervention from full-baseline error evidence; the typed deterministic renderer stays a hypothesis until that evidence supports it. Plugs into the `baselines_vi.py` patch layer without a pipeline rewrite. |
 | T05 | Analyze Vietnamese-specific behavior and errors | `planned` | Full/stripped diacritic surfaces exist; robustness, error taxonomy, and new-data demonstration remain. |
@@ -21,14 +21,14 @@ ViGSQA extends GS-QA to Vietnamese OSM data and investigates whether database gr
 
 ## Cross-Task Discoveries
 
-- Official experiments use the frozen benchmark and the matching pinned snapshot (`OSM_URL=https://download.geofabrik.de/asia/vietnam-260825.osm.pbf`); `download_osm.sh`'s `vietnam-latest` default is for producing future versions and demos, never for evaluation.
+- Official experiments use the frozen benchmark and the matching pinned snapshot (`https://download.geofabrik.de/asia/vietnam-260825.osm.pbf`), which is hardcoded directly in `download_osm.sh` along with its SHA-256 checksum.
 - All pre-freeze result artifacts (`baselines/*_eval.csv`, `baselines/REPORT_VN_GEOQA.md`, `docs/results.md`) are archived, describe a superseded candidate dataset, and must not be used as benchmark evidence.
 - The dataset lives outside version control; restore it with `scripts/restore_dataset.sh` (public Release asset) or byte-identical regeneration with the pinned seed. Read through the `generator/questions_vi` symlink; never commit `data/`.
 - Range-type gold answers are full distance-ordered sets (up to ~1254 candidates): score predictions by best applicable match against the complete gold set; never require exhaustive enumeration. T03 owns metric semantics.
 
 ## Active Next Action
 
-Run the T02 exit criterion: the same 8-question smoke on Google Colab from a fresh clone (`main.ipynb`, `RUN_MODE=smoke`). Then T03 validates metric semantics and runs the official full-800 comparison.
+Implement the downstream dataset, baseline, evaluation, and analysis cells behind the readiness barrier, then run the same 8-question smoke from a fresh Colab clone. T03 follows after T02's exit criterion passes.
 
 ## Session Prompt
 

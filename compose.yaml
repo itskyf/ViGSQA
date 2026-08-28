@@ -1,23 +1,28 @@
 services:
   postgres:
-    image: docker.io/postgis/postgis:19beta1-3.6
+    image: docker.io/postgis/postgis:18-3.6
     environment:
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${PGDATABASE}
+      POSTGRES_USER: ${PGUSER}
+      POSTGRES_PASSWORD: ${PGPASSWORD}
     ports:
-      - "127.0.0.1:5432:5432"
+      - 127.0.0.1:${PGPORT}:5432
     volumes:
       - postgres:/var/lib/postgresql
-    # healthcheck:
-    #   test: [ "CMD", "pgautoupgrade-healthcheck.sh" ]
-    #   start_period: 60s
-    #   start_interval: 2s
+    healthcheck:
+      test: [ "CMD", "pg_isready", "--host=127.0.0.1", "--quiet" ]
+      start_period: 30s
+      start_interval: 2s
   llama-cpp:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda13
-    # --alias gives /v1 a slash-free model name matching the llamacpp:ornith tag
-    command: [ --hf-repo, ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M, --alias, ornith ]
+    command: [
+      --models-preset, /config/models.ini,
+      --models-max, "1",
+    ]
     devices:
       - nvidia.com/gpu=all
     volumes:
+      - ./config/models.ini:/config/models.ini:ro,Z
       - ~/.cache/huggingface/:/root/.cache/huggingface/:Z
     ports:
       - 127.0.0.1:8080:8080
@@ -26,5 +31,6 @@ services:
       start_period: 15m
       start_interval: 5s
     restart: unless-stopped
+
 volumes:
   postgres:

@@ -1,5 +1,7 @@
 SET client_min_messages = warning;
 
+TRUNCATE osm_import_complete;
+
 DROP VIEW IF EXISTS pois;
 DROP VIEW IF EXISTS roads;
 DROP VIEW IF EXISTS parks;

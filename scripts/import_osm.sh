@@ -9,10 +9,29 @@ SOURCE_POINTER="${REPO_ROOT}/.osm_vn_source"
 FILE_INFO_CACHE="${REPO_ROOT}/.osm_vn_fileinfo"
 STYLE_FILE="${SCRIPT_DIR}/osm_poi.lua"
 
-# libpq connection variables: shared with the compose container (compose.yaml)
-# and the Colab-local server started by install_dependencies.sh.
-: "${PGHOST:=127.0.0.1}" "${PGPORT:=5432}" "${PGUSER:=postgres}" "${PGPASSWORD:=postgres}" "${PGDATABASE:=osm_vn}"
-export PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE
+: "${PGHOST:?PGHOST is required}" "${PGPORT:?PGPORT is required}"
+: "${PGUSER:?PGUSER is required}" "${PGPASSWORD:?PGPASSWORD is required}"
+: "${PGDATABASE:?PGDATABASE is required}"
+
+psql_file() {
+	if [[ -n "${COLAB_RELEASE_TAG:-}" ]]; then
+		psql --quiet --set=ON_ERROR_STOP=1 --file="$1"
+	else
+		podman compose exec --no-tty postgres psql \
+			--username="${PGUSER}" --dbname="${PGDATABASE}" \
+			--quiet --set=ON_ERROR_STOP=1 <"$1"
+	fi
+}
+
+psql_query() {
+	if [[ -n "${COLAB_RELEASE_TAG:-}" ]]; then
+		psql --tuples-only --no-align --set=ON_ERROR_STOP=1 "$@"
+	else
+		podman compose exec --no-tty postgres psql \
+			--username="${PGUSER}" --dbname="${PGDATABASE}" \
+			--tuples-only --no-align --set=ON_ERROR_STOP=1 "$@"
+	fi
+}
 
 if [[ ! -s "${SOURCE_POINTER}" ]]; then
 	echo "[ERROR] Missing ${SOURCE_POINTER}. Run download_osm.sh first." >&2
@@ -35,32 +54,23 @@ SOURCE_SIZE="$(stat --format='%s' "${OSM_FILE}")"
 SOURCE_MTIME="$(stat --format='%Y' "${OSM_FILE}")"
 STYLE_SHA256="$(sha256sum "${STYLE_FILE}" | awk '{ print $1 }')"
 
-psql \
-	--quiet \
-	--set=ON_ERROR_STOP=1 \
-	--file="${SQL_DIR}/init_marker.sql"
+psql_file "${SQL_DIR}/init_marker.sql"
 
 IMPORT_MATCH="$(
-	psql \
-		--tuples-only \
-		--no-align \
+	psql_query \
 		--set=source_file="${OSM_FILENAME}" \
 		--set=source_size="${SOURCE_SIZE}" \
 		--set=source_mtime="${SOURCE_MTIME}" \
 		--set=style_sha256="${STYLE_SHA256}" \
-		--file="${SQL_DIR}/check_import.sql"
+		<"${SQL_DIR}/check_import.sql"
 )"
 
 refresh_views() {
 	echo "[INFO] Refreshing views and spatial index..."
-	psql \
-		--quiet \
-		--set=ON_ERROR_STOP=1 \
-		--file="${SQL_DIR}/refresh_views.sql"
+	psql_file "${SQL_DIR}/refresh_views.sql"
 }
 
 if [[ "${IMPORT_MATCH}" == "1" ]]; then
-	refresh_views
 	echo "[INFO] Already imported: ${OSM_FILENAME}"
 	exit 0
 fi
@@ -161,10 +171,7 @@ awk \
     }'
 
 echo "[INFO] Preparing database tables..."
-psql \
-	--quiet \
-	--set=ON_ERROR_STOP=1 \
-	--file="${SQL_DIR}/prepare_import.sql"
+psql_file "${SQL_DIR}/prepare_import.sql"
 
 echo "[INFO] Importing POI nodes with osm2pgsql..."
 osm2pgsql \
@@ -177,21 +184,16 @@ osm2pgsql \
 	"${OSM_FILE}"
 
 echo "[INFO] Standardizing POI table column names..."
-psql \
-	--quiet \
-	--set=ON_ERROR_STOP=1 \
-	--command="ALTER TABLE planet_osm_point RENAME COLUMN node_id TO osm_id;"
+psql_file "${SQL_DIR}/standardize_columns.sql"
 
 refresh_views
 
 echo "[INFO] Recording import completion..."
-psql \
-	--quiet \
-	--set=ON_ERROR_STOP=1 \
+psql_query \
 	--set=source_file="${OSM_FILENAME}" \
 	--set=source_size="${SOURCE_SIZE}" \
 	--set=source_mtime="${SOURCE_MTIME}" \
 	--set=style_sha256="${STYLE_SHA256}" \
-	--file="${SQL_DIR}/record_import.sql"
+	<"${SQL_DIR}/record_import.sql" >/dev/null
 
 echo "[INFO] Import complete: ${OSM_FILENAME}"

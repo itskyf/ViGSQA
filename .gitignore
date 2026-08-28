@@ -18,6 +18,9 @@ baselines/cache/
 baselines/cache_vi/
 baselines/address_cache/
 
+# Per-run eval outputs; official results are reported via release assets/docs
+baselines/*_eval.csv
+
 # Ruff / tool caches
 **/.ruff_cache/
 

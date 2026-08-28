@@ -15,7 +15,7 @@ ViGSQA/
 ├── scripts/
 │   ├── install_dependencies.sh         # Cài công cụ (Colab: apt; local: pixi)
 │   ├── init_database.sh                # Tạo database osm_vn + PostGIS
-│   ├── download_osm.sh                 # Tải PBF (OSM_URL pin snapshot)
+│   ├── download_osm.sh                 # Tải PBF snapshot OSM đã pin (vietnam-260825)
 │   ├── import_osm.sh                   # osm2pgsql flex → view pois
 │   └── restore_dataset.sh              # Tải bộ dữ liệu v1.0.0 từ GitHub Release
 ├── generator/
@@ -35,24 +35,16 @@ ViGSQA/
 ## Yêu Cầu Hệ Thống
 
 - Pixi (local) hoặc Google Colab
-- Docker/Podman (local) — hoặc PostgreSQL + PostGIS cài qua `scripts/install_dependencies.sh` trên Colab
+- Docker/Podman (local) — hoặc PostgreSQL + PostGIS do notebook cài bằng apt trên Colab
 - GPU cho llama.cpp (model ~6 GB Q4_K_M)
 
 ---
 
 ## 1. Khởi Động Nhanh
 
-```bash
-podman compose up -d                              # PostGIS + llama.cpp
-pixi run bash scripts/restore_dataset.sh          # bộ dữ liệu v1.0.0 (GitHub Release)
-pixi run bash scripts/install_dependencies.sh
-pixi run bash scripts/init_database.sh
-# đánh giá bắt buộc dùng snapshot đã pin (không dùng vietnam-latest):
-OSM_URL=https://download.geofabrik.de/asia/vietnam-260825.osm.pbf \
-  pixi run bash scripts/download_osm.sh           # ~312 MB
-pixi run bash scripts/import_osm.sh
-pixi run python baselines/baselines_vi.py --model llamacpp:ornith --baseline text2sql --mode smoke
-```
+Mở và chạy `main.ipynb` trong môi trường notebook local hoặc Google Colab.
+
+Notebook chạy hai nhánh bootstrap độc lập rồi đợi cả hai hoàn tất trước khi bắt đầu phần coursework. Ở local, `compose.yaml` quản lý PostgreSQL/PostGIS và llama.cpp; trên Colab, apt cung cấp PostgreSQL/PostGIS và llama.cpp chỉ được cài bằng installer chính thức khi còn thiếu. Cài dependency, khởi động/chờ service, khởi tạo database và import snapshot OSM đã pin là các bước riêng, chạy lại an toàn. Các kiểm tra sau bootstrap và truy vấn notebook dùng psycopg3.
 
 **Lưu ý:** bộ dữ liệu nằm ngoài git (`data/` bị gitignore). Sau khi clone repo, symlink `generator/questions_vi` sẽ treo cho tới khi chạy `scripts/restore_dataset.sh` (script có sha256 kiểm tra, chạy lại vô hại). Muốn sinh lại từ đầu: xem [docs/plans/T01-dataset-quality.md](docs/plans/T01-dataset-quality.md).
 
@@ -64,11 +56,11 @@ Model duy nhất được hỗ trợ chạy local: llama.cpp qua endpoint tươn
 
 ```bash
 # smoke: 8 câu (1/loại) — chỉ để kiểm tra integration, không phải bằng chứng benchmark
-pixi run python baselines/baselines_vi.py --model llamacpp:ornith --baseline direct   --mode smoke
-pixi run python baselines/baselines_vi.py --model llamacpp:ornith --baseline text2sql --mode smoke
+python baselines/baselines_vi.py --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M --baseline direct   --mode smoke
+python baselines/baselines_vi.py --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M --baseline text2sql --mode smoke
 
 # full: 800 câu — số liệu chính thức thuộc T03
-pixi run python baselines/baselines_vi.py --model llamacpp:ornith --baseline text2sql --mode full
+python baselines/baselines_vi.py --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M --baseline text2sql --mode full
 ```
 
 Kết quả lưu tại `baselines/<model>_<baseline>_{text,parsed}_eval.csv`.

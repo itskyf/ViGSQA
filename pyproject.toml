@@ -1,0 +1,49 @@
+[project]
+name = "ViGSQA"
+version = "0.1.0"
+requires-python = ">= 3.11"
+authors = [{ name = "Kỳ", email = "40734986+itskyf@users.noreply.github.com" }]
+dependencies = [
+  "geopy>=2.5.0,<3",
+  "langchain-openai>=1.6.0,<2",
+  "nltk>=3.10.3,<4",
+  "num2words>=0.5.14,<0.6",
+  "pandas>=3.0.5,<4",
+  "psycopg[binary]>=3.3.4,<4",
+  "pydantic-settings>=2.15.0,<3",
+  "pyproj>=3.7.2,<4",
+  "shapely>=2.1.2,<3",
+  "tqdm>=4.70.0,<5",
+]
+
+[dependency-groups]
+dev = [
+  "google-colab-cli>=0.6.0,<0.7",
+  "ipykernel>=7.3.0,<8",
+  "ipywidgets>=8.1.9,<9",
+  "ruff>=0.16.5,<0.17",
+  "sqlfluff[rs]>=4.3.0,<5",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.pypi-dependencies]
+vigsqa = { path = ".", editable = true }
+
+[tool.pixi.environments]
+dev = ["dev"]
+
+[tool.pixi.dependencies]
+curl = ">=8.21.0,<9"
+osm2pgsql = ">=2.2.0,<3"
+osmium-tool = ">=1.19.1,<2"
+unzip = ">=6.0,<7"
+
+[tool.pixi.feature.dev.dependencies]
+nb-cli = ">=0.0.9,<0.0.10"

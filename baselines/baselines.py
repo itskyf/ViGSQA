@@ -716,6 +716,9 @@ def evaluate_answers(
 
 
 def save_eval(text_eval, parsed_eval, questions, model_name, prefix):
+    # Model tags like "org/repo:quant" contain "/" — flatten so the CSV path
+    # stays a file inside ROOT instead of a path into a missing directory.
+    model_name = model_name.replace("/", "_")
     df_text = pd.DataFrame(text_eval)
     df_text["type"] = [q["type"] for q in questions]
     df_text["id"] = [q["id"] for q in questions]
