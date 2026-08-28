@@ -13,7 +13,7 @@ ViGSQA extends GS-QA to Vietnamese OSM data and investigates whether database gr
 | ID | Goal | Status | Current state |
 | --- | --- | --- | --- |
 | T01 | Establish a trustworthy Vietnamese benchmark | `done` | `v1.0.0` frozen (2026-08-28) from the pinned `vietnam-260825` snapshot, seed 42, 800/800 verified, jsonl byte-identical to the prior freeze so its 80/80 human QC carries over. Published as the `data-v1.0.0` GitHub Release asset; restored by `scripts/restore_dataset.sh`. |
-| T02 | Make the whole experiment runnable end-to-end | `in_progress` | One notebook cell now runs the independent llama.cpp and PostgreSQL/OSM branches behind a readiness barrier; the local immediate rerun passed, and the H2/H3 coursework outline is restored. `scripts/check_postgres.py` was deleted: readiness comes from compose `--wait`/`service postgresql start`, and the POI count check is inlined in `bootstrap_postgres.sh` (38223 POIs verified locally). Downstream coursework code and the fresh-Colab smoke remain. |
+| T02 | Make the whole experiment runnable end-to-end | `in_progress` | All coursework cells behind the barrier are implemented: §1 runtime/DB health gates (incl. read-only probe), §2 dataset restore + 5-table EDA, §3 smoke baselines + answer-type-masked comparison, §4 error taxonomy, grounded 5-question demo, extension point. Full local run passes with zero errors. llama.cpp moved to port 8000 repo-wide (Colab's proxy holds 8080); Colab install fixed to non-editable `uv pip install --python sys.executable .` (PEP 660 `.pth` is invisible to a running kernel). Fresh-Colab smoke (exit criterion) remains. |
 | T03 | Measure correctly and establish official baselines | `planned` | Validate metric semantics per answer type (best-match against full gold candidate sets), then run and report the official full 800-question comparison on the frozen benchmark. |
 | T04 | Improve what the frozen baselines fail at | `planned` | Select the intervention from full-baseline error evidence; the typed deterministic renderer stays a hypothesis until that evidence supports it. Plugs into the `baselines_vi.py` patch layer without a pipeline rewrite. |
 | T05 | Analyze Vietnamese-specific behavior and errors | `planned` | Full/stripped diacritic surfaces exist; robustness, error taxonomy, and new-data demonstration remain. |
@@ -28,7 +28,7 @@ ViGSQA extends GS-QA to Vietnamese OSM data and investigates whether database gr
 
 ## Active Next Action
 
-Implement the downstream dataset, baseline, evaluation, and analysis cells behind the readiness barrier, then run the same 8-question smoke from a fresh Colab clone. T03 follows after T02's exit criterion passes.
+Run the same 8-question smoke from a fresh Colab clone (fresh VM, Run-all) to satisfy T02's exit criterion; then mark T02 done and start T03's metric-semantics validation on the full 800-question run.
 
 ## Session Prompt
 

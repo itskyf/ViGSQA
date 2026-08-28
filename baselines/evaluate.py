@@ -11,6 +11,9 @@ from nltk.tokenize import word_tokenize
 from shapely import from_wkt
 
 nltk.download("punkt")
+# nltk >= 3.9 word_tokenize loads punkt_tab, not punkt; without this the
+# tokenizer raises LookupError on a machine that only preinstalled punkt.
+nltk.download("punkt_tab")
 nltk.download("stopwords")
 
 stop_words = set(stopwords.words("english"))

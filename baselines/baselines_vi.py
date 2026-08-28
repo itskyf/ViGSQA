@@ -293,7 +293,7 @@ baselines.evaluate_answers = _vn_evaluate_answers
 # Example: --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M
 # The server (compose service or Colab llama-server) applies the GGUF's own
 # chat template, so no per-model prompt formatting lives here.
-# Reads LLAMACPP_URL env var (default http://localhost:8080).
+# Reads LLAMACPP_URL env var (default http://localhost:8000).
 
 _orig_build_model = baselines.build_model
 
@@ -301,7 +301,7 @@ _orig_build_model = baselines.build_model
 def _build_model_vi(model_name: str):
     if model_name.startswith("llamacpp:"):
         tag = model_name[len("llamacpp:") :]
-        base_url = os.environ.get("LLAMACPP_URL", "http://localhost:8080")
+        base_url = os.environ.get("LLAMACPP_URL", "http://localhost:8000")
         return ChatOpenAI(
             model=tag,
             base_url=f"{base_url}/v1",

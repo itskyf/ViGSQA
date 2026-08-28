@@ -2,6 +2,7 @@
 "aqua:Kampfkarren/selene" = "latest"
 "conda:docker-compose" = "latest"
 "github:microsoft/apm" = "latest"
+"pipx:git+https://github.com/googlecolab/colab-mcp.git" = "main"
 pixi = "latest"
 ruff = "latest"
 rumdl = "latest"

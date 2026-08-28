@@ -21,6 +21,10 @@ dev = [
   "google-colab-cli>=0.6.0,<0.7",
   "ipykernel>=7.3.0,<8",
   "ipywidgets>=8.1.9,<9",
+  # colab-cli 0.6.x calls jupyter_kernel_client.KernelClient and
+  # .JupyterSubprotocol; only the 0.9+ PyPI line exports both (conda-forge
+  # stalls at 0.6.0, which breaks colab-cli).
+  "jupyter-kernel-client>=0.9.0,<1",
   "ruff>=0.16.5,<0.17",
   "sqlfluff[rs]>=4.3.0,<5",
 ]

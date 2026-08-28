@@ -69,7 +69,7 @@ Kết quả lưu tại `baselines/<model>_<baseline>_{text,parsed}_eval.csv`.
 
 | Biến | Mặc định | Mô tả |
 |------|----------|-------|
-| `LLAMACPP_URL` | `http://localhost:8080` | Địa chỉ llama.cpp server |
+| `LLAMACPP_URL` | `http://localhost:8000` | Địa chỉ llama.cpp server |
 | `PGHOST` / `PGPORT` | `127.0.0.1` / `5432` | Postgres (giống `scripts/*.sh`) |
 | `PGDATABASE` | `osm_vn` | Database |
 | `PGUSER` / `PGPASSWORD` | `postgres` / `postgres` | Chứng thực local |

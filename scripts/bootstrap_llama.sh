@@ -34,8 +34,16 @@ elif [[ -n "${COLAB_RELEASE_TAG:-}" ]]; then
 		echo "[INFO] llama.cpp is already installed."
 	fi
 
-	echo "[INFO] Starting llama.cpp (log: ${LOG_FILE})..."
+	# Colab's own proxy occupies port 8080, so serve on the port implied by
+	# LLAMACPP_URL (8000, the repo-wide llama.cpp port) instead of the default.
+	LLAMA_PORT=8000
+	if [[ "${LLAMACPP_URL}" =~ :([0-9]+)$ ]]; then
+		LLAMA_PORT="${BASH_REMATCH[1]}"
+	fi
+
+	echo "[INFO] Starting llama.cpp on port ${LLAMA_PORT} (log: ${LOG_FILE})..."
 	nohup "${LLAMA_BIN}" serve \
+		--port "${LLAMA_PORT}" \
 		--models-preset "${CONFIG_FILE}" \
 		--models-max 1 \
 		--log-file "${LOG_FILE}" \
