@@ -10,19 +10,19 @@ Baselines
 
 Usage
 -----
-  python baselines.py --model sonnet4.6 --baseline direct
-  python baselines.py --model gpt4o     --baseline text2sql
-  python baselines.py --model sonnet4.6 --baseline rag --embeddings nomic
-  python baselines.py --model sonnet4.6 --baseline all
-  python baselines.py --model sonnet4.6 --parser-model gpt4o --baseline all
-  python baselines.py --model sonnet4.6 --baseline direct \
+  python pipeline.py --model sonnet4.6 --baseline direct
+  python pipeline.py --model gpt4o     --baseline text2sql
+  python pipeline.py --model sonnet4.6 --baseline rag --embeddings nomic
+  python pipeline.py --model sonnet4.6 --baseline all
+  python pipeline.py --model sonnet4.6 --parser-model gpt4o --baseline all
+  python pipeline.py --model sonnet4.6 --baseline direct \
       --clear-cache direct_answer,direct_json_parse
-  python baselines.py --model sonnet4.6 --baseline all    --clear-cache all
-  python baselines.py --model sonnet4.6 --baseline shuffled
-  python baselines.py --model qwen3.5:9b \
+  python pipeline.py --model sonnet4.6 --baseline all    --clear-cache all
+  python pipeline.py --model sonnet4.6 --baseline shuffled
+  python pipeline.py --model qwen3.5:9b \
       --ollama-url https://my-ollama.example.com --baseline direct
   OLLAMA_HOST=https://my-ollama.example.com \
-      python baselines.py --model qwen3.5:9b --baseline direct
+      python pipeline.py --model qwen3.5:9b --baseline direct
 """
 
 import argparse
@@ -35,7 +35,6 @@ import operator as op
 import os
 import random
 import re
-import sys
 import time
 from glob import glob
 from pathlib import Path
@@ -1325,9 +1324,9 @@ def main():
     questions = load_questions(mode=args.mode)
     print(f"Loaded {len(questions)} questions from {QUESTIONS_DIR}")
 
-    # Load evaluate module
-    sys.path.insert(0, str(ROOT))
-    evaluate_mod = importlib.import_module("evaluate")
+    # Load evaluate module fresh; the package-qualified name keeps a single
+    # module object shared with the Vietnamese patch layer.
+    evaluate_mod = importlib.import_module(f"{__package__}.evaluate")
     importlib.reload(evaluate_mod)
 
     geocoder = Nominatim(user_agent="SpatialQA_baseline")

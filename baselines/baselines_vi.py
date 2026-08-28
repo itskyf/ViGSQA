@@ -1,7 +1,7 @@
 """
 baselines_vi.py — runs GS-QA baselines on Vietnamese VN-GeoQA data.
 
-Patches baselines.py at runtime:
+Patches the upstream pipeline module at runtime:
   - QUESTIONS_DIR  → generator/questions_vi/
   - DB_PARAMS      → osm_vn (via PG* env)
   - CACHE_DIR      → cache_vi/
@@ -9,11 +9,11 @@ Patches baselines.py at runtime:
   - evaluate.get_osm_value → handles geo_wkt / dist_km field names
   - build_model    → llamacpp:<tag> routes to ChatOpenAI against llama.cpp /v1
 
-Usage (same flags as baselines.py):
-  python baselines_vi.py \
+Usage (run from the repo root; same flags as pipeline.py):
+  python -m baselines.baselines_vi \
     --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M \
     --baseline direct --mode smoke
-  python baselines_vi.py \
+  python -m baselines.baselines_vi \
     --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M \
     --baseline text2sql --mode full
 """
@@ -25,12 +25,11 @@ import re
 import sys
 from pathlib import Path
 
-import evaluate
 import psycopg
 from langchain_openai import ChatOpenAI
 from shapely import from_wkt
 
-import baselines
+from baselines import evaluate, pipeline
 from vigsqa.settings import PostgresSettings
 
 ROOT = Path(__file__).parent
@@ -46,29 +45,29 @@ MATCH_REL_TOLERANCE = 0.1
 
 # ── Import and patch baselines ────────────────────────────────────────────────
 # 1. Vietnamese questions directory
-baselines.QUESTIONS_DIR = ROOT.parent / "generator" / "questions_vi"
+pipeline.QUESTIONS_DIR = ROOT.parent / "generator" / "questions_vi"
 
 # 2. Vietnamese PostGIS database (same PG* env convention as scripts/*.sh)
-baselines.DB_PARAMS = PostgresSettings().connection_kwargs()
+pipeline.DB_PARAMS = PostgresSettings().connection_kwargs()
 
 # 3. Separate cache so Vietnamese runs don't collide with English cache
-baselines.CACHE_DIR = ROOT / "cache_vi"
-baselines.CACHE_DIR.mkdir(exist_ok=True)
+pipeline.CACHE_DIR = ROOT / "cache_vi"
+pipeline.CACHE_DIR.mkdir(exist_ok=True)
 
 # 4. Vietnamese prompts (direct + text2sql)
-baselines.PROMPT_FILES["direct_answer"] = (
+pipeline.PROMPT_FILES["direct_answer"] = (
     ROOT / "baseline_prompts" / "direct_answer_vi.txt"
 )
-baselines.PROMPT_FILES["direct_json_parse"] = (
+pipeline.PROMPT_FILES["direct_json_parse"] = (
     ROOT / "baseline_prompts" / "direct_json_parse_vi.txt"
 )
-baselines.PROMPT_FILES["sql_generate"] = (
+pipeline.PROMPT_FILES["sql_generate"] = (
     ROOT / "baseline_prompts" / "text2sql_generate_vi.txt"
 )
-baselines.PROMPT_FILES["sql_answer"] = (
+pipeline.PROMPT_FILES["sql_answer"] = (
     ROOT / "baseline_prompts" / "text2sql_answer_vi.txt"
 )
-baselines.PROMPT_FILES["sql_json_parse"] = (
+pipeline.PROMPT_FILES["sql_json_parse"] = (
     ROOT / "baseline_prompts" / "text2sql_json_parse_vi.txt"
 )
 
@@ -109,14 +108,14 @@ def _vn_get_osm_value(json_obj, value_label):
 
 evaluate.get_osm_value = _vn_get_osm_value
 
-# baselines.py calls importlib.reload(evaluate_mod) inside main(), which resets
-# our patch. Intercept reload to re-apply the patch every time evaluate is reloaded.
+# pipeline.py reloads evaluate inside main(), which resets our patch. Intercept
+# reload to re-apply the patch every time evaluate is reloaded.
 _orig_reload = importlib.reload
 
 
 def _reload_with_patch(module):
     result = _orig_reload(module)
-    if getattr(module, "__name__", "") == "evaluate":
+    if getattr(module, "__name__", "").endswith("evaluate"):
         module.get_osm_value = _vn_get_osm_value
     return result
 
@@ -130,13 +129,13 @@ importlib.reload = _reload_with_patch
 #   2. count/distance text eval: num2words() produces English words; Vietnamese
 #      model outputs digits — compare as digits instead.
 
-_orig_evaluate_answers = baselines.evaluate_answers
+_orig_evaluate_answers = pipeline.evaluate_answers
 
 
 def _loc_from_db(poi_name: str):
     """Look up POI centroid lon/lat by name in the VN PostGIS DB."""
     try:
-        conn = psycopg.connect(**baselines.DB_PARAMS)
+        conn = psycopg.connect(**pipeline.DB_PARAMS)
         conn.read_only = True
         cur = conn.cursor()
         cur.execute(
@@ -171,7 +170,7 @@ def _vn_evaluate_answers(
         if _a == "--baseline" and _j + 1 < len(sys.argv):
             _baseline_arg = sys.argv[_j + 1]
     if "text2sql" in _baseline_arg or _baseline_arg == "all":
-        _exec_path = baselines.CACHE_DIR / _model_arg / "sql_exec.json"
+        _exec_path = pipeline.CACHE_DIR / _model_arg / "sql_exec.json"
         if _exec_path.exists():
             try:
                 for item in json.load(open(_exec_path)):
@@ -286,7 +285,7 @@ def _vn_evaluate_answers(
     return text_eval, parsed_eval
 
 
-baselines.evaluate_answers = _vn_evaluate_answers
+pipeline.evaluate_answers = _vn_evaluate_answers
 
 # ── Model routing: llama.cpp via its OpenAI-compatible /v1 endpoint ──────────
 # Model name syntax:  llamacpp:<tag>
@@ -295,7 +294,7 @@ baselines.evaluate_answers = _vn_evaluate_answers
 # chat template, so no per-model prompt formatting lives here.
 # Reads LLAMACPP_URL env var (default http://localhost:8000).
 
-_orig_build_model = baselines.build_model
+_orig_build_model = pipeline.build_model
 
 
 def _build_model_vi(model_name: str):
@@ -312,9 +311,9 @@ def _build_model_vi(model_name: str):
     return _orig_build_model(model_name)
 
 
-baselines.build_model = _build_model_vi
-baselines.build_parser_model = _build_model_vi
+pipeline.build_model = _build_model_vi
+pipeline.build_parser_model = _build_model_vi
 
 # ── Run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    baselines.main()
+    pipeline.main()

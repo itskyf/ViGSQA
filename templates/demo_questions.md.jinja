@@ -1,0 +1,33 @@
+{% for item in items %}
+<details style="margin-bottom: 0.5em;">
+<summary style="cursor: pointer; font-weight: 600;">{{ item.id }} · {{ item.answer_type }}</summary>
+
+**Question**
+
+> {{ item.question }}
+
+**SQL**
+
+```sql
+{{ item.sql | trim }}
+```
+
+**Rows**
+
+```json
+{{ item.rows }}
+```
+
+**Answer**
+
+> {{ item.answer }}
+
+**Parsed**
+
+```json
+{{ item.parsed }}
+```
+
+</details>
+
+{% endfor %}

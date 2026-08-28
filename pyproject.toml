@@ -21,10 +21,9 @@ dev = [
   "google-colab-cli>=0.6.0,<0.7",
   "ipykernel>=7.3.0,<8",
   "ipywidgets>=8.1.9,<9",
-  # colab-cli 0.6.x calls jupyter_kernel_client.KernelClient and
-  # .JupyterSubprotocol; only the 0.9+ PyPI line exports both (conda-forge
-  # stalls at 0.6.0, which breaks colab-cli).
+  # colab-cli 0.6.x needs KernelClient + JupyterSubprotocol: >=0.9 has both; 1.x renames KernelClient
   "jupyter-kernel-client>=0.9.0,<1",
+  "minijinja>=2.22.0,<3",
   "ruff>=0.16.5,<0.17",
   "sqlfluff[rs]>=4.3.0,<5",
 ]
@@ -32,6 +31,11 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+# `baselines` ships with the distribution so the notebook can import the
+# patched pipeline in-process; VCS-ignored caches/CSVs never enter the wheel.
+[tool.hatch.build.targets.wheel]
+packages = ["src/vigsqa", "baselines"]
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]

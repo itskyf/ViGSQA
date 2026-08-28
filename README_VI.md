@@ -55,12 +55,13 @@ Notebook chạy hai nhánh bootstrap độc lập rồi đợi cả hai hoàn t�
 Model duy nhất được hỗ trợ chạy local: llama.cpp qua endpoint tương thích OpenAI `/v1`, client là `langchain-openai.ChatOpenAI` (không dùng Ollama, không tự dựng chat template).
 
 ```bash
+# chạy từ thư mục gốc repo
 # smoke: 8 câu (1/loại) — chỉ để kiểm tra integration, không phải bằng chứng benchmark
-python baselines/baselines_vi.py --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M --baseline direct   --mode smoke
-python baselines/baselines_vi.py --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M --baseline text2sql --mode smoke
+python -m baselines.baselines_vi --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M --baseline direct   --mode smoke
+python -m baselines.baselines_vi --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M --baseline text2sql --mode smoke
 
 # full: 800 câu — số liệu chính thức thuộc T03
-python baselines/baselines_vi.py --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M --baseline text2sql --mode full
+python -m baselines.baselines_vi --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M --baseline text2sql --mode full
 ```
 
 Kết quả lưu tại `baselines/<model>_<baseline>_{text,parsed}_eval.csv`.

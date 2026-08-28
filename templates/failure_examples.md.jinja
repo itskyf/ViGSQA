@@ -1,0 +1,35 @@
+{% for item in items %}
+<details style="margin-bottom: 0.5em;">
+<summary style="cursor: pointer; font-weight: 600;">{{ item.baseline }} · {{ item.category }} · {{ item.qid }}</summary>
+
+**type:** `{{ item.qtype }}`
+
+**Question**
+
+> {{ item.question }}
+
+{% if item.sql %}
+**SQL**
+
+```sql
+{{ item.sql | trim }}
+```
+
+**Rows**
+
+```json
+{{ item.rows }}
+```
+
+{% endif %}
+**Model answer**
+
+> {{ item.model_answer }}
+
+**Gold**
+
+> {{ item.gold }}
+
+</details>
+
+{% endfor %}

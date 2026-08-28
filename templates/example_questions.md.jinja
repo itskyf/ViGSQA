@@ -1,0 +1,28 @@
+{% for item in items %}
+<details style="margin-bottom: 0.5em;">
+<summary style="cursor: pointer; font-weight: 600;">{{ item.title }}</summary>
+
+**answer type:** `{{ item.example.answer_type }}`
+
+**Question**
+
+> {{ item.example.question }}
+
+**Stripped**
+
+> {{ item.example.question_surfaces.stripped }}
+
+**Gold answers**
+
+{% for answer in item.answers -%}
+{{ answer }}
+{% endfor %}
+**Gold SQL**
+
+```sql
+{{ item.example.sql | trim }}
+```
+
+</details>
+
+{% endfor %}
