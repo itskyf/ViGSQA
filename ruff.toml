@@ -1,0 +1,29 @@
+# The `hk` pre-commit suite (ruff >= 0.16 with widened defaults) was introduced
+# after these files were written. `baselines/` is upstream GS-QA code plus a
+# thin Vietnamese patch layer; `generator/` produced the frozen benchmark and
+# must not be churned for style. Their defensive error handling (blind excepts
+# that record failures into the result records) and legacy formatting are
+# deliberate. New code outside these directories stays fully linted.
+[lint.per-file-ignores]
+"baselines/*.py" = ["BLE001", "S110", "S112", "SIM115", "C408", "UP031", "RUF046", "RUF059", "I001", "F401", "W605", "B023", "PLC0206"]
+"generator/*.py" = [
+  "UP031",
+  "SIM115",
+  "FURB129",
+  "UP003",
+  "F401",
+  "SIM103",
+  "BLE001",
+  "I001",
+  "PLC0206",
+  "C405",
+  "FURB122",
+  "S112",
+  "C408",
+  "E722",
+  "F811",
+  "F841",
+  "S110",
+  "SIM114",
+  "SIM401",
+]

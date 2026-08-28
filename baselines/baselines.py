@@ -59,14 +59,15 @@ CACHE_DIR.mkdir(exist_ok=True)
 # ---------------------------------------------------------------------------
 
 PROMPT_FILES = {
-    "direct_answer":       PROMPTS_DIR / "direct_answer.txt",
-    "direct_json_parse":   PROMPTS_DIR / "direct_json_parse.txt",
-    "sql_generate":        PROMPTS_DIR / "text2sql_generate.txt",
-    "sql_answer":          PROMPTS_DIR / "text2sql_answer.txt",
-    "sql_json_parse":      PROMPTS_DIR / "text2sql_json_parse.txt",
-    "rag_answer":          PROMPTS_DIR / "rag_answer.txt",
-    "rag_json_parse":      PROMPTS_DIR / "rag_json_parse.txt",
+    "direct_answer": PROMPTS_DIR / "direct_answer.txt",
+    "direct_json_parse": PROMPTS_DIR / "direct_json_parse.txt",
+    "sql_generate": PROMPTS_DIR / "text2sql_generate.txt",
+    "sql_answer": PROMPTS_DIR / "text2sql_answer.txt",
+    "sql_json_parse": PROMPTS_DIR / "text2sql_json_parse.txt",
+    "rag_answer": PROMPTS_DIR / "rag_answer.txt",
+    "rag_json_parse": PROMPTS_DIR / "rag_json_parse.txt",
 }
+
 
 def load_prompt(key: str) -> str:
     path = PROMPT_FILES[key]
@@ -79,28 +80,47 @@ def load_prompt(key: str) -> str:
 # Model setup
 # ---------------------------------------------------------------------------
 
+
 def build_model(model_name: str):
     if model_name == "sonnet4.6":
         from langchain_anthropic import ChatAnthropic
+
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        return ChatAnthropic(model="claude-sonnet-4-6", temperature=0, max_tokens=4096, api_key=api_key)
+        return ChatAnthropic(
+            model="claude-sonnet-4-6", temperature=0, max_tokens=4096, api_key=api_key
+        )
 
     if model_name == "haiku4.5":
         from langchain_anthropic import ChatAnthropic
+
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        return ChatAnthropic(model="claude-haiku-4-5-20251001", temperature=0, max_tokens=4096, api_key=api_key)
+        return ChatAnthropic(
+            model="claude-haiku-4-5-20251001",
+            temperature=0,
+            max_tokens=4096,
+            api_key=api_key,
+        )
 
     if model_name == "gpt4o":
         from langchain_openai import ChatOpenAI
+
         api_key = os.environ.get("OPENAI_API_KEY", "")
-        return ChatOpenAI(model="gpt-4o", temperature=0, max_tokens=4096, api_key=api_key)
+        return ChatOpenAI(
+            model="gpt-4o", temperature=0, max_tokens=4096, api_key=api_key
+        )
 
     # Any other name is treated as an Ollama model tag (e.g. qwen3.5:9b, llama3.1:8b).
     # Use OLLAMA_HOST env var or --ollama-url CLI flag to route to a remote instance.
     from langchain_ollama import ChatOllama
+
     base_url = os.environ.get("OLLAMA_HOST", "https://ollama.com")
-    return ChatOllama(model=model_name, temperature=0, num_ctx=4096, num_predict=4096,
-                      base_url=base_url)
+    return ChatOllama(
+        model=model_name,
+        temperature=0,
+        num_ctx=4096,
+        num_predict=4096,
+        base_url=base_url,
+    )
 
 
 def build_parser_model(model_name: str):
@@ -113,6 +133,7 @@ def build_parser_model(model_name: str):
 # Rate-limited invocation
 # ---------------------------------------------------------------------------
 
+
 def _parse_wait_seconds(err_str: str, attempt: int) -> float:
     """Extract wait time from error message, or compute exponential backoff."""
     # Try 'try again in Xs' pattern
@@ -121,7 +142,7 @@ def _parse_wait_seconds(err_str: str, attempt: int) -> float:
         return float(m.group(1)) + 2
     # Sonnet: per-minute token limit → wait up to 60s + backoff
     base = 60
-    return min(base * (2 ** attempt), 600)
+    return min(base * (2**attempt), 600)
 
 
 def invoke_with_retry(model, messages, max_retries: int = 8):
@@ -139,7 +160,9 @@ def invoke_with_retry(model, messages, max_retries: int = 8):
             )
             if is_rate_limit and attempt < max_retries - 1:
                 wait = _parse_wait_seconds(err_str, attempt)
-                print(f"\n  [rate limit] attempt {attempt + 1}/{max_retries} — sleeping {wait:.0f}s …")
+                print(
+                    f"\n  [rate limit] attempt {attempt + 1}/{max_retries} — sleeping {wait:.0f}s …"
+                )
                 time.sleep(wait)
                 continue
             raise
@@ -149,6 +172,7 @@ def invoke_with_retry(model, messages, max_retries: int = 8):
 # ---------------------------------------------------------------------------
 # Cache helpers
 # ---------------------------------------------------------------------------
+
 
 def cache_path(model_name: str, step: str) -> Path:
     p = CACHE_DIR / model_name
@@ -167,8 +191,11 @@ def load_cache(model_name: str, step: str) -> dict:
 
 class _JSONEncoder(json.JSONEncoder):
     """Handles types returned by psycopg that the default encoder can't serialize."""
+
     def default(self, o):
-        import decimal, datetime
+        import datetime
+        import decimal
+
         if isinstance(o, decimal.Decimal):
             return float(o)
         if isinstance(o, (datetime.date, datetime.datetime)):
@@ -177,7 +204,9 @@ class _JSONEncoder(json.JSONEncoder):
 
 
 def save_cache(model_name: str, step: str, records: list):
-    cache_path(model_name, step).write_text(json.dumps(records, indent=2, cls=_JSONEncoder))
+    cache_path(model_name, step).write_text(
+        json.dumps(records, indent=2, cls=_JSONEncoder)
+    )
 
 
 def clear_cache(model_name: str, steps):
@@ -203,22 +232,32 @@ def clear_cache(model_name: str, steps):
 # Question loading
 # ---------------------------------------------------------------------------
 
-def load_questions() -> list:
+
+def load_questions(mode: str = "full") -> list:
+    """Load benchmark questions, keeping their frozen string ids.
+
+    `smoke` keeps only the first question of each type file — a deterministic
+    8-question integration subset (1/type), never benchmark evidence.
+    """
+    if mode not in ("smoke", "full"):
+        raise ValueError(f"unknown mode: {mode!r}")
     files = sorted(glob(str(QUESTIONS_DIR / "*.jsonl")))
     questions = []
-    qid = 0
     for path in files:
         qtype = Path(path).stem
         with open(path) as f:
-            for _ in range(100):
-                line = f.readline()
-                if not line:
+            for i, line in enumerate(f):
+                if mode == "smoke" and i > 0:
+                    break
+                if i >= 100:
                     break
                 q = json.loads(line)
-                q["id"] = qid
+                if not q.get("id"):
+                    raise KeyError(
+                        f"question id missing in {path} — frozen benchmarks require stable ids"
+                    )
                 q["type"] = qtype
                 questions.append(q)
-                qid += 1
     return questions
 
 
@@ -226,9 +265,15 @@ def load_questions() -> list:
 # JSON / math utilities  (carried over from notebooks)
 # ---------------------------------------------------------------------------
 
-_BIN_OPS = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul,
-            ast.Div: op.truediv, ast.FloorDiv: op.floordiv,
-            ast.Mod: op.mod, ast.Pow: op.pow}
+_BIN_OPS = {
+    ast.Add: op.add,
+    ast.Sub: op.sub,
+    ast.Mult: op.mul,
+    ast.Div: op.truediv,
+    ast.FloorDiv: op.floordiv,
+    ast.Mod: op.mod,
+    ast.Pow: op.pow,
+}
 _UNARY_OPS = {ast.UAdd: op.pos, ast.USub: op.neg}
 _ALLOWED_CHARS = re.compile(r"^[0-9+\-*/().\s]+$")
 MATH_EQ_RE = re.compile(
@@ -242,6 +287,7 @@ def safe_eval(expr: str) -> float:
     expr = expr.strip()
     if not expr or not _ALLOWED_CHARS.fullmatch(expr):
         raise ValueError(f"Invalid expression: {expr!r}")
+
     def _eval(n):
         if isinstance(n, ast.Constant) and isinstance(n.value, (int, float)):
             return n.value
@@ -250,6 +296,7 @@ def safe_eval(expr: str) -> float:
         if isinstance(n, ast.UnaryOp) and type(n.op) in _UNARY_OPS:
             return _UNARY_OPS[type(n.op)](_eval(n.operand))
         raise ValueError(f"Unsupported expression: {expr!r}")
+
     return _eval(ast.parse(expr, mode="eval").body)
 
 
@@ -263,6 +310,7 @@ def replace_math(text: str) -> str:
         except Exception:
             pass
         return m.group(0)
+
     return MATH_EQ_RE.sub(repl, text)
 
 
@@ -276,26 +324,30 @@ def flatten_if_nested(array):
 
 
 def extract_json_blocks(text: str, idx: int) -> list:
-    matches = re.findall(r'```[\s]*json(.*?)```', text, re.DOTALL)
+    matches = re.findall(r"```[\s]*json(.*?)```", text, re.DOTALL)
     blocks = []
     for match in matches:
         try:
             s = match.strip()
             s = replace_math(s)
-            s = re.sub(r'\b\d+(?:_\d+)*\b', lambda x: x.group().replace('_', ''), s)
-            s = re.sub(r'\b\d+(?:,\d+)*\b', lambda x: x.group().replace(',', ''), s)
-            s = re.sub(r'//.*?\n', '', s)
-            s = re.sub(r',\s*}', '}', s)
-            s = s.replace('''\\\'''', '''\'''').replace('''\\&''', '''&''').replace('}\njson', '}')
-            if re.search(r'}\s*{', s):
-                s = re.sub(r'}\s*{', '},\n{', s)
-                s = '[\n%s\n]' % s
-            convert_area = 'acres' in s
+            s = re.sub(r"\b\d+(?:_\d+)*\b", lambda x: x.group().replace("_", ""), s)
+            s = re.sub(r"\b\d+(?:,\d+)*\b", lambda x: x.group().replace(",", ""), s)
+            s = re.sub(r"//.*?\n", "", s)
+            s = re.sub(r",\s*}", "}", s)
+            s = (
+                s.replace("""\\\'""", """\'""")
+                .replace("""\\&""", """&""")
+                .replace("}\njson", "}")
+            )
+            if re.search(r"}\s*{", s):
+                s = re.sub(r"}\s*{", "},\n{", s)
+                s = "[\n%s\n]" % s
+            convert_area = "acres" in s
             if convert_area:
-                s = s.replace(' acres,', ',')
+                s = s.replace(" acres,", ",")
             data = json.loads(s)
-            if convert_area and 'area' in data:
-                data['area'] = data['area'] * 4046.8564224
+            if convert_area and "area" in data:
+                data["area"] = data["area"] * 4046.8564224
             blocks.append(data)
         except json.JSONDecodeError as e:
             print(f"  [json parse warning] question {idx}: {e}")
@@ -306,21 +358,35 @@ def extract_json_blocks(text: str, idx: int) -> list:
 # SQL execution
 # ---------------------------------------------------------------------------
 
-DB_PARAMS = dict(host="localhost", dbname="osm_ca", user="postgres", password="postgres", port=5432)
+DB_PARAMS = dict(
+    host=os.getenv("PGHOST", "localhost"),
+    dbname=os.getenv("PGDATABASE", "osm_ca"),
+    user=os.getenv("PGUSER", "postgres"),
+    password=os.getenv("PGPASSWORD", "postgres"),
+    port=int(os.getenv("PGPORT", "5432")),
+)
 SQL_TIMEOUT_MS = 100_000
 
 
 def make_db_conn():
-    return psycopg.connect(**DB_PARAMS, row_factory=dict_row)
+    # autocommit so session-level SETs (read-only, timeout) apply to the very
+    # next statement instead of the next transaction
+    return psycopg.connect(**DB_PARAMS, row_factory=dict_row, autocommit=True)
 
 
 def run_sql(sql: str, conn) -> dict:
     try:
         with conn.cursor() as cur:
             cur.execute(f"SET statement_timeout = {SQL_TIMEOUT_MS}")
+            cur.execute("SET default_transaction_read_only = ON")
             cur.execute(sql)
             rows = cur.fetchmany(100)
-            return {"output": [{k: v for k, v in row.items() if v is not None} for row in rows], "error": ""}
+            return {
+                "output": [
+                    {k: v for k, v in row.items() if v is not None} for row in rows
+                ],
+                "error": "",
+            }
     except Exception as e:
         try:
             conn.rollback()
@@ -330,12 +396,13 @@ def run_sql(sql: str, conn) -> dict:
 
 
 def extract_sql_blocks(text: str) -> list:
-    return re.findall(r'```[\s]*sql(.*?)```', text, re.DOTALL)
+    return re.findall(r"```[\s]*sql(.*?)```", text, re.DOTALL)
 
 
 # ---------------------------------------------------------------------------
 # Pipeline steps
 # ---------------------------------------------------------------------------
+
 
 def step_generate_answers(questions, model, model_name, cache_key, system_prompt):
     """Step: question → text answer."""
@@ -345,7 +412,10 @@ def step_generate_answers(questions, model, model_name, cache_key, system_prompt
         if q["id"] in cache:
             results.append(cache[q["id"]])
         else:
-            messages = [SystemMessage(content=system_prompt), HumanMessage(content=q["question"])]
+            messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=q["question"]),
+            ]
             content = invoke_with_retry(model, messages).content
             record = {"id": q["id"], "content": content}
             results.append(record)
@@ -355,12 +425,16 @@ def step_generate_answers(questions, model, model_name, cache_key, system_prompt
     return results
 
 
-def step_parse_to_json(questions, answers, parser_model, model_name, cache_key, json_prompt_key):
+def step_parse_to_json(
+    questions, answers, parser_model, model_name, cache_key, json_prompt_key
+):
     """Step: question + text answer → JSON answer (always uses local parser model)."""
     base_prompt = load_prompt(json_prompt_key)
     cache = load_cache(model_name, cache_key)
     results = []
-    for q, a in tqdm.tqdm(zip(questions, answers), total=len(questions), desc=f"  {cache_key}"):
+    for q, a in tqdm.tqdm(
+        zip(questions, answers), total=len(questions), desc=f"  {cache_key}"
+    ):
         if q["id"] in cache:
             results.append(cache[q["id"]])
             continue
@@ -386,7 +460,9 @@ def step_execute_sql(questions, sql_answers, model_name):
     cache = load_cache(model_name, "sql_exec")
     results = []
     conn = None
-    for q, a in tqdm.tqdm(zip(questions, sql_answers), total=len(questions), desc="  sql_exec"):
+    for q, a in tqdm.tqdm(
+        zip(questions, sql_answers), total=len(questions), desc="  sql_exec"
+    ):
         if q["id"] in cache:
             results.append(cache[q["id"]])
             continue
@@ -419,7 +495,9 @@ def step_answer_from_records(questions, sql_answers, sql_outputs, model, model_n
     base_prompt = load_prompt("sql_answer")
     cache = load_cache(model_name, "sql_answer")
     results = []
-    for q, sql_out in tqdm.tqdm(zip(questions, sql_outputs), total=len(questions), desc="  sql_answer"):
+    for q, sql_out in tqdm.tqdm(
+        zip(questions, sql_outputs), total=len(questions), desc="  sql_answer"
+    ):
         if q["id"] in cache:
             results.append(cache[q["id"]])
             continue
@@ -437,6 +515,7 @@ def step_answer_from_records(questions, sql_answers, sql_outputs, model, model_n
 # ---------------------------------------------------------------------------
 # Evaluation  (unchanged from notebooks)
 # ---------------------------------------------------------------------------
+
 
 def get_recursive(data, search_key):
     out = []
@@ -456,7 +535,9 @@ def improved_f1(new_f1, scores):
     return "F1" not in scores or new_f1 > scores["F1"]
 
 
-def evaluate_answers(questions, answers, parsed_answers, evaluate_mod, geocoder, geod, prefix):
+def evaluate_answers(
+    questions, answers, parsed_answers, evaluate_mod, geocoder, geod, prefix
+):
     text_eval = []
     parsed_eval = []
 
@@ -467,14 +548,22 @@ def evaluate_answers(questions, answers, parsed_answers, evaluate_mod, geocoder,
 
         # --- text evaluation ---
         key = ""
-        if "multi_source1" in q["type"]:   key = "multi_source_long_answer"
-        elif "name" in q["type"]:          key = "name"
-        elif "loc" in q["type"]:           key = "address"
-        elif "angle" in q["type"]:         key = "angle_description"
-        elif "area" in q["type"]:          key = "area"
-        elif "length" in q["type"]:        key = "length"
-        elif "count" in q["type"]:         key = "count"
-        elif "distance" in q["type"]:      key = "distance"
+        if "multi_source1" in q["type"]:
+            key = "multi_source_long_answer"
+        elif "name" in q["type"]:
+            key = "name"
+        elif "loc" in q["type"]:
+            key = "address"
+        elif "angle" in q["type"]:
+            key = "angle_description"
+        elif "area" in q["type"]:
+            key = "area"
+        elif "length" in q["type"]:
+            key = "length"
+        elif "count" in q["type"]:
+            key = "count"
+        elif "distance" in q["type"]:
+            key = "distance"
 
         true_answers = []
         for ans in q["answers"]:
@@ -490,7 +579,9 @@ def evaluate_answers(questions, answers, parsed_answers, evaluate_mod, geocoder,
             true_answers.append(v)
 
         if text_answer and text_answer.strip() and true_answers:
-            P, R, F1 = evaluate_mod.evaluate_entity_names(text_answer, "\n".join(true_answers))
+            P, R, F1 = evaluate_mod.evaluate_entity_names(
+                text_answer, "\n".join(true_answers)
+            )
             text_eval.append({"attempted": True, "P": P, "R": R, "F1": F1})
         else:
             text_eval.append({"attempted": False, "P": 0, "R": 0, "F1": 0})
@@ -538,7 +629,9 @@ def evaluate_answers(questions, answers, parsed_answers, evaluate_mod, geocoder,
                     pred_loc = evaluate_mod.get_location_by_address(geocoder, pred)
                     if pred_loc is None:
                         continue
-                    dist_err = evaluate_mod.evaluate_location(geod, [pred_loc], [loc])[0]
+                    dist_err = evaluate_mod.evaluate_location(geod, [pred_loc], [loc])[
+                        0
+                    ]
                     dist_err = 1.0 if dist_err > 5e5 else dist_err / 5e5
                     if dist_err < scores.get("distance_error", float("inf")):
                         scores["distance_error"] = dist_err
@@ -564,7 +657,9 @@ def evaluate_answers(questions, answers, parsed_answers, evaluate_mod, geocoder,
                     if angle_err < scores.get("angle_error", float("inf")):
                         scores["angle_error"] = angle_err
         elif q["type"].endswith(("area", "length", "count", "distance")):
-            mkey = next(k for k in ("area", "length", "count", "distance") if k in q["type"])
+            mkey = next(
+                k for k in ("area", "length", "count", "distance") if k in q["type"]
+            )
             for ans in q["answers"]:
                 v = evaluate_mod.get_osm_value(ans, mkey)
                 if v is None:
@@ -619,6 +714,7 @@ def save_eval(text_eval, parsed_eval, questions, model_name, prefix):
 # Baselines
 # ---------------------------------------------------------------------------
 
+
 def step_rag_answers(questions, model, model_name, vector_store, k=10):
     """Step: question + retrieved OSM records → text answer."""
     base_prompt = load_prompt("rag_answer")
@@ -642,39 +738,58 @@ def step_rag_answers(questions, model, model_name, vector_store, k=10):
     return results
 
 
-def run_direct(questions, model, parser_model, model_name, evaluate_mod, geocoder, geod):
+def run_direct(
+    questions, model, parser_model, model_name, evaluate_mod, geocoder, geod
+):
     print("\n[direct baseline]")
 
     # Step 1: generate answers
     answers = step_generate_answers(
-        questions, model, model_name,
+        questions,
+        model,
+        model_name,
         cache_key="direct_answer",
         system_prompt=load_prompt("direct_answer"),
     )
 
     # Step 2: parse to JSON
     json_answers = step_parse_to_json(
-        questions, answers, parser_model, model_name,
+        questions,
+        answers,
+        parser_model,
+        model_name,
         cache_key="direct_json_parse",
         json_prompt_key="direct_json_parse",
     )
 
     # Step 3: extract JSON blocks
-    parsed_answers = [extract_json_blocks(a["content"], i) for i, a in enumerate(json_answers)]
+    parsed_answers = [
+        extract_json_blocks(a["content"], i) for i, a in enumerate(json_answers)
+    ]
 
     # Evaluation
     text_eval, parsed_eval = evaluate_answers(
-        questions, answers, parsed_answers, evaluate_mod, geocoder, geod, prefix="direct"
+        questions,
+        answers,
+        parsed_answers,
+        evaluate_mod,
+        geocoder,
+        geod,
+        prefix="direct",
     )
     save_eval(text_eval, parsed_eval, questions, model_name, prefix="direct")
 
 
-def run_text2sql(questions, model, parser_model, model_name, evaluate_mod, geocoder, geod):
+def run_text2sql(
+    questions, model, parser_model, model_name, evaluate_mod, geocoder, geod
+):
     print("\n[text2sql baseline]")
 
     # Step 1: generate SQL
     sql_answers = step_generate_answers(
-        questions, model, model_name,
+        questions,
+        model,
+        model_name,
         cache_key="sql_generate",
         system_prompt=load_prompt("sql_generate"),
     )
@@ -683,21 +798,34 @@ def run_text2sql(questions, model, parser_model, model_name, evaluate_mod, geoco
     sql_outputs = step_execute_sql(questions, sql_answers, model_name)
 
     # Step 3: generate answer from records
-    answers = step_answer_from_records(questions, sql_answers, sql_outputs, model, model_name)
+    answers = step_answer_from_records(
+        questions, sql_answers, sql_outputs, model, model_name
+    )
 
     # Step 4: parse to JSON
     json_answers = step_parse_to_json(
-        questions, answers, parser_model, model_name,
+        questions,
+        answers,
+        parser_model,
+        model_name,
         cache_key="sql_json_parse",
         json_prompt_key="sql_json_parse",
     )
 
     # Step 5: extract JSON blocks
-    parsed_answers = [extract_json_blocks(a["content"], i) for i, a in enumerate(json_answers)]
+    parsed_answers = [
+        extract_json_blocks(a["content"], i) for i, a in enumerate(json_answers)
+    ]
 
     # Evaluation
     text_eval, parsed_eval = evaluate_answers(
-        questions, answers, parsed_answers, evaluate_mod, geocoder, geod, prefix="text2sql"
+        questions,
+        answers,
+        parsed_answers,
+        evaluate_mod,
+        geocoder,
+        geod,
+        prefix="text2sql",
     )
     save_eval(text_eval, parsed_eval, questions, model_name, prefix="text2sql")
 
@@ -706,10 +834,10 @@ WIKIPEDIA_CORPUS = ROOT / "wikipedia_corpus.jsonl"
 
 EMBEDDINGS_MODELS = {
     # name            : (provider, model_id)
-    "minilm":          ("hf",     "all-MiniLM-L6-v2"),   # fast, local, no Ollama needed
-    "nomic":           ("ollama", "nomic-embed-text"),    # fast Ollama embedding model
-    "qwen3.5":         ("ollama", "qwen3.5:cloud"),       # original (slow)
-    "openai-small":    ("openai", "text-embedding-3-small"),
+    "minilm": ("hf", "all-MiniLM-L6-v2"),  # fast, local, no Ollama needed
+    "nomic": ("ollama", "nomic-embed-text"),  # fast Ollama embedding model
+    "qwen3.5": ("ollama", "qwen3.5:cloud"),  # original (slow)
+    "openai-small": ("openai", "text-embedding-3-small"),
 }
 
 
@@ -717,13 +845,16 @@ def build_embeddings(name: str):
     provider, model_id = EMBEDDINGS_MODELS[name]
     if provider == "hf":
         from langchain_huggingface import HuggingFaceEmbeddings
+
         return HuggingFaceEmbeddings(model_name=model_id)
     if provider == "ollama":
         from langchain_ollama import OllamaEmbeddings
+
         base_url = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
         return OllamaEmbeddings(model=model_id, base_url=base_url)
     if provider == "openai":
         from langchain_openai import OpenAIEmbeddings
+
         return OpenAIEmbeddings(model=model_id)
     raise ValueError(f"Unknown embeddings provider: {provider}")
 
@@ -762,7 +893,10 @@ def _build_vectorstore(embeddings, store_dir: Path):
                     break
                 q = json.loads(line)
                 objs = extract_objects_with_geometry(q)
-                corpus += [{k: o[k] for k in o if o[k] is not None and k != "geometry"} for o in objs]
+                corpus += [
+                    {k: o[k] for k in o if o[k] is not None and k != "geometry"}
+                    for o in objs
+                ]
 
     if WIKIPEDIA_CORPUS.exists():
         with open(WIKIPEDIA_CORPUS) as f:
@@ -795,6 +929,7 @@ def _build_vectorstore(embeddings, store_dir: Path):
 
 def _load_vectorstore(embeddings, store_dir: Path):
     from langchain_chroma import Chroma
+
     return Chroma(
         collection_name="osm",
         embedding_function=embeddings,
@@ -802,8 +937,16 @@ def _load_vectorstore(embeddings, store_dir: Path):
     )
 
 
-def run_rag(questions, model, parser_model, model_name, evaluate_mod, geocoder, geod,
-            embeddings_name: str = "minilm"):
+def run_rag(
+    questions,
+    model,
+    parser_model,
+    model_name,
+    evaluate_mod,
+    geocoder,
+    geod,
+    embeddings_name: str = "minilm",
+):
     print(f"\n[rag baseline]  embeddings={embeddings_name}")
 
     embeddings = build_embeddings(embeddings_name)
@@ -823,13 +966,18 @@ def run_rag(questions, model, parser_model, model_name, evaluate_mod, geocoder, 
 
     # Step 2: parse to JSON
     json_answers = step_parse_to_json(
-        questions, answers, parser_model, model_name,
+        questions,
+        answers,
+        parser_model,
+        model_name,
         cache_key="rag_json_parse",
         json_prompt_key="rag_json_parse",
     )
 
     # Step 3: extract JSON blocks
-    parsed_answers = [extract_json_blocks(a["content"], i) for i, a in enumerate(json_answers)]
+    parsed_answers = [
+        extract_json_blocks(a["content"], i) for i, a in enumerate(json_answers)
+    ]
 
     # Evaluation
     text_eval, parsed_eval = evaluate_answers(
@@ -842,6 +990,7 @@ def run_rag(questions, model, parser_model, model_name, evaluate_mod, geocoder, 
 # Shuffled (random) baseline
 # ---------------------------------------------------------------------------
 
+
 def _rebuild_query_shuffled(original_sql: str, q_type: str) -> str:
     """
     Build a randomised LIMIT 1 query keeping only simple tag=value predicates.
@@ -852,9 +1001,12 @@ def _rebuild_query_shuffled(original_sql: str, q_type: str) -> str:
     — exactly what we want for a random pick.
     """
     # Determine the main table from the FROM clause (ignore CTEs)
-    with_names = set(re.findall(r'\b(\w+)\b\s+AS\s*\(', original_sql, re.IGNORECASE))
-    from_m = re.search(r'\bFROM\s+([\w,\s]+?)(?:\s+WHERE|\s+ORDER|\s+GROUP|\s+LIMIT|;|$)',
-                       original_sql, re.IGNORECASE)
+    with_names = set(re.findall(r"\b(\w+)\b\s+AS\s*\(", original_sql, re.IGNORECASE))
+    from_m = re.search(
+        r"\bFROM\s+([\w,\s]+?)(?:\s+WHERE|\s+ORDER|\s+GROUP|\s+LIMIT|;|$)",
+        original_sql,
+        re.IGNORECASE,
+    )
     table = "pois"
     if from_m:
         tables = [t.strip().split()[0] for t in from_m.group(1).split(",")]
@@ -865,8 +1017,9 @@ def _rebuild_query_shuffled(original_sql: str, q_type: str) -> str:
     # Extract only simple   col = 'value'   or   col ILIKE 'value'   predicates.
     # This safely ignores ST_ functions, BETWEEN, numeric fragments, etc.
     simple_preds = re.findall(
-        r'\b\w+\s*(?:=|ILIKE|LIKE)\s*\'[^\']+\'',
-        original_sql, re.IGNORECASE,
+        r"\b\w+\s*(?:=|ILIKE|LIKE)\s*\'[^\']+\'",
+        original_sql,
+        re.IGNORECASE,
     )
 
     predicates = list(dict.fromkeys(simple_preds))  # deduplicate, preserve order
@@ -880,14 +1033,20 @@ def _rebuild_query_shuffled(original_sql: str, q_type: str) -> str:
 
 def _random_angle() -> dict:
     import random
+
     directions = [
-        ("north",     [random.uniform(0.0, 22.5), random.uniform(337.5, 360.0)][random.randint(0, 1)]),
+        (
+            "north",
+            [random.uniform(0.0, 22.5), random.uniform(337.5, 360.0)][
+                random.randint(0, 1)
+            ],
+        ),
         ("northeast", random.uniform(22.5, 67.5)),
-        ("east",      random.uniform(67.5, 112.5)),
+        ("east", random.uniform(67.5, 112.5)),
         ("southeast", random.uniform(112.5, 157.5)),
-        ("south",     random.uniform(157.5, 202.5)),
+        ("south", random.uniform(157.5, 202.5)),
         ("southwest", random.uniform(202.5, 247.5)),
-        ("west",      random.uniform(247.5, 292.5)),
+        ("west", random.uniform(247.5, 292.5)),
         ("northwest", random.uniform(292.5, 337.5)),
     ]
     name, angle = random.choice(directions)
@@ -897,27 +1056,28 @@ def _random_angle() -> dict:
 def _random_multi_source_value(attribute: str):
     """Generate a plausible random value for a multi_source attribute."""
     import random
+
     generators = {
-        "Architect":             lambda: f"Architect {random.randint(1, 999)}",
-        "Built":                 lambda: str(random.randint(1800, 2025)),
-        "Created":               lambda: str(random.randint(1800, 2025)),
-        "Established":           lambda: str(random.randint(1700, 2025)),
-        "Director":              lambda: f"Director {random.randint(1, 999)}",
-        "Founder":               lambda: f"Founder {random.randint(1, 999)}",
-        "Headquarters":          lambda: f"City {random.randint(1, 999)}",
-        "Opened":                lambda: str(random.randint(1800, 2025)),
-        "Opening date":          lambda: str(random.randint(1800, 2025)),
+        "Architect": lambda: f"Architect {random.randint(1, 999)}",
+        "Built": lambda: str(random.randint(1800, 2025)),
+        "Created": lambda: str(random.randint(1800, 2025)),
+        "Established": lambda: str(random.randint(1700, 2025)),
+        "Director": lambda: f"Director {random.randint(1, 999)}",
+        "Founder": lambda: f"Founder {random.randint(1, 999)}",
+        "Headquarters": lambda: f"City {random.randint(1, 999)}",
+        "Opened": lambda: str(random.randint(1800, 2025)),
+        "Opening date": lambda: str(random.randint(1800, 2025)),
         "Affiliated university": lambda: f"University {random.randint(1, 99)}",
-        "Emergency department":  lambda: random.choice(["Yes", "No"]),
-        "Helipad":               lambda: random.choice(["Yes", "No"]),
-        "Date opened":           lambda: str(random.randint(1900, 2025)),
-        "Capacity":              lambda: str(random.randint(50, 100_000)),
-        "Former names":          lambda: f"Old Name {random.randint(1, 99)}",
-        "Motto":                 lambda: "A random motto",
-        "Mascot":                lambda: f"Mascot{random.randint(1, 99)}",
-        "Nickname":              lambda: f"Nick{random.randint(1, 99)}",
-        "Designed by":           lambda: f"Designer {random.randint(1, 99)}",
-        "Nearest\xa0city":       lambda: f"City {random.randint(1, 99)}",
+        "Emergency department": lambda: random.choice(["Yes", "No"]),
+        "Helipad": lambda: random.choice(["Yes", "No"]),
+        "Date opened": lambda: str(random.randint(1900, 2025)),
+        "Capacity": lambda: str(random.randint(50, 100_000)),
+        "Former names": lambda: f"Old Name {random.randint(1, 99)}",
+        "Motto": lambda: "A random motto",
+        "Mascot": lambda: f"Mascot{random.randint(1, 99)}",
+        "Nickname": lambda: f"Nick{random.randint(1, 99)}",
+        "Designed by": lambda: f"Designer {random.randint(1, 99)}",
+        "Nearest\xa0city": lambda: f"City {random.randint(1, 99)}",
     }
     gen = generators.get(attribute)
     return gen() if gen else f"Unknown {attribute}"
@@ -925,6 +1085,7 @@ def _random_multi_source_value(attribute: str):
 
 def run_shuffled(questions, parser_model, model_name, evaluate_mod, geocoder, geod):
     import random
+
     print("\n[shuffled baseline]")
 
     # The answer-generation step is model-independent (pure SQL + random),
@@ -951,7 +1112,13 @@ def run_shuffled(questions, parser_model, model_name, evaluate_mod, geocoder, ge
             # Must be checked before the generic "name" branch because
             # knn+name+multi_source1 contains "name" but needs its own handler.
             att = q["answers"][0].get("multi_source_attribute", "")
-            element = [{"multi_source_long_answer": att + " " + str(_random_multi_source_value(att))}]
+            element = [
+                {
+                    "multi_source_long_answer": att
+                    + " "
+                    + str(_random_multi_source_value(att))
+                }
+            ]
 
         elif "name" in q_type or "loc" in q_type:
             sql = _rebuild_query_shuffled(q["sql"], q_type).replace("\x01", "")
@@ -978,13 +1145,13 @@ def run_shuffled(questions, parser_model, model_name, evaluate_mod, geocoder, ge
         # Convert element to text
         key_map = [
             ("multi_source1", "multi_source_long_answer"),
-            ("name",          "name"),
-            ("loc",           "address"),
-            ("angle",         "angle_description"),
-            ("area",          "area"),
-            ("length",        "length"),
-            ("count",         "count"),
-            ("distance",      "distance"),
+            ("name", "name"),
+            ("loc", "address"),
+            ("angle", "angle_description"),
+            ("area", "area"),
+            ("length", "length"),
+            ("count", "count"),
+            ("distance", "distance"),
         ]
         key = next((k for tag, k in key_map if tag in q_type), "")
 
@@ -1013,15 +1180,26 @@ def run_shuffled(questions, parser_model, model_name, evaluate_mod, geocoder, ge
 
     # JSON-parse step (cached under parser model_name since it depends on the parser)
     json_answers = step_parse_to_json(
-        questions, answers, parser_model, model_name,
+        questions,
+        answers,
+        parser_model,
+        model_name,
         cache_key="shuffled_json_parse",
         json_prompt_key="direct_json_parse",
     )
 
-    parsed_answers = [extract_json_blocks(a["content"], i) for i, a in enumerate(json_answers)]
+    parsed_answers = [
+        extract_json_blocks(a["content"], i) for i, a in enumerate(json_answers)
+    ]
 
     text_eval, parsed_eval = evaluate_answers(
-        questions, answers, parsed_answers, evaluate_mod, geocoder, geod, prefix="shuffled"
+        questions,
+        answers,
+        parsed_answers,
+        evaluate_mod,
+        geocoder,
+        geod,
+        prefix="shuffled",
     )
     save_eval(text_eval, parsed_eval, questions, model_name, prefix="shuffled")
 
@@ -1030,28 +1208,40 @@ def run_shuffled(questions, parser_model, model_name, evaluate_mod, geocoder, ge
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description="SpatialQA baseline runner")
     parser.add_argument(
-        "--model", required=True,
+        "--model",
+        required=True,
         help="Model for generation: 'sonnet4.6', 'haiku4.5', 'gpt4o', or any local Ollama tag (e.g. qwen3.5:9b, llama3.1:8b)",
     )
     parser.add_argument(
-        "--baseline", default="all",
+        "--baseline",
+        default="all",
         choices=["direct", "text2sql", "rag", "shuffled", "all"],
         help="Which baseline(s) to run",
     )
     parser.add_argument(
-        "--parser-model", default=None,
+        "--parser-model",
+        default=None,
         help="Model for the JSON-parsing step (default: same as --model)",
     )
     parser.add_argument(
-        "--embeddings", default="nomic",
+        "--mode",
+        default="full",
+        choices=["smoke", "full"],
+        help="smoke = first question per type (8 total, integration evidence only); full = entire benchmark",
+    )
+    parser.add_argument(
+        "--embeddings",
+        default="nomic",
         choices=list(EMBEDDINGS_MODELS.keys()),
         help="Embedding model for the RAG vector store (default: nomic)",
     )
     parser.add_argument(
-        "--ollama-url", default=None,
+        "--ollama-url",
+        default=None,
         help=(
             "Base URL for Ollama. "
             "Overrides the OLLAMA_HOST environment variable. "
@@ -1059,11 +1249,13 @@ def parse_args():
         ),
     )
     parser.add_argument(
-        "--ollama-key", default=None,
+        "--ollama-key",
+        default=None,
         help="API key for Ollama cloud. Overrides the OLLAMA_API_KEY environment variable.",
     )
     parser.add_argument(
-        "--clear-cache", default="",
+        "--clear-cache",
+        default="",
         help=(
             "Comma-separated cache steps to clear before running, or 'all'. "
             "Steps: direct_answer, direct_json_parse, "
@@ -1096,11 +1288,12 @@ def main():
     parser_model = build_parser_model(args.parser_model or args.model)
 
     # Load questions
-    questions = load_questions()
+    questions = load_questions(mode=args.mode)
     print(f"Loaded {len(questions)} questions from {QUESTIONS_DIR}")
 
     # Load evaluate module
     import sys
+
     sys.path.insert(0, str(ROOT))
     evaluate_mod = importlib.import_module("evaluate")
     importlib.reload(evaluate_mod)
@@ -1110,14 +1303,26 @@ def main():
 
     # Run baseline(s)
     if args.baseline in ("direct", "all"):
-        run_direct(questions, model, parser_model, args.model, evaluate_mod, geocoder, geod)
+        run_direct(
+            questions, model, parser_model, args.model, evaluate_mod, geocoder, geod
+        )
 
     if args.baseline in ("text2sql", "all"):
-        run_text2sql(questions, model, parser_model, args.model, evaluate_mod, geocoder, geod)
+        run_text2sql(
+            questions, model, parser_model, args.model, evaluate_mod, geocoder, geod
+        )
 
     if args.baseline in ("rag", "all"):
-        run_rag(questions, model, parser_model, args.model, evaluate_mod, geocoder, geod,
-                embeddings_name=args.embeddings)
+        run_rag(
+            questions,
+            model,
+            parser_model,
+            args.model,
+            evaluate_mod,
+            geocoder,
+            geod,
+            embeddings_name=args.embeddings,
+        )
 
     if args.baseline in ("shuffled", "all"):
         run_shuffled(questions, parser_model, args.model, evaluate_mod, geocoder, geod)
