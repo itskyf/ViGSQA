@@ -199,6 +199,19 @@ def invoke_with_retry(model, messages, max_retries: int = 8):
     raise RuntimeError("Max retries exceeded")
 
 
+# Terminal per-question model failures are cached explicitly ({"error": ...})
+# so runs stay complete and resumable; a long unbroken streak means something
+# systemic (server down, OOM) and still aborts with the cache preserved.
+TERMINAL_FAILURE_STREAK = 10
+
+
+def invoke_or_capture(model, messages) -> tuple[str, str | None]:
+    try:
+        return invoke_with_retry(model, messages).content, None
+    except Exception as e:  # noqa: BLE001 — the error is frozen into the cache
+        return "", str(e)
+
+
 # ---------------------------------------------------------------------------
 # Cache helpers
 # ---------------------------------------------------------------------------
@@ -264,7 +277,8 @@ def load_questions(mode: str = "full") -> list:
     """Load benchmark questions, keeping their frozen string ids.
 
     `smoke` keeps only the first question of each type file — a deterministic
-    8-question integration subset (1/type), never benchmark evidence.
+    one-per-type integration subset (28 questions for the full benchmark),
+    never benchmark evidence.
     """
     if mode not in ("smoke", "full"):
         raise ValueError(f"unknown mode: {mode!r}")
@@ -436,6 +450,7 @@ def step_generate_answers(questions, model, model_name, cache_key, system_prompt
     """Step: question → text answer."""
     cache = load_cache(model_name, cache_key)
     results = []
+    consecutive_failures = 0
     for q in tqdm.tqdm(questions, desc=f"  {cache_key}"):
         if q["id"] in cache:
             results.append(cache[q["id"]])
@@ -444,12 +459,20 @@ def step_generate_answers(questions, model, model_name, cache_key, system_prompt
                 SystemMessage(content=system_prompt),
                 HumanMessage(content=q["question"]),
             ]
-            content = invoke_with_retry(model, messages).content
+            content, error = invoke_or_capture(model, messages)
             record = {"id": q["id"], "content": content}
+            if error:
+                record["error"] = error
             results.append(record)
             # Write-through cache after every item so partial runs are recoverable
             cache[q["id"]] = record
             save_cache(model_name, cache_key, list(cache.values()))
+            consecutive_failures = consecutive_failures + 1 if error else 0
+            if consecutive_failures >= TERMINAL_FAILURE_STREAK:
+                raise RuntimeError(
+                    f"{cache_key}: {consecutive_failures} consecutive model"
+                    " failures — aborting; cached results are preserved"
+                )
     return results
 
 
@@ -460,6 +483,7 @@ def step_parse_to_json(
     base_prompt = load_prompt(json_prompt_key)
     cache = load_cache(model_name, cache_key)
     results = []
+    consecutive_failures = 0
     for q, a in tqdm.tqdm(
         zip(questions, answers, strict=False),
         total=len(questions),
@@ -477,11 +501,19 @@ def step_parse_to_json(
             SystemMessage(content=prompt),
             HumanMessage(content=f"Question: {q['question']}\nAnswer: {a['content']}"),
         ]
-        content = invoke_with_retry(parser_model, messages).content
+        content, error = invoke_or_capture(parser_model, messages)
         record = {"id": q["id"], "content": content}
+        if error:
+            record["error"] = error
         results.append(record)
         cache[q["id"]] = record
         save_cache(model_name, cache_key, list(cache.values()))
+        consecutive_failures = consecutive_failures + 1 if error else 0
+        if consecutive_failures >= TERMINAL_FAILURE_STREAK:
+            raise RuntimeError(
+                f"{cache_key}: {consecutive_failures} consecutive model"
+                " failures — aborting; cached results are preserved"
+            )
     return results
 
 
@@ -527,6 +559,7 @@ def step_answer_from_records(questions, sql_answers, sql_outputs, model, model_n
     base_prompt = load_prompt("sql_answer")
     cache = load_cache(model_name, "sql_answer")
     results = []
+    consecutive_failures = 0
     for q, sql_out in tqdm.tqdm(
         zip(questions, sql_outputs, strict=False),
         total=len(questions),
@@ -538,11 +571,19 @@ def step_answer_from_records(questions, sql_answers, sql_outputs, model, model_n
         records_text = json.dumps(sql_out.get("records", []), indent=2)
         prompt = base_prompt + records_text
         messages = [SystemMessage(content=prompt), HumanMessage(content=q["question"])]
-        content = invoke_with_retry(model, messages).content
+        content, error = invoke_or_capture(model, messages)
         record = {"id": q["id"], "content": content}
+        if error:
+            record["error"] = error
         results.append(record)
         cache[q["id"]] = record
         save_cache(model_name, "sql_answer", list(cache.values()))
+        consecutive_failures = consecutive_failures + 1 if error else 0
+        if consecutive_failures >= TERMINAL_FAILURE_STREAK:
+            raise RuntimeError(
+                f"sql_answer: {consecutive_failures} consecutive model"
+                " failures — aborting; cached results are preserved"
+            )
     return results
 
 

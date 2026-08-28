@@ -4,10 +4,14 @@ baselines_vi.py — runs GS-QA baselines on Vietnamese VN-GeoQA data.
 Patches the upstream pipeline module at runtime:
   - QUESTIONS_DIR  → generator/questions_vi/
   - DB_PARAMS      → osm_vn (via PG* env)
-  - CACHE_DIR      → cache_vi/
+  - CACHE_DIR      → cache_vi/ds-{dataset_version}/pv-{prompt_version}/
   - PROMPT_FILES   → Vietnamese prompts for direct and text2sql baselines
   - evaluate.get_osm_value → handles geo_wkt / dist_km field names
   - build_model    → llamacpp:<tag> routes to ChatOpenAI against llama.cpp /v1
+
+Cache and eval outputs are namespaced by dataset version (from the frozen
+MANIFEST.json) and prompt version (sha256-8 of the active Vietnamese prompts),
+so results from one freeze can never be reused for another.
 
 Usage (run from the repo root; same flags as pipeline.py):
   python -m baselines.baselines_vi \
@@ -18,6 +22,7 @@ Usage (run from the repo root; same flags as pipeline.py):
     --baseline text2sql --mode full
 """
 
+import hashlib
 import importlib
 import json
 import os
@@ -50,11 +55,8 @@ pipeline.QUESTIONS_DIR = ROOT.parent / "generator" / "questions_vi"
 # 2. Vietnamese PostGIS database (same PG* env convention as scripts/*.sh)
 pipeline.DB_PARAMS = PostgresSettings().connection_kwargs()
 
-# 3. Separate cache so Vietnamese runs don't collide with English cache
-pipeline.CACHE_DIR = ROOT / "cache_vi"
-pipeline.CACHE_DIR.mkdir(exist_ok=True)
-
-# 4. Vietnamese prompts (direct + text2sql)
+# 4. Vietnamese prompts (direct + text2sql) — bound before the prompt-version
+# hash below so the namespace always reflects the prompts actually in use.
 pipeline.PROMPT_FILES["direct_answer"] = (
     ROOT / "baseline_prompts" / "direct_answer_vi.txt"
 )
@@ -71,11 +73,85 @@ pipeline.PROMPT_FILES["sql_json_parse"] = (
     ROOT / "baseline_prompts" / "text2sql_json_parse_vi.txt"
 )
 
+
+def _dataset_version() -> str:
+    """Dataset version from the frozen MANIFEST.json behind the symlink."""
+    manifest = pipeline.QUESTIONS_DIR / "MANIFEST.json"
+    try:
+        return json.loads(manifest.read_text())["version"]
+    except (OSError, ValueError, KeyError):
+        return "unknown"
+
+
+def _prompt_version() -> str:
+    """sha256-8 over the active Vietnamese prompt files."""
+    h = hashlib.sha256()
+    for key in (
+        "direct_answer",
+        "direct_json_parse",
+        "sql_generate",
+        "sql_answer",
+        "sql_json_parse",
+    ):
+        h.update(pipeline.PROMPT_FILES[key].read_bytes())
+    return h.hexdigest()[:8]
+
+
+DATASET_VERSION = _dataset_version()
+PROMPT_VERSION = _prompt_version()
+
+# 3. Separate, version-namespaced cache so results from one dataset/prompt
+# freeze can never be reused for another (and never collide with English runs).
+pipeline.CACHE_DIR = (
+    ROOT / "cache_vi" / f"ds-{DATASET_VERSION}" / f"pv-{PROMPT_VERSION}"
+)
+pipeline.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+# Provisional eval CSVs go to a namespaced results dir (official reporting is
+# T03's job; these must never be described as benchmark scores).
+RESULTS_DIR = ROOT.parent / "results" / f"ds-{DATASET_VERSION}"
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+_orig_save_eval = pipeline.save_eval
+
+
+def _save_eval_vi(text_eval, parsed_eval, questions, model_name, prefix):
+    # save_eval resolves pipeline.ROOT at call time; swap it for the call.
+    original_root = pipeline.ROOT
+    pipeline.ROOT = RESULTS_DIR
+    try:
+        return _orig_save_eval(text_eval, parsed_eval, questions, model_name, prefix)
+    finally:
+        pipeline.ROOT = original_root
+
+
+pipeline.save_eval = _save_eval_vi
+
 # ── Patch evaluate.get_osm_value for VN-GeoQA field names ────────────────────
 # VN-GeoQA answers use:
 #   geo_wkt  (WKT string) instead of geometry
 #   dist_km  (float, kilometres) instead of distance (metres)
 _orig_get_osm_value = evaluate.get_osm_value
+
+
+# Upstream 45-degree compass sectors as (exclusive upper bound, VN label).
+VN_SECTORS = [
+    (22.5, "bắc"),
+    (67.5, "đông bắc"),
+    (112.5, "đông"),
+    (157.5, "đông nam"),
+    (202.5, "nam"),
+    (247.5, "tây nam"),
+    (292.5, "tây"),
+    (337.5, "tây bắc"),
+    (360.0, "bắc"),
+]
+
+
+def _vn_get_angle_desc(angle) -> str:
+    """Vietnamese compass sector of an azimuth, upstream's 45-degree sectors."""
+    a = float(angle) % 360
+    return next(label for bound, label in VN_SECTORS if a < bound)
 
 
 def _vn_get_osm_value(json_obj, value_label):
@@ -93,6 +169,11 @@ def _vn_get_osm_value(json_obj, value_label):
             return json_obj["dist_km"] * 1000  # km → metres
         return None
 
+    if value_label == "angle_description":
+        # v2 answers carry only the numeric angle; derive the Vietnamese sector.
+        angle = json_obj.get("angle")
+        return None if angle is None else _vn_get_angle_desc(angle)
+
     if value_label == "address":
         # VN-GeoQA answers have no address fields; returning None causes the
         # evaluator to skip the geocoding path (which requires address_cache writes).
@@ -107,6 +188,7 @@ def _vn_get_osm_value(json_obj, value_label):
 
 
 evaluate.get_osm_value = _vn_get_osm_value
+evaluate.get_angle_desc = _vn_get_angle_desc
 
 # pipeline.py reloads evaluate inside main(), which resets our patch. Intercept
 # reload to re-apply the patch every time evaluate is reloaded.
@@ -117,6 +199,7 @@ def _reload_with_patch(module):
     result = _orig_reload(module)
     if getattr(module, "__name__", "").endswith("evaluate"):
         module.get_osm_value = _vn_get_osm_value
+        module.get_angle_desc = _vn_get_angle_desc
     return result
 
 
@@ -170,7 +253,7 @@ def _vn_evaluate_answers(
         if _a == "--baseline" and _j + 1 < len(sys.argv):
             _baseline_arg = sys.argv[_j + 1]
     if "text2sql" in _baseline_arg or _baseline_arg == "all":
-        _exec_path = pipeline.CACHE_DIR / _model_arg / "sql_exec.json"
+        _exec_path = pipeline.cache_path(_model_arg, "sql_exec")
         if _exec_path.exists():
             try:
                 for item in json.load(open(_exec_path)):
@@ -253,24 +336,28 @@ def _vn_evaluate_answers(
                     parsed_eval[i]["distance_error"] = dist_err
                     parsed_eval[i]["attempted"] = True
 
-        # Fix 2: count/distance text eval — digit-matching
+        # Fix 2: count/distance/area/length text eval — digit-matching
         # (model outputs digits, not English words)
-        if "count" in qtype or "distance" in qtype:
-            mkey = "count" if "count" in qtype else "distance"
+        if any(k in qtype for k in ("count", "distance", "area", "length")):
+            mkey = next(
+                k for k in ("area", "length", "count", "distance") if k in qtype
+            )
             text_answer = answers[i].get("content", "")
-            pred_nums = [int(n) for n in re.findall(r"\b\d+\b", text_answer)]
+            pred_nums = [
+                float(n) for n in re.findall(r"\b\d+(?:\.\d+)?\b", text_answer)
+            ]
             if not pred_nums:
                 continue
             for ans in q["answers"]:
                 true_val = _vn_get_osm_value(ans, mkey)
                 if true_val is None:
                     continue
-                true_int = round(float(true_val))
+                true_num = round(float(true_val))
                 for pn in pred_nums:
                     match = (
                         pn == 0
-                        if true_int == 0
-                        else abs(pn - true_int) / true_int < MATCH_REL_TOLERANCE
+                        if true_num == 0
+                        else abs(pn - true_num) / true_num < MATCH_REL_TOLERANCE
                     )
                     if match:
                         if 1.0 > text_eval[i].get("F1", 0.0):

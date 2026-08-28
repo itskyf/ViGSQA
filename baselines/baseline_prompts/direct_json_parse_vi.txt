@@ -15,6 +15,9 @@ Rules:
 - If the answer contains coordinates (longitude/latitude), include "lon" and "lat" as numbers.
 - If the answer contains a location name or address, include "address".
 - "distance" must be in metres (convert km to metres if needed).
+- "area" must be in square metres and "length" in metres (convert km2/km if needed).
 - "count" must be an integer (not words).
+- "azimuth_angle" must be degrees 0-360 clockwise from north (bac = 0, dong = 90, nam = 180, tay = 270).
+- If the schema has an extra attribute key and the answer contains that attribute's value, include it verbatim.
 - If a value is missing don't include it in the output, and don't write any comments.
 - All json blocks must be enclosed with ```json and ```
