@@ -179,6 +179,13 @@ def run_layer2(entry: dict, idx: int, expected_type: str | None = None) -> Check
             failures.append(
                 "SQL_NO_ST_INTERSECTS: intersects type without ST_Intersects"
             )
+        if (
+            qtype.endswith(("_total+area", "_total+length"))
+            and "SUM" not in sql.upper()
+        ):
+            failures.append(
+                "SQL_NO_SUM: total question answered without SUM aggregation"
+            )
         region_ids = {m.group(1) for m in REGION_SUBQUERY_RE.finditer(sql)}
         if not region_ids:
             failures.append("SQL_NO_REGION_SUBQUERY: region not referenced by id")
@@ -215,6 +222,15 @@ def run_layer2(entry: dict, idx: int, expected_type: str | None = None) -> Check
     if ":direction" in qtype or ":towards" in qtype:
         if "ST_AZIMUTH" not in sql.upper():
             failures.append("SQL_NO_ST_AZIMUTH: direction/towards semantics missing")
+    if ":towards" in qtype and "BETWEEN" in sql.upper():
+        # The naive BETWEEN corridor silently drops candidates when the
+        # reference azimuth crosses north; the generator emits a modulo
+        # corridor instead. (A string check can only catch known-bad
+        # patterns; wrap-safety itself is validated by the spot check.)
+        failures.append(
+            "SQL_NAIVE_TOWARDS: corridor uses BETWEEN instead of a "
+            "wrap-safe modulo predicate"
+        )
 
     # determinism: a bare LIMIT stores an arbitrary subset of the true answers
     if not check_limit_ordered(sql):

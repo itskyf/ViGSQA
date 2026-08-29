@@ -43,7 +43,7 @@ benh vien co khoa cap cuu -> amenity='hospital' AND emergency ILIKE '%yes%'
 ho nuoc / ho -> lakes water IN ('lake','pond'); ho chua nuoc -> water='reservoir'
 song -> lakes waterway='river'; kenh -> waterway='canal'
 duong cao toc -> roads highway='motorway'; duong truc -> 'trunk'; duong lon -> 'primary'
-duong chinh -> 'secondary'; duong nhanh -> 'tertiary'; duong dan cu -> 'residential'
+duong chinh -> 'secondary'; duong huyen -> 'tertiary'; duong dan cu -> 'residential'
 tinh / thanh pho / huyen / quan / phuong / xa -> regions.region_name ILIKE '%<ten>%'
 
 --- Spatial building blocks ---
@@ -89,14 +89,16 @@ Nearest POI in a compass direction (example: east):
     AND p.amenity ILIKE '%supermarket%'
   ORDER BY p.geometry <-> ref.geometry LIMIT 1
 
-Nearest POI towards a second named place (corridor of +/-22.5 degrees):
+Nearest POI towards a second named place (corridor of +/-22.5 degrees,
+wrap-safe across 0/360 — 382.5 = 360 + 22.5, so MOD yields the minimal
+angular difference; ::numeric is required for MOD):
   SELECT p.poi_name
   FROM pois p,
        (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ten1>%') ref,
        (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ten2>%') tgt
-  WHERE degrees(ST_Azimuth(ref.geometry, p.geometry))
-        BETWEEN degrees(ST_Azimuth(ref.geometry, tgt.geometry)) - 22.5
-            AND degrees(ST_Azimuth(ref.geometry, tgt.geometry)) + 22.5
+  WHERE MOD((degrees(ST_Azimuth(ref.geometry, p.geometry))
+             - degrees(ST_Azimuth(ref.geometry, tgt.geometry)) + 382.5)::numeric,
+            360.0) <= 45
     AND p.amenity ILIKE '%pharmacy%'
   ORDER BY p.geometry <-> ref.geometry LIMIT 1
 

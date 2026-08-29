@@ -533,10 +533,12 @@ def generate_poi_type(type_str: str, tid: str, n: int = 100) -> list[dict]:
             # positive (the azimuth difference never reaches -360), so the MOD
             # result is the minimal angular difference in [0, 360) and <= 45
             # selects the corridor. Plain BETWEEN -22.5/+22.5 silently drops
-            # candidates whenever the reference azimuth crosses north.
+            # candidates whenever the reference azimuth crosses north. The
+            # ::numeric cast is required — Postgres has no % operator for
+            # (double precision, numeric).
             where.append(
-                "MOD(degrees(ST_Azimuth(origin.geom, pois.geometry)) "
-                "- angle.value + 382.5, 360) <= 45"
+                "MOD((degrees(ST_Azimuth(origin.geom, pois.geometry)) "
+                "- angle.value + 382.5)::numeric, 360.0) <= 45"
             )
 
         # COUNT aggregates cannot carry an ORDER BY over non-grouped columns;

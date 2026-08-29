@@ -370,6 +370,27 @@ def load_wikidata_pool() -> list[dict]:
     return pool
 
 
+def descriptor_index(pool: list[dict], cache: WikipediaCache) -> dict:
+    """Map (sub_category, attribute key, value) -> pool ids carrying it.
+
+    T8 describes the anchor only by category + infobox attribute, so that
+    triple must identify exactly one pool POI; otherwise the question is
+    ambiguous while the gold SQL points at one specific coordinate.
+    Uniqueness is checkable within the wikidata-infobox pool — the DB holds
+    no external attributes for non-wikidata POIs.
+    """
+    index: dict = {}
+    for poi in pool:
+        cat = _poi_sub_category(poi)
+        if not cat:
+            continue
+        attribute = attribute_for(cat[1], cache.infobox(poi["wikidata"]) or {})
+        if not attribute:
+            continue
+        index.setdefault((cat[1], attribute[0], attribute[1]), []).append(poi["id"])
+    return index
+
+
 def _poi_sub_category(poi: dict) -> tuple[str, str] | None:
     for col in ("amenity", "tourism", "shop", "leisure"):
         if poi.get(col):
@@ -484,6 +505,7 @@ def generate_multi_source2(tid: str, n: int = 100) -> list[dict]:
     """T8: anchor displayed as an infobox descriptor; answer = plain KNN."""
     cache = WikipediaCache()
     pool = load_wikidata_pool()
+    unique = descriptor_index(pool, cache)
     tmpls = load_templates("knn+name+multi_source2")
     results, fails, seen = [], 0, set()
     pbar = tqdm(total=n, desc=f"{tid} knn+name+multi_source2")
@@ -503,6 +525,10 @@ def generate_multi_source2(tid: str, n: int = 100) -> list[dict]:
             fails += 1
             continue
         attr_key, attr_value = attribute
+        # Ambiguous descriptor: another same-category pool POI shares the value.
+        if len(unique.get((anchor_sub_cat, attr_key, attr_value), ())) != 1:
+            fails += 1
+            continue
         descriptor = nfc(
             ATTRIBUTES[attr_key]["desc"].format(
                 cat=vn_label(anchor_sub_cat), v=attr_value

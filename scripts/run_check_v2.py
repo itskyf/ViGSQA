@@ -11,6 +11,7 @@ Usage:
 """
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -20,6 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 QUESTIONS_DIR = ROOT / "generator" / "questions_vi"
 CACHE_ROOT = ROOT / "baselines" / "cache_vi"
+PROMPT_DIR = ROOT / "baselines" / "baseline_prompts"
 EXPECTED_QUESTIONS = 2800
 EXPECTED_TIDS = 28
 EXPECTED_PER_TID = 100
@@ -27,6 +29,33 @@ STEPS = {
     "direct": ["direct_answer", "direct_json_parse"],
     "text2sql": ["sql_generate", "sql_exec", "sql_answer", "sql_json_parse"],
 }
+# Must stay in sync with baselines_vi._prompt_version (same files, same order).
+PROMPT_FILES = [
+    "direct_answer_vi.txt",
+    "direct_json_parse_vi.txt",
+    "text2sql_generate_vi.txt",
+    "text2sql_answer_vi.txt",
+    "text2sql_json_parse_vi.txt",
+]
+
+
+def dataset_version() -> str:
+    return json.loads((QUESTIONS_DIR / "MANIFEST.json").read_text())["version"]
+
+
+def prompt_version() -> str:
+    h = hashlib.sha256()
+    for name in PROMPT_FILES:
+        h.update((PROMPT_DIR / name).read_bytes())
+    return h.hexdigest()[:8]
+
+
+def namespaced_cache_dir() -> Path:
+    """The exact cache namespace baselines_vi.py uses for this freeze."""
+    path = CACHE_ROOT / f"ds-{dataset_version()}" / f"pv-{prompt_version()}"
+    if not path.is_dir():
+        raise SystemExit(f"cache namespace missing: {path}")
+    return path
 
 
 def load_questions() -> list[dict]:
@@ -35,17 +64,6 @@ def load_questions() -> list[dict]:
         with open(path, encoding="utf-8") as f:
             questions.extend(json.loads(line) for line in f if line.strip())
     return questions
-
-
-def namespaced_cache_dir() -> Path:
-    """The single ds-*/pv-* namespace baselines_vi.py created for this freeze."""
-    matches = sorted(CACHE_ROOT.glob("ds-*/pv-*"))
-    if len(matches) != 1:
-        raise SystemExit(
-            f"expected exactly one cache namespace under {CACHE_ROOT}, "
-            f"found {[m.name for m in matches]}"
-        )
-    return matches[0]
 
 
 def osm_snapshot() -> dict:
@@ -124,7 +142,7 @@ def main() -> int:
         "osm_snapshot": osm_snapshot(),
         "model": args.model,
         "baseline": args.baseline,
-        "prompt_version": cache_dir.name.removeprefix("pv-"),
+        "prompt_version": prompt_version(),
         "started": Path(f"{log_prefix}.start_ts").read_text().strip(),
         "finished": subprocess.run(
             ["date", "--iso-8601=seconds"], capture_output=True, text=True, check=False
