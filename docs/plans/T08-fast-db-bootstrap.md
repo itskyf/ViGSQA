@@ -44,7 +44,9 @@ Priority: **restore > build**.
   `.osm_vn_fileinfo` osmium-scan cache key on that md5 (`filename + source_md5`, plus `style_sha256`
   for the marker). The local file's md5 (`620d0258ffecd450363e24560d0a7b8b`) matches the live sidecar,
   and the same file carries the previously pinned sha256 (`99ab8080…`) — chain of custody unchanged.
-  The lua style keeps its sha256 (no upstream reference exists for it).
+  The lua style keeps its sha256 (no upstream reference exists for it). No
+  backward-compat shims exist for older marker shapes (`init_marker.sql` is a
+  plain `CREATE TABLE IF NOT EXISTS`) — explicitly out of scope by decision.
 - **The dump artifact is byte-deterministic.** pg_dump 18 randomizes the `\restrict`/`\unrestrict`
   tokens per run, which changed the compressed bytes on every export; `export_database.sh` normalizes
   both tokens to a fixed value (the restore filters delete those lines outright), so re-exporting an
