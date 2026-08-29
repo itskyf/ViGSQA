@@ -73,7 +73,7 @@ Once G2 passes, no new OSM fields, template families, model backends, evaluation
   User explicitly accepted: odd OSM names are data properties, not QC errors; T7/T8 skew stays unfixed pre-freeze, recorded as a data property, results to be reported per-TID.
   Full dataset regenerated (seed 42) → 2,800/2,800 incl. the new SUM/BETWEEN guards, zero "đường nhánh" left; second pinned-seed run byte-identical; MANIFEST/sha256/TSV regenerated for round-2 review (`sha256sum --check` green).
 - **G4 round 2 (2026-08-29): APPROVED** by the user. Extra fix found during the round-2 pass: the `tertiary` label also lived in the intersects-family `LENGTH_SELECTOR` (`intersects:length_max+name-069` still read "đường nhánh") — both label sites now "đường huyện"; full regen verified again (2,800/2,800). Dataset bytes synced byte-identically to the main checkout, then the user approved commit/push/release.
-  **W4 freeze (done, 2026-08-29)**: `v2.0.0` published as GitHub Release `data-v2.0.0` (asset `vn-geoqa-v2.0.0.zip`, contains `questions_vi/` at its root; restore round-trip verified via `scripts/restore_dataset.sh`'s sha256 check against `scripts/v2.0.0.sha256`).
+  **W4 freeze (done, 2026-08-29)**: `v2.0.0` published as GitHub Release `data-v2.0.0` (asset `vn-geoqa-v2.0.0.zip`, contains `questions_vi/` at its root; `origin/main` fast-forwarded to the approved worktree branch). End-to-end restore from the published asset verified (`28 files, 2800 questions verified`) — it caught one real bug: the regenerated `scripts/v2.0.0.sha256` used `questions_vi/`-prefixed paths while `restore_dataset.sh` checks from inside `questions_vi/` (v1 style is bare filenames); fixed before the final publish.
 
 ## Session notes
 
