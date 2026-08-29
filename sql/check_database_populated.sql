@@ -1,10 +1,11 @@
+-- Fast-path probe for scripts/restore_database.sh: returns 1 when every
+-- reference object exists, zero rows otherwise. Only to_regclass is
+-- referenced, so a fresh database yields an empty result instead of a parse
+-- error (check_import.sql additionally requires snapshot-lineage variables
+-- that a fresh environment cannot supply).
 SELECT 1
-FROM public.osm_import_complete
 WHERE
-    source_file = :'source_file'
-    AND source_md5 = :'source_md5'
-    AND style_sha256 = :'style_sha256'
-    AND to_regclass('public.planet_osm_point') IS NOT NULL
+    to_regclass('public.planet_osm_point') IS NOT NULL
     AND to_regclass('public.planet_osm_region') IS NOT NULL
     AND to_regclass('public.planet_osm_park') IS NOT NULL
     AND to_regclass('public.planet_osm_lake') IS NOT NULL
@@ -14,5 +15,4 @@ WHERE
     AND to_regclass('public.parks') IS NOT NULL
     AND to_regclass('public.lakes') IS NOT NULL
     AND to_regclass('public.roads') IS NOT NULL
-ORDER BY imported_at DESC
-LIMIT 1;
+    AND to_regclass('public.osm_import_complete') IS NOT NULL;

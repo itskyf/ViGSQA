@@ -5,6 +5,10 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd -P)"
 SQL_DIR="${REPO_ROOT}/sql"
 
+: "${PGHOST:?PGHOST is required}" "${PGPORT:?PGPORT is required}"
+: "${PGUSER:?PGUSER is required}" "${PGPASSWORD:?PGPASSWORD is required}"
+: "${PGDATABASE:?PGDATABASE is required}"
+
 echo "[INFO] PostgreSQL branch: checking dependencies..."
 ./scripts/install_dependencies.sh
 
@@ -14,9 +18,16 @@ echo "[INFO] PostgreSQL branch: starting the service..."
 echo "[INFO] PostgreSQL branch: initializing when required..."
 ./scripts/init_database.sh
 
-echo "[INFO] PostgreSQL branch: preparing the pinned OSM snapshot..."
-./scripts/download_osm.sh
-./scripts/import_osm.sh
+# Priority: prebuilt release dump > raw osm2pgsql import. restore_database.sh
+# skips a populated database, so repeat bootstraps no-op whichever path ran
+# first. DB_RESTORE=0 forces the raw import.
+if [[ "${DB_RESTORE:-1}" != "0" ]] && ./scripts/restore_database.sh; then
+	echo "[INFO] PostgreSQL branch: reference database restored from the release asset."
+else
+	echo "[INFO] PostgreSQL branch: building from the pinned OSM snapshot..."
+	./scripts/download_osm.sh
+	./scripts/import_osm.sh
+fi
 
 echo "[INFO] PostgreSQL branch: validating the import..."
 # Querying the views exercises PostGIS functions, so a missing extension

@@ -4,13 +4,11 @@ TRUNCATE osm_import_complete;
 
 INSERT INTO osm_import_complete (
     source_file,
-    source_size,
-    source_mtime,
+    source_md5,
     style_sha256
 )
 VALUES (
     :'source_file',
-    :'source_size'::bigint,
-    :'source_mtime'::bigint,
+    :'source_md5',
     :'style_sha256'
 );

@@ -17,12 +17,13 @@ ViGSQA extends GS-QA to Vietnamese OSM data and investigates whether database gr
 | T03 | Measure correctly and establish official baselines | `planned` | Validate metric semantics per answer type (best-match against full gold candidate sets), then aggregate and report the official comparison over the **v2.0.0 raw artifacts** (see T07). Raw caches are authoritative pre-evaluation evidence; interim eval CSVs are provisional. |
 | T04 | Improve what the frozen baselines fail at | `planned` | Select the intervention from v2.0.0 full-baseline error evidence; the typed deterministic renderer stays a hypothesis until that evidence supports it. Plugs into the `baselines_vi.py` patch layer without a pipeline rewrite. |
 | T05 | Analyze Vietnamese-specific behavior and errors | `planned` | Full/stripped diacritic surfaces exist; robustness, error taxonomy, and the new-data demonstration (final demo on new Vietnamese questions with the frozen final method) remain. |
-| T07 | Complete the 28-template benchmark v2.0.0 and capture raw baseline runs | `in_progress` | W1–W4 done: G1, probe, G2 140/140, G3 2,800/2,800, G4 **approved round 2** (2026-08-29) and `v2.0.0` published as the `data-v2.0.0` GitHub Release. Next: prompt freeze → G5 CLI smoke → four overnight raw runs. Record: `docs/plans/T07-benchmark-v2-raw-runs.md`. |
+| T07 | Complete the 28-template benchmark v2.0.0 and capture raw baseline runs | `in_progress` | W1–W5 and G5 done; smoke caches were pruned. W7 CLI preflight now exports `PG*` defaults from the parent driver, eliminating unset-variable warnings for every compose call; both services and all five tables are healthy, and no full cache record exists yet. `main-v2.ipynb` is drafted. Next: resume W7/G6, then notebook Run All. Record: `docs/plans/T07-benchmark-v2-raw-runs.md`. |
 | T06 | Tell the story as an ACL paper | `planned` | Course requires the official ACL style files; the current `report/main.typ` Typst placeholder is replaced in T06. |
+| T08 | Fast database bootstrap via prebuilt release dump | `done` | `bootstrap_postgres.sh` restores `osm-vn-v2.0.0.sql.gz` (Release `data-v2.0.0`, URL+SHA-256 pinned, 121 MB) before falling back to the osm2pgsql import; verified on PostgreSQL 18 and on 14/PostGIS 3.5 with exact G1 counts. Import lineage dropped `source_size`/`source_mtime` for `filename + md5` content identity (Geofabrik's own sidecar). `DB_RESTORE=0` forces the raw path. Record: `docs/plans/T08-fast-db-bootstrap.md`. |
 
 ## Cross-Task Discoveries
 
-- Official experiments use the frozen benchmark and the matching pinned snapshot (`https://download.geofabrik.de/asia/vietnam-260825.osm.pbf`), which is hardcoded directly in `download_osm.sh` along with its SHA-256 checksum.
+- Official experiments use the frozen benchmark and the matching pinned snapshot (`https://download.geofabrik.de/asia/vietnam-260825.osm.pbf`), verified in `download_osm.sh` against the md5 sidecar Geofabrik publishes for the extract (formerly a repo-pinned SHA-256; same bytes).
 - All pre-freeze result artifacts (`baselines/*_eval.csv`, `baselines/REPORT_VN_GEOQA.md`, `docs/results.md`) are archived, describe a superseded candidate dataset, and must not be used as benchmark evidence.
 - The dataset lives outside version control; restore it with `scripts/restore_dataset.sh` (public Release asset) or byte-identical regeneration with the pinned seed. Read through the `generator/questions_vi` symlink; never commit `data/`.
 - Range-type gold answers are full distance-ordered sets (up to ~1254 candidates): score predictions by best applicable match against the complete gold set; never require exhaustive enumeration. T03 owns metric semantics.
@@ -30,7 +31,7 @@ ViGSQA extends GS-QA to Vietnamese OSM data and investigates whether database gr
 
 ## Active Next Action
 
-T07 W5: freeze the five vi prompts, run the 28-question CLI smoke (Ornith text2sql then direct) on the published `v2.0.0`, then launch the four overnight raw runs via `scripts/run_official_v2.sh`.
+T07 W7: run the four sequential raw baselines with `scripts/run_official_v2.sh`; after G6 passes, execute `main-v2.ipynb` top-to-bottom and close the task (re-sync the notebook's Drive copy first to pick up T08's §1.1 note).
 
 ## Session Prompt
 

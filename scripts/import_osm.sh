@@ -50,8 +50,10 @@ if [[ ! -s "${OSM_FILE}" ]]; then
 	exit 1
 fi
 
-SOURCE_SIZE="$(stat --format='%s' "${OSM_FILE}")"
-SOURCE_MTIME="$(stat --format='%Y' "${OSM_FILE}")"
+# Content identity for both the marker lineage and the osmium-scan cache:
+# the md5 Geofabrik publishes for the extract, machine-independent unlike the
+# size/mtime pair it replaces. The lua style keeps its sha256.
+SOURCE_MD5="$(md5sum "${OSM_FILE}" | awk '{ print $1 }')"
 STYLE_SHA256="$(sha256sum "${STYLE_FILE}" | awk '{ print $1 }')"
 
 psql_file "${SQL_DIR}/init_marker.sql"
@@ -59,8 +61,7 @@ psql_file "${SQL_DIR}/init_marker.sql"
 IMPORT_MATCH="$(
 	psql_query \
 		--set=source_file="${OSM_FILENAME}" \
-		--set=source_size="${SOURCE_SIZE}" \
-		--set=source_mtime="${SOURCE_MTIME}" \
+		--set=source_md5="${SOURCE_MD5}" \
 		--set=style_sha256="${STYLE_SHA256}" \
 		<"${SQL_DIR}/check_import.sql"
 )"
@@ -76,8 +77,7 @@ if [[ "${IMPORT_MATCH}" == "1" ]]; then
 fi
 
 CACHED_FILE=""
-CACHED_SIZE=""
-CACHED_MTIME=""
+CACHED_MD5=""
 TOTAL_NODES=""
 TOTAL_WAYS=""
 TOTAL_RELATIONS=""
@@ -86,16 +86,15 @@ CACHE_VALID=false
 if [[ -s "${FILE_INFO_CACHE}" ]]; then
 	IFS=$'\t' read -r \
 		CACHED_FILE \
-		CACHED_SIZE \
-		CACHED_MTIME \
+		CACHED_MD5 \
 		TOTAL_NODES \
 		TOTAL_WAYS \
 		TOTAL_RELATIONS \
 		<"${FILE_INFO_CACHE}" || true
 
 	if [[ "${CACHED_FILE}" == "${OSM_FILE}" &&
-		"${CACHED_SIZE}" == "${SOURCE_SIZE}" &&
-		"${CACHED_MTIME}" == "${SOURCE_MTIME}" &&
+		"${CACHED_MD5}" =~ ^[0-9a-f]{32}$ &&
+		"${CACHED_MD5}" == "${SOURCE_MD5}" &&
 		"${TOTAL_NODES}" =~ ^[0-9]+$ &&
 		"${TOTAL_WAYS}" =~ ^[0-9]+$ &&
 		"${TOTAL_RELATIONS}" =~ ^[0-9]+$ ]]; then
@@ -147,10 +146,9 @@ if [[ "${CACHE_VALID}" != true ]]; then
 
 	CACHE_TMP="$(mktemp "${FILE_INFO_CACHE}.XXXXXX")"
 
-	printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+	printf '%s\t%s\t%s\t%s\t%s\n' \
 		"${OSM_FILE}" \
-		"${SOURCE_SIZE}" \
-		"${SOURCE_MTIME}" \
+		"${SOURCE_MD5}" \
 		"${TOTAL_NODES}" \
 		"${TOTAL_WAYS}" \
 		"${TOTAL_RELATIONS}" \
@@ -191,8 +189,7 @@ refresh_views
 echo "[INFO] Recording import completion..."
 psql_query \
 	--set=source_file="${OSM_FILENAME}" \
-	--set=source_size="${SOURCE_SIZE}" \
-	--set=source_mtime="${SOURCE_MTIME}" \
+	--set=source_md5="${SOURCE_MD5}" \
 	--set=style_sha256="${STYLE_SHA256}" \
 	<"${SQL_DIR}/record_import.sql" >/dev/null
 

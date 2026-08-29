@@ -10,6 +10,11 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${ROOT_DIR}"
 
 export LLAMACPP_URL="${LLAMACPP_URL:-http://localhost:8000}"
+export PGHOST="${PGHOST:-127.0.0.1}"
+export PGPORT="${PGPORT:-5432}"
+export PGDATABASE="${PGDATABASE:-osm_vn}"
+export PGUSER="${PGUSER:-postgres}"
+export PGPASSWORD="${PGPASSWORD:-postgres}"
 PYTHON="${PYTHON:-pixi run python}"
 
 LOG_DIR="${ROOT_DIR}/logs/v2.0.0"

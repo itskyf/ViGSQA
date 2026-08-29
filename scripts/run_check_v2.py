@@ -67,13 +67,18 @@ def load_questions() -> list[dict]:
 
 
 def osm_snapshot() -> dict:
-    """Pinned PBF URL + sha256 as hardcoded in scripts/download_osm.sh."""
+    """Snapshot URL pinned in scripts/download_osm.sh plus the md5 of the
+    local copy (Geofabrik publishes that md5 as the extract's sidecar)."""
     src = (ROOT / "scripts" / "download_osm.sh").read_text()
     url = re.search(r'OSM_URL="([^"]+)"', src)
-    checksum = re.search(r'OSM_SHA256="([0-9a-fA-F]{64})"', src)
-    if not url or not checksum:
+    if not url:
         raise SystemExit("could not parse the pinned OSM snapshot from download_osm.sh")
-    return {"url": url.group(1), "sha256": checksum.group(1).upper()}
+    pbf = ROOT / url.group(1).rsplit("/", 1)[-1]
+    if not pbf.is_file():
+        raise SystemExit(f"OSM snapshot not found: {pbf}")
+    with open(pbf, "rb") as f:
+        digest = hashlib.file_digest(f, "md5").hexdigest()
+    return {"url": url.group(1), "md5": digest}
 
 
 def main() -> int:

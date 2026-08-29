@@ -36,14 +36,19 @@ logs/
 .ipynb_checkpoints/
 # Authoritative notebook copy lives in Google Drive/Colab; never track it
 main.ipynb
+main-v2.ipynb
 
 # Python environments
 .venv/
 
 # OSM downloads and per-machine import state (see questions_vi/MANIFEST.json for provenance)
 *.osm.pbf
+*.osm.pbf.md5
 .osm_vn_source
 .osm_vn_fileinfo
+
+# Prebuilt reference-DB release dump cache (scripts/restore_database.sh)
+osm-vn-*.sql.gz*
 
 # Model weights
 *.gguf
