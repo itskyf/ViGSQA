@@ -72,6 +72,8 @@ Once G2 passes, no new OSM fields, template families, model backends, evaluation
   4. **Templates/lexicon**: length_max "tổng chiều dài lớn nhất" → "chiều dài lớn nhất"; direction/towards loc templates reworded (phía [3] [2] → phía [3] của [2] etc.); hostel → "nhà nghỉ tập thể"; tertiary → "đường huyện" (VN road-admin ladder; fixed in BOTH the VN_LABEL map and the intersects-family `LENGTH_SELECTOR`, missed there in the first pass and caught by the round-2 TSV — `intersects:length_max+name-069`); takeaway label → "nhà hàng có bán mang về".
   User explicitly accepted: odd OSM names are data properties, not QC errors; T7/T8 skew stays unfixed pre-freeze, recorded as a data property, results to be reported per-TID.
   Full dataset regenerated (seed 42) → 2,800/2,800 incl. the new SUM/BETWEEN guards, zero "đường nhánh" left; second pinned-seed run byte-identical; MANIFEST/sha256/TSV regenerated for round-2 review (`sha256sum --check` green).
+- **G4 round 2 (2026-08-29): APPROVED** by the user. Extra fix found during the round-2 pass: the `tertiary` label also lived in the intersects-family `LENGTH_SELECTOR` (`intersects:length_max+name-069` still read "đường nhánh") — both label sites now "đường huyện"; full regen verified again (2,800/2,800). Dataset bytes synced byte-identically to the main checkout, then the user approved commit/push/release.
+  **W4 freeze (done, 2026-08-29)**: `v2.0.0` published as GitHub Release `data-v2.0.0` (asset `vn-geoqa-v2.0.0.zip`, contains `questions_vi/` at its root; restore round-trip verified via `scripts/restore_dataset.sh`'s sha256 check against `scripts/v2.0.0.sha256`).
 
 ## Session notes
 
@@ -82,4 +84,4 @@ Once G2 passes, no new OSM fields, template families, model backends, evaluation
 
 ## Next
 
-G4 round 2: user re-reviews the regenerated spot-check TSV (focus: T27/T28 SQL, towards rows, T08 anchors, reworded templates). On approval: refresh MANIFEST human-QC line → publish `data-v2.0.0` Release → prompt freeze → G5 CLI smoke → launch the four overnight raw runs.
+W5: freeze the five vi prompts (no further edits after this point), then the 28-question CLI smoke (one per TID, Ornith text2sql then direct) — both CSVs covering 28 ids passes G5 → immediately launch the four overnight raw runs via `scripts/run_official_v2.sh` (sequential, temperature 0, no `--clear-cache`).
