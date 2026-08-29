@@ -113,7 +113,7 @@ VN_LABEL = {
     "museum": "bảo tàng",
     "attraction": "điểm tham quan",
     "gallery": "phòng trưng bày",
-    "hostel": "nhà nghỉ thanh niên",
+    "hostel": "nhà nghỉ tập thể",
     # shop
     "supermarket": "siêu thị",
     "convenience": "cửa hàng tiện lợi",
@@ -135,7 +135,7 @@ VN_LABEL = {
     "trunk": "đường trục",
     "primary": "đường lớn",
     "secondary": "đường chính",
-    "tertiary": "đường nhánh",
+    "tertiary": "đường huyện",
     "residential": "đường dân cư",
     "unclassified": "đường nhỏ",
     "pedestrian": "đường đi bộ",
@@ -528,9 +528,15 @@ def generate_poi_type(type_str: str, tid: str, n: int = 100) -> list[dict]:
             subst[dir_key] = dir_label
             entities[dir_key] = {"direction": dir_label}
         elif modifier == "towards":
+            # Corridor of +/-22.5 degrees around the anchor->reference azimuth,
+            # wrap-safe across 0/360: 382.5 = 360 + 22.5 keeps the dividend
+            # positive (the azimuth difference never reaches -360), so the MOD
+            # result is the minimal angular difference in [0, 360) and <= 45
+            # selects the corridor. Plain BETWEEN -22.5/+22.5 silently drops
+            # candidates whenever the reference azimuth crosses north.
             where.append(
-                "degrees(ST_Azimuth(origin.geom, pois.geometry)) "
-                "BETWEEN angle.value - 22.5 AND angle.value + 22.5"
+                "MOD(degrees(ST_Azimuth(origin.geom, pois.geometry)) "
+                "- angle.value + 382.5, 360) <= 45"
             )
 
         # COUNT aggregates cannot carry an ORDER BY over non-grouped columns;
@@ -687,7 +693,7 @@ def generate_intersects_type(type_str: str, tid: str, n: int = 100) -> list[dict
                 )
             else:  # area_total / length_total
                 sql = (
-                    f"SELECT {measure} AS {kind.split('_')[0]}\n"
+                    f"SELECT SUM({measure}) AS {kind.split('_')[0]}\n"
                     f"FROM {table}\n"
                     f"WHERE {predicate}\n"
                     f"  AND ST_Intersects(geometry, {region_subquery});"

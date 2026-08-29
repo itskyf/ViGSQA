@@ -9,7 +9,7 @@
         ["quán burger", "cuisine ILIKE '%burger%'"],
         ["nhà hàng Ấn", "cuisine ILIKE '%indian%'"],
         ["quán gà rán", "cuisine ILIKE '%chicken%'"],
-        ["nhà hàng mang về", "takeaway ILIKE '%yes%'"],
+        ["nhà hàng có bán mang về", "takeaway ILIKE '%yes%'"],
         ["nhà hàng có chỗ ngồi ngoài trời", "outdoor_seating ILIKE '%yes%'"],
         ["nhà hàng có giao hàng", "delivery ILIKE '%yes%'"]
     ],

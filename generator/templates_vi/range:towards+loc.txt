@@ -1,4 +1,4 @@
-Các [1] trong bán kính [2] quanh [3] nằm về hướng [4] ở đâu?
+Trong bán kính [2] quanh [3], các [1] về hướng [4] nằm ở đâu?
 Trong phạm vi [2] từ [3], vị trí các [1] về hướng [4] là gì?
 Những [1] cách [3] không quá [2] theo hướng [4] nằm ở đâu?
 Cho tôi biết vị trí các [1] trong vòng [2] quanh [3] về phía [4].

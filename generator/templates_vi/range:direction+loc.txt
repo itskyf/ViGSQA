@@ -1,4 +1,4 @@
 Các [1] ở phía [4] [3] trong phạm vi [2] nằm ở đâu?
 Trong bán kính [2] từ [3], vị trí các [1] phía [4] là gì?
 Những [1] cách [3] không quá [2] về phía [4] nằm ở đâu?
-Cho tôi biết vị trí các [1] trong vòng [2] quanh [3] phía [4].
+Cho tôi biết vị trí các [1] ở phía [4] của [3] và trong phạm vi [2].

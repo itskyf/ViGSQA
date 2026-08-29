@@ -1,4 +1,4 @@
 [1] gần nhất phía [3] của [2] nằm ở đâu?
 Vị trí của [1] gần nhất về phía [3] từ [2] là gì?
-[1] nào ở phía [3] [2] và gần nhất, nó nằm ở đâu?
-Cho tôi biết vị trí [1] gần nhất nằm phía [3] [2].
+[1] nào ở phía [3] của [2] và gần [2] nhất? Nó nằm ở đâu?
+Cho tôi biết vị trí của [1] gần nhất ở phía [3] của [2].
