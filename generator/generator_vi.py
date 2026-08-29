@@ -178,7 +178,7 @@ AREA_SELECTOR = [
 LENGTH_SELECTOR = [
     ("roads", "highway", "primary", "đường lớn"),
     ("roads", "highway", "secondary", "đường chính"),
-    ("roads", "highway", "tertiary", "đường nhánh"),
+    ("roads", "highway", "tertiary", "đường huyện"),
     ("roads", "highway", "residential", "đường dân cư"),
     ("roads", "highway", "motorway", "đường cao tốc"),
     ("roads", "highway", "trunk", "đường trục"),

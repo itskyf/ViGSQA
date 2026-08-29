@@ -17,7 +17,7 @@ ViGSQA extends GS-QA to Vietnamese OSM data and investigates whether database gr
 | T03 | Measure correctly and establish official baselines | `planned` | Validate metric semantics per answer type (best-match against full gold candidate sets), then aggregate and report the official comparison over the **v2.0.0 raw artifacts** (see T07). Raw caches are authoritative pre-evaluation evidence; interim eval CSVs are provisional. |
 | T04 | Improve what the frozen baselines fail at | `planned` | Select the intervention from v2.0.0 full-baseline error evidence; the typed deterministic renderer stays a hypothesis until that evidence supports it. Plugs into the `baselines_vi.py` patch layer without a pipeline rewrite. |
 | T05 | Analyze Vietnamese-specific behavior and errors | `planned` | Full/stripped diacritic surfaces exist; robustness, error taxonomy, and the new-data demonstration (final demo on new Vietnamese questions with the frozen final method) remain. |
-| T07 | Complete the 28-template benchmark v2.0.0 and capture raw baseline runs | `in_progress` | W1 done (G1), W2 done (probe + G2 140/140; scope freeze in effect), W3 done (G3: 2,800/2,800 verified; regen check caught and fixed a towards-CTE paren bug; dataset frozen bytes carry the angle [0,360) fix). W4 prep done (MANIFEST, checksums, spot-check TSV, symlink → v2.0.0; cache namespace `ds-v2.0.0/pv-085560f5`). Next: G4 human QC → publish Release → prompt freeze → G5 smoke → overnight raw inference. Record: `docs/plans/T07-benchmark-v2-raw-runs.md`. |
+| T07 | Complete the 28-template benchmark v2.0.0 and capture raw baseline runs | `in_progress` | W1–W3 done (G1, probe, G2 140/140, G3 2,800/2,800). G4 round 1 NOT approved by the user — all four findings fixed (T27/T28 missing SUM, towards 0/360 wraparound, T08 descriptor uniqueness, template/lexicon rewording); dataset regenerated, 2,800/2,800, awaiting G4 round-2 re-approval before Release/publish/prompt-freeze/G5/overnight runs. Record: `docs/plans/T07-benchmark-v2-raw-runs.md`. |
 | T06 | Tell the story as an ACL paper | `planned` | Course requires the official ACL style files; the current `report/main.typ` Typst placeholder is replaced in T06. |
 
 ## Cross-Task Discoveries
@@ -30,7 +30,7 @@ ViGSQA extends GS-QA to Vietnamese OSM data and investigates whether database gr
 
 ## Active Next Action
 
-T07 W4: user performs G4 human QC (review `generator/templates_vi/*.txt` for naturalness + annotate `docs/qc_spot_check_v2.0.0.tsv`), then publish the `data-v2.0.0` Release, freeze prompts, run the G5 CLI smoke, and launch the four overnight raw runs.
+T07 G4 round 2: user re-reviews `docs/qc_spot_check_v2.0.0.tsv` (regenerated after the round-1 fixes: T27/T28 SUM, towards wraparound, T08 uniqueness, template/lexicon rewording). On approval → publish `data-v2.0.0` → prompt freeze → G5 smoke → four overnight raw runs.
 
 ## Session Prompt
 
