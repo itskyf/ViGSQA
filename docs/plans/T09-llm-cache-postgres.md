@@ -32,10 +32,22 @@ Changing model / quantization / generation parameters / prompt → miss. Changin
 - **Concurrency (`--concurrency`)**: N=4 → 64/64 byte-identical hits, observed concurrency exactly 4; N=1 → 64/64 hits, observed exactly 1; 16 concurrent idempotent re-updates left the table at 1,513 rows / 1,513 distinct prompts.
 - **Restore round trip**: `export_llm_cache.sh` (271 KB dump + sha256) → `DROP DATABASE` → bootstrap's guard recreates → `restore_llm_cache.sh` → re-validate green (1,513/1,513 byte-identical on both URLs). Restore proven both ways: over an existing DB (replace) and cold (creates the DB itself).
 - **Infrastructure**: `podman compose down --volumes` → clean stack; OSM restore green with exact T07-G1 counts (pois 38,223 / regions 8,535 / parks 1,492 / lakes 7,973 / roads 175,318); bootstrap idempotent; `restart: always` on both services confirmed via `podman inspect` + `podman compose config`.
+- **Compose startup cleanup**: the local official runner starts the complete compose stack once (Postgres, llama.cpp, and HAProxy) without `--wait`, passes `--wait-only` to the PostgreSQL bootstrap, then waits on HAProxy's `/health` endpoint. HAProxy already depends on a healthy llama.cpp service, so no second llama.cpp poll runs locally; Colab retains its direct llama.cpp bootstrap and health wait.
 - **No-regression**: with the cache not configured (in-process import without `setup_llm_cache()`), `get_llm_cache() is None` → JSON-skip fallback active (asserted).
 
 ## Session notes
 
+- **HAProxy runtime validation (2026-08-30)**: the first live probe found the
+  container restarting because `config/haproxy.cfg` lacked its final newline;
+  HAProxy 3.4 rejected the file as truncated. Adding the newline made the
+  image's config check pass. The proxied `/health` then alternated between 200
+  and a backend's 503, so HAProxy now owns that path via `monitor-uri`; repeated
+  probes test proxy readiness directly while compose owns llama.cpp readiness.
+- **Progress accounting fix (2026-08-30)**: the shared LLM driver previously
+  advanced tqdm once per concurrency batch while declaring a question-count
+  total, so `214/2800` at concurrency 4 represented about 856 completed
+  questions. It now updates by the actual batch length, including a short final
+  batch; cache behavior and artifacts are unchanged.
 - **Locked-version verification (before any code)**: langchain-core 1.6.1 / langchain-openai 1.6.0 / langchain-community 0.4.2 / sqlalchemy 2.0.52 / psycopg 3.3.4. Verified live: `.invoke()` consults `self.cache` (or the global) before `_generate`; the cache key = (`dumps(messages)` with ids stripped, `model._get_llm_string()`); the llm_string is `json.dumps(lc-constructor serialization, sort_keys=True) + "---" + str(stop)` with the model kwargs NESTED under a `"kwargs"` key — the first `_normalize_llm_string` draft assumed flat kwargs and P2 caught it immediately (probe did its job). `openai_api_key` serializes as a secret *reference* (`{"id": ["OPENAI_API_KEY"], "type": "secret"}`), so the api-key value never reaches the key even before normalization; stripping it keeps the invariant explicit. langchain-community emits a sunset `DeprecationWarning` on import — accepted, it is the locked set.
 - **Bugs found by validation**: (1) the flat-kwargs normalizer assumption (above); (2) `restore_llm_cache.sh`'s `psql_admin()` helper dropped its arguments (missing `"$@"`), silently no-op'ing the create-DB guard — caught by observing "Creating" print on an existing DB; fixed and both branches re-proven.
 - **User coding-standards feedback applied**: no `noqa` suppressions (root-cause fixes instead — the lazy-import factory became top-level imports and a module-level class; the mutable `LLM_CONCURRENCY` global and the env-var variant became explicit parameter threading); no inline heredoc/`python -c` scripts for repo work. Full validation chain re-run green after the refactor (validate 1,513/1,513 both URLs; concurrency N=4 observed 4, N=1 observed 1, writes intact; no-regression assert).

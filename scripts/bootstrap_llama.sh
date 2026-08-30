@@ -49,8 +49,8 @@ elif [[ -n "${COLAB_RELEASE_TAG:-}" ]]; then
 		--log-file "${LOG_FILE}" \
 		>/dev/null 2>&1 &
 else
-	echo "[INFO] Starting the compose llama.cpp service..."
-	podman compose up --detach llama-cpp
+	echo "[ERROR] Local llama.cpp startup is owned by the compose orchestrator." >&2
+	exit 1
 fi
 
 flock -u "${lock_fd}"
@@ -64,7 +64,7 @@ until [[ "$(health_code)" == 200 ]]; do
 		if [[ -n "${COLAB_RELEASE_TAG:-}" ]]; then
 			tail --lines=40 "${LOG_FILE}" 2>/dev/null || true
 		else
-			podman compose logs --tail=40 llama-cpp >&2 || true
+			podman compose logs --tail=40 llamacpp >&2 || true
 		fi
 		exit 1
 	fi

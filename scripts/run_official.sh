@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${ROOT_DIR}"
 
-export LLAMACPP_URL="${LLAMACPP_URL:-http://localhost:8000}"
+export LLAMACPP_URL="${LLAMACPP_URL:-http://localhost:8080}"
 export PGHOST="${PGHOST:-127.0.0.1}"
 export PGPORT="${PGPORT:-5432}"
 export PGDATABASE="${PGDATABASE:-osm_vn}"
@@ -20,11 +20,30 @@ export PGPASSWORD="${PGPASSWORD:-postgres}"
 LOG_DIR="${ROOT_DIR}/logs/official"
 mkdir -p "${LOG_DIR}"
 
-echo "[INFO] Preflight: reference database (five-table gate)..."
-./scripts/bootstrap_postgres.sh
+BOOTSTRAP_ARGS=()
+if [[ -z "${COLAB_RELEASE_TAG:-}" ]]; then
+	echo "[INFO] Preflight: starting the compose stack..."
+	podman compose up --detach
+	BOOTSTRAP_ARGS=(--wait-only)
+fi
 
-echo "[INFO] Preflight: llama.cpp..."
-./scripts/bootstrap_llama.sh
+echo "[INFO] Preflight: reference database (five-table gate)..."
+./scripts/bootstrap_postgres.sh "${BOOTSTRAP_ARGS[@]}"
+
+if [[ -n "${COLAB_RELEASE_TAG:-}" ]]; then
+	echo "[INFO] Preflight: llama.cpp..."
+	./scripts/bootstrap_llama.sh
+else
+	echo "[INFO] Waiting for HAProxy at ${LLAMACPP_URL}..."
+	if ! curl --fail --silent --show-error --output /dev/null \
+		--max-time 2 --retry 180 --retry-all-errors --retry-delay 5 \
+		--retry-max-time "${HAPROXY_WAIT_SECONDS:-900}" \
+		"${LLAMACPP_URL}/health"; then
+		podman compose logs --tail=40 haproxy >&2 || true
+		exit 1
+	fi
+	echo "[INFO] HAProxy is ready."
+fi
 
 echo "[INFO] Preflight: frozen dataset..."
 ./scripts/restore_dataset.sh

@@ -43,7 +43,6 @@ from pathlib import Path
 
 import pandas as pd
 import psycopg
-import tqdm
 from geopy.geocoders import Nominatim
 from langchain_core.documents import Document
 from langchain_core.globals import get_llm_cache
@@ -52,6 +51,7 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from num2words import num2words
 from psycopg.rows import dict_row
 from pyproj import Geod
+from tqdm import tqdm
 
 # Optional model backends: only the selected model/provider needs them, so a
 # missing package must not break importing this module.
@@ -256,29 +256,29 @@ def run_llm_step(
     todo = [i for i, q in enumerate(questions) if not (skip_json and q["id"] in cache)]
     consecutive_failures = 0
     batch = max(1, llm_concurrency)
-    for start in tqdm.tqdm(
-        range(0, len(todo), batch), total=len(todo), desc=f"  {cache_key}"
-    ):
-        idxs = todo[start : start + batch]
-        contents = invoke_or_capture_many(
-            model, [build_messages(i) for i in idxs], llm_concurrency
-        )
-        for i, (content, error) in zip(idxs, contents, strict=True):
-            record = {"id": questions[i]["id"], "content": content}
-            if error:
-                record["error"] = error
-            results[i] = record
-            # Write-through after every item so partial runs are recoverable;
-            # identical replays (cache hits) skip the rewrite.
-            if cache.get(questions[i]["id"]) != record:
-                cache[questions[i]["id"]] = record
-                save_cache(model_name, cache_key, list(cache.values()))
-            consecutive_failures = consecutive_failures + 1 if error else 0
-            if consecutive_failures >= TERMINAL_FAILURE_STREAK:
-                raise RuntimeError(
-                    f"{cache_key}: {consecutive_failures} consecutive model"
-                    " failures — aborting; cached results are preserved"
-                )
+    with tqdm(total=len(todo), desc=f"  {cache_key}") as progress:
+        for start in range(0, len(todo), batch):
+            idxs = todo[start : start + batch]
+            contents = invoke_or_capture_many(
+                model, [build_messages(i) for i in idxs], llm_concurrency
+            )
+            for i, (content, error) in zip(idxs, contents, strict=True):
+                record = {"id": questions[i]["id"], "content": content}
+                if error:
+                    record["error"] = error
+                results[i] = record
+                # Write-through after every item so partial runs are recoverable;
+                # identical replays (cache hits) skip the rewrite.
+                if cache.get(questions[i]["id"]) != record:
+                    cache[questions[i]["id"]] = record
+                    save_cache(model_name, cache_key, list(cache.values()))
+                consecutive_failures = consecutive_failures + 1 if error else 0
+                if consecutive_failures >= TERMINAL_FAILURE_STREAK:
+                    raise RuntimeError(
+                        f"{cache_key}: {consecutive_failures} consecutive model"
+                        " failures — aborting; cached results are preserved"
+                    )
+            progress.update(len(idxs))
     return [
         r if r is not None else cache[q["id"]]
         for r, q in zip(results, questions, strict=True)
@@ -569,7 +569,7 @@ def step_execute_sql(questions, sql_answers, model_name):
     cache = load_cache(model_name, "sql_exec")
     results = []
     conn = None
-    for q, a in tqdm.tqdm(
+    for q, a in tqdm(
         zip(questions, sql_answers, strict=False),
         total=len(questions),
         desc="  sql_exec",
@@ -830,7 +830,7 @@ def step_rag_answers(questions, model, model_name, vector_store, k=10):
     base_prompt = load_prompt("rag_answer")
     cache = load_cache(model_name, "rag_answer")
     results = []
-    for q in tqdm.tqdm(questions, desc="  rag_answer"):
+    for q in tqdm(questions, desc="  rag_answer"):
         if q["id"] in cache:
             results.append(cache[q["id"]])
             continue
@@ -1037,7 +1037,7 @@ def _build_vectorstore(embeddings, store_dir: Path):
     )
 
     batch, ids, i = [], [], 0
-    for obj in tqdm.tqdm(corpus, desc="  embedding"):
+    for obj in tqdm(corpus, desc="  embedding"):
         batch.append(Document(page_content=json.dumps(obj)))
         ids.append(str(i))
         i += 1
@@ -1224,7 +1224,7 @@ def run_shuffled(
     )
     conn = make_db_conn() if needs_db else None
 
-    for q in tqdm.tqdm(questions, desc="  shuffled_answers"):
+    for q in tqdm(questions, desc="  shuffled_answers"):
         if q["id"] in cache:
             answers.append(cache[q["id"]])
             continue
@@ -1248,7 +1248,7 @@ def run_shuffled(
             sql = _rebuild_query_shuffled(q["sql"], q_type).replace("\x01", "")
             result = run_sql(sql, conn)
             if result["error"]:
-                tqdm.tqdm.write(f"  [SQL error] q{q['id']}: {result['error'][:120]}")
+                tqdm.write(f"  [SQL error] q{q['id']}: {result['error'][:120]}")
             element = result["output"]
 
         elif "angle" in q_type:

@@ -1,6 +1,20 @@
 #!/usr/bin/env bash
 set -o errexit -o nounset -o pipefail
 
+case "$#" in
+0) ;;
+1)
+	if [[ "$1" != "--wait-only" ]]; then
+		echo "[ERROR] Unknown argument: $1" >&2
+		exit 2
+	fi
+	;;
+*)
+	echo "[ERROR] Usage: ${0##*/} [--wait-only]" >&2
+	exit 2
+	;;
+esac
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd -P)"
 SQL_DIR="${REPO_ROOT}/sql"
@@ -13,7 +27,7 @@ echo "[INFO] PostgreSQL branch: checking dependencies..."
 ./scripts/install_dependencies.sh
 
 echo "[INFO] PostgreSQL branch: starting the service..."
-./scripts/start_postgres.sh
+./scripts/start_postgres.sh "$@"
 
 echo "[INFO] PostgreSQL branch: initializing when required..."
 ./scripts/init_database.sh
