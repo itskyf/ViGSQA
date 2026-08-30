@@ -1,13 +1,13 @@
-"""G6 completion asserts + minimal run manifest for one v2.0.0 baseline run.
+"""G6 completion asserts + minimal run manifest for one official baseline run.
 
-Run by scripts/run_official_v2.sh right after each baseline finishes. Asserts
+Run by scripts/run_official.sh right after each baseline finishes. Asserts
 the raw caches are complete against the frozen questions, then writes a
 minimal manifest (git commit, dataset/OSM provenance, model, prompt hash,
 baseline, timestamps, completed/failed counts).
 
 Usage:
-    python scripts/run_check_v2.py --model llamacpp:org/repo:QUANT \
-        --baseline text2sql --log logs/v2.0.0/<run_prefix>
+    python scripts/run_check.py --model llamacpp:org/repo:QUANT \
+        --baseline text2sql --log logs/official/<run_prefix>
 """
 
 import argparse
@@ -39,10 +39,6 @@ PROMPT_FILES = [
 ]
 
 
-def dataset_version() -> str:
-    return json.loads((QUESTIONS_DIR / "MANIFEST.json").read_text())["version"]
-
-
 def prompt_version() -> str:
     h = hashlib.sha256()
     for name in PROMPT_FILES:
@@ -52,7 +48,7 @@ def prompt_version() -> str:
 
 def namespaced_cache_dir() -> Path:
     """The exact cache namespace baselines_vi.py uses for this freeze."""
-    path = CACHE_ROOT / f"ds-{dataset_version()}" / f"pv-{prompt_version()}"
+    path = CACHE_ROOT / f"pv-{prompt_version()}"
     if not path.is_dir():
         raise SystemExit(f"cache namespace missing: {path}")
     return path

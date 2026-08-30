@@ -29,6 +29,34 @@ else
 	./scripts/import_osm.sh
 fi
 
+# The LangChain LLM cache lives in its own logical database so restoring or
+# clearing it can never touch the OSM reference data. The cache table itself is
+# created by SQLAlchemyMd5Cache on first use — no schema SQL here.
+LLM_CACHE_DB="${LLM_CACHE_DBNAME:-llm_cache}"
+if [[ -n "${COLAB_RELEASE_TAG:-}" ]]; then
+	DB_EXISTS="$(psql --tuples-only --no-align \
+		--set=db_name="${LLM_CACHE_DB}" \
+		--file="${SQL_DIR}/check_database.sql")"
+else
+	# Local psql runs inside the container, so the SQL arrives via stdin.
+	DB_EXISTS="$(podman compose exec --no-tty postgres psql \
+		--username="${PGUSER}" --dbname=postgres \
+		--tuples-only --no-align \
+		--set=db_name="${LLM_CACHE_DB}" --set=db_user="${PGUSER}" \
+		<"${SQL_DIR}/check_database.sql")"
+fi
+if [[ "${DB_EXISTS%%|*}" != "1" ]]; then
+	echo "[INFO] PostgreSQL branch: creating the LLM cache database '${LLM_CACHE_DB}'..."
+	if [[ -n "${COLAB_RELEASE_TAG:-}" ]]; then
+		runuser -u postgres -- createdb --owner="${PGUSER}" "${LLM_CACHE_DB}"
+	else
+		podman compose exec --no-tty postgres createdb \
+			--username="${PGUSER}" --owner="${PGUSER}" "${LLM_CACHE_DB}"
+	fi
+else
+	echo "[INFO] PostgreSQL branch: LLM cache database '${LLM_CACHE_DB}' already exists."
+fi
+
 echo "[INFO] PostgreSQL branch: validating the import..."
 # Querying the views exercises PostGIS functions, so a missing extension
 # fails the psql call itself; here only the non-empty results need asserting.

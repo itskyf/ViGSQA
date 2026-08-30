@@ -4,14 +4,13 @@ baselines_vi.py — runs GS-QA baselines on Vietnamese VN-GeoQA data.
 Patches the upstream pipeline module at runtime:
   - QUESTIONS_DIR  → generator/questions_vi/
   - DB_PARAMS      → osm_vn (via PG* env)
-  - CACHE_DIR      → cache_vi/ds-{dataset_version}/pv-{prompt_version}/
+  - CACHE_DIR      → cache_vi/pv-{prompt_version}/
   - PROMPT_FILES   → Vietnamese prompts for direct and text2sql baselines
   - evaluate.get_osm_value → handles geo_wkt / dist_km field names
   - build_model    → llamacpp:<tag> routes to ChatOpenAI against llama.cpp /v1
 
-Cache and eval outputs are namespaced by dataset version (from the frozen
-MANIFEST.json) and prompt version (sha256-8 of the active Vietnamese prompts),
-so results from one freeze can never be reused for another.
+Step caches are namespaced by the prompt version (sha256-8 of the active
+Vietnamese prompts), so a prompt change never reuses another freeze's results.
 
 Usage (run from the repo root; same flags as pipeline.py):
   python -m baselines.baselines_vi \
@@ -29,10 +28,14 @@ import os
 import re
 import sys
 from pathlib import Path
+from urllib.parse import quote_plus
 
 import psycopg
+from langchain_community.cache import SQLAlchemyMd5Cache
+from langchain_core.globals import set_llm_cache
 from langchain_openai import ChatOpenAI
 from shapely import from_wkt
+from sqlalchemy import create_engine
 
 from baselines import evaluate, pipeline
 from vigsqa.settings import PostgresSettings
@@ -100,16 +103,14 @@ def _prompt_version() -> str:
 DATASET_VERSION = _dataset_version()
 PROMPT_VERSION = _prompt_version()
 
-# 3. Separate, version-namespaced cache so results from one dataset/prompt
-# freeze can never be reused for another (and never collide with English runs).
-pipeline.CACHE_DIR = (
-    ROOT / "cache_vi" / f"ds-{DATASET_VERSION}" / f"pv-{PROMPT_VERSION}"
-)
+# 3. Separate, prompt-namespaced cache so results from one prompt freeze can
+# never be reused for another (and never collide with English runs).
+pipeline.CACHE_DIR = ROOT / "cache_vi" / f"pv-{PROMPT_VERSION}"
 pipeline.CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-# Provisional eval CSVs go to a namespaced results dir (official reporting is
-# T03's job; these must never be described as benchmark scores).
-RESULTS_DIR = ROOT.parent / "results" / f"ds-{DATASET_VERSION}"
+# Provisional eval CSVs (official reporting is T03's job; these must never be
+# described as benchmark scores).
+RESULTS_DIR = ROOT.parent / "results"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 _orig_save_eval = pipeline.save_eval
@@ -401,6 +402,77 @@ def _build_model_vi(model_name: str):
 pipeline.build_model = _build_model_vi
 pipeline.build_parser_model = _build_model_vi
 
+# ── PostgreSQL LLM cache (LangChain) ─────────────────────────────────────────
+# The cache is the skip layer for LLM steps; the JSON step files remain
+# write-through artifacts. Colab/in-process runs must call setup_llm_cache().
+LLM_CACHE_DBNAME = os.environ.get("LLM_CACHE_DBNAME", "llm_cache")
+
+# Cache identity follows the model request, not the endpoint serving it, so
+# exactly these transport-only fields are stripped before lookup/update.
+_TRANSPORT_ONLY_KEYS = ("openai_api_base", "openai_api_key")
+
+
+def _normalize_llm_string(llm_string: str) -> str:
+    """Drop transport-only fields from a LangChain cache key.
+
+    The same model/generation parameters at a different endpoint must share
+    cache rows. On a parse failure the string passes through unchanged, so the
+    failure mode is endpoint-coupled keys (redundant inference), never a false
+    hit. ponytail: if langchain-openai adds another transport-only kwarg to
+    _get_llm_string, add it to _TRANSPORT_ONLY_KEYS or keys fragment per
+    endpoint configuration.
+    """
+    head, sep, tail = llm_string.rpartition("---")
+    if not head:
+        return llm_string
+    try:
+        payload = json.loads(head)
+    except json.JSONDecodeError:
+        return llm_string
+    kwargs = payload.get("kwargs") if isinstance(payload, dict) else None
+    if not isinstance(kwargs, dict):
+        return llm_string
+    for key in _TRANSPORT_ONLY_KEYS:
+        kwargs.pop(key, None)
+    return json.dumps(payload, sort_keys=True) + sep + tail
+
+
+class TransportNormalizedMd5Cache(SQLAlchemyMd5Cache):
+    """`SQLAlchemyMd5Cache` that keys on the model request, ignoring endpoint.
+
+    Model name, quantization tag, temperature, and max_tokens stay keyed."""
+
+    def lookup(self, prompt, llm_string):
+        return super().lookup(prompt, _normalize_llm_string(llm_string))
+
+    def update(self, prompt, llm_string, return_val):
+        super().update(prompt, _normalize_llm_string(llm_string), return_val)
+
+
+def llm_cache_engine():
+    """SQLAlchemy engine for the `llm_cache` database (PG* env credentials)."""
+    s = PostgresSettings()
+    password = quote_plus(s.password.get_secret_value())
+    url = (
+        f"postgresql+psycopg://{quote_plus(s.user)}:{password}"
+        f"@{s.host}:{s.port}/{LLM_CACHE_DBNAME}"
+    )
+    # pool_pre_ping: overnight runs must survive a restarted postgres service.
+    return create_engine(url, pool_pre_ping=True)
+
+
+def setup_llm_cache() -> None:
+    """Point LangChain's global LLM cache at the `llm_cache` Postgres database.
+
+    A database that cannot be reached fails loudly here — never falls back
+    silently to uncached inference.
+    """
+    s = PostgresSettings()
+    set_llm_cache(TransportNormalizedMd5Cache(llm_cache_engine()))
+    print(f"[llm-cache] normalized md5 cache -> {s.host}:{s.port}/{LLM_CACHE_DBNAME}")
+
+
 # ── Run ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    setup_llm_cache()
     pipeline.main()

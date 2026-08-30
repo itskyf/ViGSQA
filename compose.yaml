@@ -13,13 +13,10 @@ services:
       test: [ "CMD", "pg_isready", "--host=127.0.0.1", "--quiet" ]
       start_period: 30s
       start_interval: 2s
+    restart: always
   llama-cpp:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda13
-    command: [
-      --port, "8000",
-      --models-preset, /config/models.ini,
-      --models-max, "1",
-    ]
+    command: [ --port, "8000", --models-preset, /config/models.ini, --models-max, "1" ]
     devices:
       - nvidia.com/gpu=all
     volumes:
@@ -31,7 +28,7 @@ services:
       test: [ "CMD", "curl", "--request", "GET", "--fail", "--silent", "--show-error", "--output", "/dev/null", "http://localhost:8000/health" ]
       start_period: 15m
       start_interval: 5s
-    restart: unless-stopped
+    restart: always
 
 volumes:
   postgres:

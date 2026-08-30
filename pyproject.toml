@@ -5,6 +5,7 @@ requires-python = ">= 3.11"
 authors = [{ name = "Kỳ", email = "40734986+itskyf@users.noreply.github.com" }]
 dependencies = [
   "geopy>=2.5.0,<3",
+  "langchain-community>=0.4.2,<0.5",
   "langchain-openai>=1.6.0,<2",
   "nltk>=3.10.3,<4",
   "num2words>=0.5.14,<0.6",
@@ -52,6 +53,7 @@ curl = ">=8.21.0,<9"
 osm2pgsql = ">=2.2.0,<3"
 osmium-tool = ">=1.19.1,<2"
 unzip = ">=6.0,<7"
+sqlalchemy = ">=2.0,<3"
 
 [tool.pixi.feature.dev.dependencies]
 nb-cli = ">=0.0.9,<0.0.10"

@@ -36,6 +36,8 @@ import os
 import random
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
+from functools import cache
 from glob import glob
 from pathlib import Path
 
@@ -44,6 +46,7 @@ import psycopg
 import tqdm
 from geopy.geocoders import Nominatim
 from langchain_core.documents import Document
+from langchain_core.globals import get_llm_cache
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from num2words import num2words
@@ -210,6 +213,76 @@ def invoke_or_capture(model, messages) -> tuple[str, str | None]:
         return invoke_with_retry(model, messages).content, None
     except Exception as e:  # noqa: BLE001 — the error is frozen into the cache
         return "", str(e)
+
+
+# Client-side bound on concurrent LLM calls, threaded from `--llm-concurrency`
+# through the step functions like every other CLI setting (default 1 = the
+# exact sequential path). Server-side slots live in config/models.ini.
+
+
+@cache
+def _llm_pool(max_workers: int) -> ThreadPoolExecutor:
+    return ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="llm")
+
+
+def invoke_or_capture_many(
+    model, calls, llm_concurrency=1
+) -> list[tuple[str, str | None]]:
+    """`invoke_or_capture` over a batch of message lists, bounded by
+    `llm_concurrency`. `Executor.map` preserves input order, so record
+    processing and the JSON write-through stay on the calling thread."""
+    if llm_concurrency <= 1:
+        return [invoke_or_capture(model, messages) for messages in calls]
+    pool = _llm_pool(llm_concurrency)
+    return list(pool.map(lambda m: invoke_or_capture(model, m), calls))
+
+
+def run_llm_step(
+    questions, model, model_name, cache_key, build_messages, llm_concurrency=1
+):
+    """Shared driver for the LLM steps: skip layer, bounded calls, write-through.
+
+    Skip layer: the global LangChain cache when configured — resume replays
+    finished questions as cache hits and re-invokes only ids with no cached
+    row; otherwise the JSON step cache, the exact upstream behavior. JSON stays
+    a complete write-through artifact either way (the completion checks read it).
+
+    `build_messages(i)` returns the message list for `questions[i]`; each step
+    keeps its own prompt construction.
+    """
+    cache = load_cache(model_name, cache_key)
+    skip_json = get_llm_cache() is None
+    results: list = [None] * len(questions)
+    todo = [i for i, q in enumerate(questions) if not (skip_json and q["id"] in cache)]
+    consecutive_failures = 0
+    batch = max(1, llm_concurrency)
+    for start in tqdm.tqdm(
+        range(0, len(todo), batch), total=len(todo), desc=f"  {cache_key}"
+    ):
+        idxs = todo[start : start + batch]
+        contents = invoke_or_capture_many(
+            model, [build_messages(i) for i in idxs], llm_concurrency
+        )
+        for i, (content, error) in zip(idxs, contents, strict=True):
+            record = {"id": questions[i]["id"], "content": content}
+            if error:
+                record["error"] = error
+            results[i] = record
+            # Write-through after every item so partial runs are recoverable;
+            # identical replays (cache hits) skip the rewrite.
+            if cache.get(questions[i]["id"]) != record:
+                cache[questions[i]["id"]] = record
+                save_cache(model_name, cache_key, list(cache.values()))
+            consecutive_failures = consecutive_failures + 1 if error else 0
+            if consecutive_failures >= TERMINAL_FAILURE_STREAK:
+                raise RuntimeError(
+                    f"{cache_key}: {consecutive_failures} consecutive model"
+                    " failures — aborting; cached results are preserved"
+                )
+    return [
+        r if r is not None else cache[q["id"]]
+        for r, q in zip(results, questions, strict=True)
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -446,75 +519,49 @@ def extract_sql_blocks(text: str) -> list:
 # ---------------------------------------------------------------------------
 
 
-def step_generate_answers(questions, model, model_name, cache_key, system_prompt):
+def step_generate_answers(
+    questions, model, model_name, cache_key, system_prompt, llm_concurrency=1
+):
     """Step: question → text answer."""
-    cache = load_cache(model_name, cache_key)
-    results = []
-    consecutive_failures = 0
-    for q in tqdm.tqdm(questions, desc=f"  {cache_key}"):
-        if q["id"] in cache:
-            results.append(cache[q["id"]])
-        else:
-            messages = [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=q["question"]),
-            ]
-            content, error = invoke_or_capture(model, messages)
-            record = {"id": q["id"], "content": content}
-            if error:
-                record["error"] = error
-            results.append(record)
-            # Write-through cache after every item so partial runs are recoverable
-            cache[q["id"]] = record
-            save_cache(model_name, cache_key, list(cache.values()))
-            consecutive_failures = consecutive_failures + 1 if error else 0
-            if consecutive_failures >= TERMINAL_FAILURE_STREAK:
-                raise RuntimeError(
-                    f"{cache_key}: {consecutive_failures} consecutive model"
-                    " failures — aborting; cached results are preserved"
-                )
-    return results
+
+    def build_messages(i):
+        return [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=questions[i]["question"]),
+        ]
+
+    return run_llm_step(
+        questions, model, model_name, cache_key, build_messages, llm_concurrency
+    )
 
 
 def step_parse_to_json(
-    questions, answers, parser_model, model_name, cache_key, json_prompt_key
+    questions,
+    answers,
+    parser_model,
+    model_name,
+    cache_key,
+    json_prompt_key,
+    llm_concurrency=1,
 ):
     """Step: question + text answer → JSON answer (always uses local parser model)."""
     base_prompt = load_prompt(json_prompt_key)
-    cache = load_cache(model_name, cache_key)
-    results = []
-    consecutive_failures = 0
-    for q, a in tqdm.tqdm(
-        zip(questions, answers, strict=False),
-        total=len(questions),
-        desc=f"  {cache_key}",
-    ):
-        if q["id"] in cache:
-            results.append(cache[q["id"]])
-            continue
+
+    def build_messages(i):
+        q, a = questions[i], answers[i]
         if "multi_source1" in q["type"]:
             attr = q["answers"][0].get("multi_source_attribute", "")
             prompt = base_prompt.replace("%OTHER_ATT%", f'"{attr}": string')
         else:
             prompt = base_prompt.replace("%OTHER_ATT%", "")
-        messages = [
+        return [
             SystemMessage(content=prompt),
             HumanMessage(content=f"Question: {q['question']}\nAnswer: {a['content']}"),
         ]
-        content, error = invoke_or_capture(parser_model, messages)
-        record = {"id": q["id"], "content": content}
-        if error:
-            record["error"] = error
-        results.append(record)
-        cache[q["id"]] = record
-        save_cache(model_name, cache_key, list(cache.values()))
-        consecutive_failures = consecutive_failures + 1 if error else 0
-        if consecutive_failures >= TERMINAL_FAILURE_STREAK:
-            raise RuntimeError(
-                f"{cache_key}: {consecutive_failures} consecutive model"
-                " failures — aborting; cached results are preserved"
-            )
-    return results
+
+    return run_llm_step(
+        questions, parser_model, model_name, cache_key, build_messages, llm_concurrency
+    )
 
 
 def step_execute_sql(questions, sql_answers, model_name):
@@ -554,37 +601,22 @@ def step_execute_sql(questions, sql_answers, model_name):
     return results
 
 
-def step_answer_from_records(questions, sql_answers, sql_outputs, model, model_name):
+def step_answer_from_records(
+    questions, sql_answers, sql_outputs, model, model_name, llm_concurrency=1
+):
     """Step: question + SQL records → text answer."""
     base_prompt = load_prompt("sql_answer")
-    cache = load_cache(model_name, "sql_answer")
-    results = []
-    consecutive_failures = 0
-    for q, sql_out in tqdm.tqdm(
-        zip(questions, sql_outputs, strict=False),
-        total=len(questions),
-        desc="  sql_answer",
-    ):
-        if q["id"] in cache:
-            results.append(cache[q["id"]])
-            continue
-        records_text = json.dumps(sql_out.get("records", []), indent=2)
-        prompt = base_prompt + records_text
-        messages = [SystemMessage(content=prompt), HumanMessage(content=q["question"])]
-        content, error = invoke_or_capture(model, messages)
-        record = {"id": q["id"], "content": content}
-        if error:
-            record["error"] = error
-        results.append(record)
-        cache[q["id"]] = record
-        save_cache(model_name, "sql_answer", list(cache.values()))
-        consecutive_failures = consecutive_failures + 1 if error else 0
-        if consecutive_failures >= TERMINAL_FAILURE_STREAK:
-            raise RuntimeError(
-                f"sql_answer: {consecutive_failures} consecutive model"
-                " failures — aborting; cached results are preserved"
-            )
-    return results
+
+    def build_messages(i):
+        records_text = json.dumps(sql_outputs[i].get("records", []), indent=2)
+        return [
+            SystemMessage(content=base_prompt + records_text),
+            HumanMessage(content=questions[i]["question"]),
+        ]
+
+    return run_llm_step(
+        questions, model, model_name, "sql_answer", build_messages, llm_concurrency
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -817,7 +849,14 @@ def step_rag_answers(questions, model, model_name, vector_store, k=10):
 
 
 def run_direct(
-    questions, model, parser_model, model_name, evaluate_mod, geocoder, geod
+    questions,
+    model,
+    parser_model,
+    model_name,
+    evaluate_mod,
+    geocoder,
+    geod,
+    llm_concurrency=1,
 ):
     print("\n[direct baseline]")
 
@@ -828,6 +867,7 @@ def run_direct(
         model_name,
         cache_key="direct_answer",
         system_prompt=load_prompt("direct_answer"),
+        llm_concurrency=llm_concurrency,
     )
 
     # Step 2: parse to JSON
@@ -838,6 +878,7 @@ def run_direct(
         model_name,
         cache_key="direct_json_parse",
         json_prompt_key="direct_json_parse",
+        llm_concurrency=llm_concurrency,
     )
 
     # Step 3: extract JSON blocks
@@ -859,7 +900,14 @@ def run_direct(
 
 
 def run_text2sql(
-    questions, model, parser_model, model_name, evaluate_mod, geocoder, geod
+    questions,
+    model,
+    parser_model,
+    model_name,
+    evaluate_mod,
+    geocoder,
+    geod,
+    llm_concurrency=1,
 ):
     print("\n[text2sql baseline]")
 
@@ -870,6 +918,7 @@ def run_text2sql(
         model_name,
         cache_key="sql_generate",
         system_prompt=load_prompt("sql_generate"),
+        llm_concurrency=llm_concurrency,
     )
 
     # Step 2: execute SQL
@@ -877,7 +926,12 @@ def run_text2sql(
 
     # Step 3: generate answer from records
     answers = step_answer_from_records(
-        questions, sql_answers, sql_outputs, model, model_name
+        questions,
+        sql_answers,
+        sql_outputs,
+        model,
+        model_name,
+        llm_concurrency=llm_concurrency,
     )
 
     # Step 4: parse to JSON
@@ -888,6 +942,7 @@ def run_text2sql(
         model_name,
         cache_key="sql_json_parse",
         json_prompt_key="sql_json_parse",
+        llm_concurrency=llm_concurrency,
     )
 
     # Step 5: extract JSON blocks
@@ -1146,7 +1201,15 @@ def _random_multi_source_value(attribute: str):
     return gen() if gen else f"Unknown {attribute}"
 
 
-def run_shuffled(questions, parser_model, model_name, evaluate_mod, geocoder, geod):
+def run_shuffled(
+    questions,
+    parser_model,
+    model_name,
+    evaluate_mod,
+    geocoder,
+    geod,
+    llm_concurrency=1,
+):
     print("\n[shuffled baseline]")
 
     # The answer-generation step is model-independent (pure SQL + random),
@@ -1250,6 +1313,7 @@ def run_shuffled(questions, parser_model, model_name, evaluate_mod, geocoder, ge
         model_name,
         cache_key="shuffled_json_parse",
         json_prompt_key="direct_json_parse",
+        llm_concurrency=llm_concurrency,
     )
 
     parsed_answers = [
@@ -1336,6 +1400,16 @@ def parse_args():
             "rag_answer, rag_json_parse"
         ),
     )
+    parser.add_argument(
+        "--llm-concurrency",
+        type=int,
+        required=True,
+        help=(
+            "Client-side bound on concurrent LLM calls, shared by all LLM "
+            "steps; the official runner passes 4 (the llama.cpp preset in "
+            "config/models.ini serves 4 slots)."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -1376,12 +1450,26 @@ def main():
     # Run baseline(s)
     if args.baseline in ("direct", "all"):
         run_direct(
-            questions, model, parser_model, args.model, evaluate_mod, geocoder, geod
+            questions,
+            model,
+            parser_model,
+            args.model,
+            evaluate_mod,
+            geocoder,
+            geod,
+            llm_concurrency=args.llm_concurrency,
         )
 
     if args.baseline in ("text2sql", "all"):
         run_text2sql(
-            questions, model, parser_model, args.model, evaluate_mod, geocoder, geod
+            questions,
+            model,
+            parser_model,
+            args.model,
+            evaluate_mod,
+            geocoder,
+            geod,
+            llm_concurrency=args.llm_concurrency,
         )
 
     if args.baseline in ("rag", "all"):
@@ -1397,7 +1485,15 @@ def main():
         )
 
     if args.baseline in ("shuffled", "all"):
-        run_shuffled(questions, parser_model, args.model, evaluate_mod, geocoder, geod)
+        run_shuffled(
+            questions,
+            parser_model,
+            args.model,
+            evaluate_mod,
+            geocoder,
+            geod,
+            llm_concurrency=args.llm_concurrency,
+        )
 
     print("\nDone.")
 

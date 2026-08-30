@@ -67,14 +67,13 @@ text2sql prompts hard-code `pois.geometry`.
 
 ## Step 2 — Question Generation
 
-Datasets are versioned under `data/<version>/questions_vi/` with
-`generator/questions_vi` as a symlink to the current version, so code and
-notebooks keep using the familiar path. `data/` is **not tracked by git**
-(`.gitignore`): the frozen dataset is published as a public GitHub Release
-asset and restored by:
+The dataset lives at `data/questions_vi/` with `generator/questions_vi` as a
+symlink to it, so code and notebooks keep using the familiar path. `data/` is
+**not tracked by git** (`.gitignore`): the frozen dataset is published as a
+public GitHub Release asset (tag `data-v2.0.0`) and restored by:
 
 1. `./scripts/restore_dataset.sh` — downloads, unpacks, and sha256-verifies
-   `data/v1.0.0/questions_vi` (idempotent; needs only `curl` + `unzip`), or
+   `data/questions_vi` (idempotent; needs only `curl` + `unzip`), or
 2. running the pipeline above against the **pinned snapshot** and regenerating
    with the pinned seed. `download_osm.sh` downloads the pinned
    `vietnam-260825.osm.pbf` snapshot:
@@ -85,20 +84,21 @@ asset and restored by:
    ./scripts/download_osm.sh
    ./scripts/init_database.sh && ./scripts/import_osm.sh
    # from the repo root (--output is resolved from the current directory):
-   python generator/generator_vi.py --seed 42 --count 100 --output data/v1.0.0/questions_vi
+   python generator/generator_vi.py --seed 42 --count 100 --output data/questions_vi
    ```
 
    Regeneration needs the running database and the pinned PBF; the Release
    asset needs neither.
 
 Either way, verify integrity against the sha256 table in
-`docs/plans/T01-dataset-quality.md`. To publish a new version, generate into a
-new directory, verify, update the MANIFEST, then repoint the symlink:
+`docs/plans/T01-dataset-quality.md`. To publish a new dataset version, generate
+into a new directory, verify, update the MANIFEST, then repoint the symlink and
+tag the release (the version lives only in the tag):
 
 ```bash
 cd generator
-python generator_vi.py --seed 42 --count 100 --output ../data/v1.0.1/questions_vi
-# verify, update MANIFEST, then: ln -sfn ../data/v1.0.1/questions_vi questions_vi
+python generator_vi.py --seed 42 --count 100 --output ../data/questions_vi_new
+# verify, update MANIFEST, then: ln -sfn ../data/questions_vi_new questions_vi
 ```
 
 The seed pins both the Python sampling and the per-call

@@ -1,6 +1,6 @@
 # VN-GeoQA — Bộ Dữ Liệu Hỏi Đáp Không Gian Địa Lý Tiếng Việt
 
-Bộ dữ liệu gồm **800 câu hỏi tiếng Việt** về không gian địa lý (KNN và range query), được tổng hợp tự động từ dữ liệu OpenStreetMap Việt Nam, đóng băng tại phiên bản **v1.0.0**.
+Bộ dữ liệu gồm **2.800 câu hỏi tiếng Việt** về không gian địa lý (28 loại câu hỏi × 100), được tổng hợp tự động từ dữ liệu OpenStreetMap Việt Nam, đóng băng tại phiên bản **v2.0.0**.
 
 **Tài liệu tiếng Anh: [README.md](README.md)**
 
@@ -17,12 +17,12 @@ ViGSQA/
 │   ├── init_database.sh                # Tạo database osm_vn + PostGIS
 │   ├── download_osm.sh                 # Tải PBF snapshot OSM đã pin (vietnam-260825)
 │   ├── import_osm.sh                   # osm2pgsql flex → view pois
-│   └── restore_dataset.sh              # Tải bộ dữ liệu v1.0.0 từ GitHub Release
+│   └── restore_dataset.sh              # Tải bộ dữ liệu từ GitHub Release (data-v2.0.0)
 ├── generator/
 │   ├── generator_vi.py                 # Sinh câu hỏi tiếng Việt từ DB
 │   ├── verify_vi.py                    # Kiểm tra chất lượng câu hỏi
 │   ├── templates_vi/                   # Template câu hỏi tiếng Việt (8 loại)
-│   └── questions_vi -> ../data/v1.0.0/questions_vi   # symlink
+│   └── questions_vi -> ../data/questions_vi   # symlink
 └── baselines/
     ├── baselines_vi.py                 # Chạy baseline trên VN-GeoQA
     ├── baseline_prompts/               # Prompt tiếng Việt (direct + text2sql)
@@ -74,8 +74,20 @@ Kết quả lưu tại `baselines/<model>_<baseline>_{text,parsed}_eval.csv`.
 | `PGHOST` / `PGPORT` | `127.0.0.1` / `5432` | Postgres (giống `scripts/*.sh`) |
 | `PGDATABASE` | `osm_vn` | Database |
 | `PGUSER` / `PGPASSWORD` | `postgres` / `postgres` | Chứng thực local |
+| `LLM_CACHE_DBNAME` | `llm_cache` | Tên DB cache LLM (tách biệt DB OSM `osm_vn`) |
+
+Cờ `--llm-concurrency N` (bắt buộc) giới hạn số lời gọi LLM đồng thời phía client; `scripts/run_official.sh` truyền `4` để khớp 4 slot của preset server trong `config/models.ini`.
 
 SQL do model sinh luôn chạy trong transaction **read-only** kèm statement timeout.
+
+### Cache LLM (PostgreSQL)
+
+LangChain cache (`SQLAlchemyMd5Cache` chuẩn hoá bỏ trường transport như `base_url`/api key) luôn bật cho pipeline, nằm trong DB `llm_cache` — cùng service Postgres nhưng tách biệt hoàn toàn với DB tham chiếu `osm_vn`, nên restore/xoá cache không bao giờ ảnh hưởng dữ liệu OSM. Hai luồng restore độc lập:
+
+- **OSM**: `scripts/bootstrap_postgres.sh` (dump release `osm-vn.sql.gz` của tag `data-v2.0.0`, ghim SHA-256).
+- **LLM cache**: `scripts/export_llm_cache.sh` → `scripts/restore_llm_cache.sh <dump>`.
+
+Hợp đồng cache-key: cùng một yêu cầu model (model/quantization/tham số sinh/prompt giữ nguyên) tại endpoint khác nhau → cache hit; đổi model hoặc tham số sinh → miss. File JSON step (`cache_vi/…`) vẫn là artifact ghi-đầy-đủ; chi tiết trong `docs/plans/T09-llm-cache-postgres.md`.
 
 ---
 
@@ -114,4 +126,4 @@ Câu range lưu **toàn bộ** tập đáp án sắp xếp theo khoảng cách (
 
 ## 4. Kết Quả Thực Nghiệm
 
-Các báo cáo hiện có ([`baselines/REPORT_VN_GEOQA.md`](baselines/REPORT_VN_GEOQA.md), [docs/results.md](docs/results.md)) là **kết quả trước khi freeze** — không phải bằng chứng benchmark. Kết quả chính thức trên benchmark v1.0.0 sẽ được chạy lại ở T03.
+Các báo cáo hiện có ([`baselines/REPORT_VN_GEOQA.md`](baselines/REPORT_VN_GEOQA.md), [docs/results.md](docs/results.md)) là **kết quả trước khi freeze** — không phải bằng chứng benchmark. Kết quả chính thức sẽ được tổng hợp ở T03.

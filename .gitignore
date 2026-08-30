@@ -1,5 +1,6 @@
 .agents/
 .claude/
+.codebuddy/
 .codex/
 .gemini/
 .mcp.json
@@ -36,7 +37,6 @@ logs/
 .ipynb_checkpoints/
 # Authoritative notebook copy lives in Google Drive/Colab; never track it
 main.ipynb
-main-v2.ipynb
 
 # Python environments
 .venv/
@@ -48,7 +48,11 @@ main-v2.ipynb
 .osm_vn_fileinfo
 
 # Prebuilt reference-DB release dump cache (scripts/restore_database.sh)
-osm-vn-*.sql.gz*
+osm-vn.sql.gz*
+# Dataset release archive (scripts/restore_dataset.sh)
+vn-geoqa.zip
+# LLM-cache dumps (scripts/export_llm_cache.sh, regenerable)
+llm-cache-*.sql.gz*
 
 # Model weights
 *.gguf

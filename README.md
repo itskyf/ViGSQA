@@ -7,12 +7,12 @@ This fork adds **VN-GeoQA**, a Vietnamese-language geospatial QA benchmark built
 | | VN-GeoQA |
 |--|--|
 | Language | Vietnamese |
-| Version | **v1.0.0 (frozen)** — [`data/v1.0.0/questions_vi/MANIFEST.json`](data/v1.0.0/questions_vi/MANIFEST.json) |
-| Questions | 800 (100 × 8 types), stable `{type}-NNN` ids |
+| Version | **v2.0.0 (frozen)** — [`data/questions_vi/MANIFEST.json`](data/questions_vi/MANIFEST.json) |
+| Questions | 2,800 (100 × 28 canonical GS-QA types), stable `{type}-NNN` ids + `tid` |
 | Source | Geofabrik `vietnam-260825.osm.pbf` (sha256 in MANIFEST) → PostGIS `osm_vn` |
 | Database | OSM Vietnam (PostGIS `osm_vn` + llama.cpp via [`compose.yaml`](compose.yaml)) |
-| Dataset | `data/v1.0.0/questions_vi/` — **not in git** by design; restore with `scripts/restore_dataset.sh` (public GitHub Release asset, sha256-verified) or regenerate with seed 42. Symlinked at `generator/questions_vi/` |
-| QC | automated checks 800/800 + human review of an 80-record seeded sample |
+| Dataset | `data/questions_vi/` — **not in git** by design; restore with `scripts/restore_dataset.sh` (public GitHub Release asset, sha256-verified) or regenerate with seed 42. Symlinked at `generator/questions_vi/` |
+| QC | automated checks 2,800/2,800 + human review of a 140-record seeded sample |
 | Baselines | direct, text2sql — llama.cpp OpenAI-compatible `/v1` via `langchain-openai` |
 | Results | [`baselines/REPORT_VN_GEOQA.md`](baselines/REPORT_VN_GEOQA.md) *(archived, pre-freeze)* |
 
@@ -95,7 +95,7 @@ The scripts can be easily modified for any model, and are based on LangChain.
 
 ### Benchmark Data
 
-> **Removed from this fork's working tree:** the upstream English `benchmark/` tree (28 × 100 questions, ~168 MB) is deleted at the freeze commit but remains in the inherited history (fork base `tien02/nlp-ck`), so it is recoverable with `git checkout base/main -- benchmark` or regenerable via `baselines/clean_benchmark.py`. The Vietnamese benchmark (`data/v1.0.0/questions_vi/`) is kept out of git by design (see the table above for restore paths). The English data can be regenerated with `baselines/clean_benchmark.py` from the upstream GS-QA artifacts (see "Question Generation" below and the upstream repo). The schema documentation below still describes those upstream English files.
+> **Removed from this fork's working tree:** the upstream English `benchmark/` tree (28 × 100 questions, ~168 MB) is deleted at the freeze commit but remains in the inherited history (fork base `tien02/nlp-ck`), so it is recoverable with `git checkout base/main -- benchmark` or regenerable via `baselines/clean_benchmark.py`. The Vietnamese benchmark (`data/questions_vi/`) is kept out of git by design (see the table above for restore paths). The English data can be regenerated with `baselines/clean_benchmark.py` from the upstream GS-QA artifacts (see "Question Generation" below and the upstream repo). The schema documentation below still describes those upstream English files.
 
 The upstream benchmark questions were located in the `benchmark/` directory. The folder contains 28 directories, one for each question type. Inside each directory there are 100 folders, one for each question. Inside each of these folders, there are two JSON files, one for the question itself and one for the answers we obtaiend from our baselines.
 

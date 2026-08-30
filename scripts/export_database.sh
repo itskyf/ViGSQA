@@ -8,7 +8,7 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd -P)"
 
 DUMP_VERSION="v2.0.0"
 RELEASE_TAG="data-${DUMP_VERSION}"
-DUMP_FILE="${REPO_ROOT}/osm-vn-${DUMP_VERSION}.sql.gz"
+DUMP_FILE="${REPO_ROOT}/osm-vn.sql.gz"
 PART_FILE="${DUMP_FILE}.part"
 
 : "${PGHOST:?PGHOST is required}" "${PGPORT:?PGPORT is required}"
