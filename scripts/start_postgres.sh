@@ -16,15 +16,16 @@ case "$#" in
 	;;
 esac
 
-# Colab: service(8) blocks until the postmaster accepts connections.
 if [[ -n "${COLAB_RELEASE_TAG:-}" ]]; then
-	if ((WAIT_ONLY)); then
-		until pg_isready --quiet; do
-			sleep 2
-		done
-	else
+	if ((! WAIT_ONLY)); then
 		service postgresql start
 	fi
+	until pg_isready \
+		--host="${PGHOST}" --port="${PGPORT}" \
+		--username="${PGUSER}" --dbname="${PGDATABASE}" \
+		--timeout=2 --quiet; do
+		sleep 2
+	done
 else
 	if ((! WAIT_ONLY)); then
 		podman compose up --detach postgres

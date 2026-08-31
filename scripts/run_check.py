@@ -18,6 +18,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from baselines.pipeline import extract_json_blocks, extract_sql_blocks
+
 ROOT = Path(__file__).resolve().parent.parent
 QUESTIONS_DIR = ROOT / "generator" / "questions_vi"
 CACHE_ROOT = ROOT / "baselines" / "cache_vi"
@@ -29,6 +31,16 @@ STEPS = {
     "direct": ["direct_answer", "direct_json_parse"],
     "text2sql": ["sql_generate", "sql_exec", "sql_answer", "sql_json_parse"],
 }
+# Non-failed records must satisfy their stage's output contract, judged by the
+# same parsers the pipeline consumes artifacts with (never a raw substring).
+# `finish_reason` enforcement is the runtime validator's job — the JSON
+# artifact does not store it.
+STAGE_CONTENT_CHECKS = {
+    "sql_generate": lambda r: bool(extract_sql_blocks(r.get("content", ""))),
+    "sql_answer": lambda r: bool(r.get("content", "").strip()),
+    "sql_json_parse": lambda r: bool(extract_json_blocks(r.get("content", ""))),
+}
+REPORT_ID_LIMIT = 20
 # Must stay in sync with baselines_vi._prompt_version (same files, same order).
 PROMPT_FILES = [
     "direct_answer_vi.txt",
@@ -113,22 +125,70 @@ def main() -> int:
     for step in STEPS[args.baseline]:
         records = json.loads((cache_dir / args.model / f"{step}.json").read_text())
         record_ids = {r["id"] for r in records}
-        assert record_ids == question_ids, (
-            f"{step}: {len(question_ids - record_ids)} question ids missing from cache"
+        missing_ids = sorted(question_ids - record_ids)
+        assert not missing_ids, (
+            f"{step}: {len(missing_ids)} question ids missing from cache;"
+            f" first {REPORT_ID_LIMIT}: {missing_ids[:REPORT_ID_LIMIT]}"
         )
         failed = [r for r in records if r.get("error")]
-        if step == "sql_generate":
-            empty_sql = [
-                r["id"]
-                for r in records
-                if not r.get("error") and "```sql" not in r.get("content", "")
+        content_check = STAGE_CONTENT_CHECKS.get(step)
+        if content_check is not None:
+            invalid = [
+                r["id"] for r in records if not r.get("error") and not content_check(r)
             ]
-            assert not empty_sql, f"{step}: non-failed records without sql blocks"
+            assert not invalid, (
+                f"{step}: {len(invalid)} non-failed records fail the stage"
+                f" content contract; first {REPORT_ID_LIMIT}:"
+                f" {invalid[:REPORT_ID_LIMIT]}"
+            )
         if step == "sql_exec":
             missing = [r["id"] for r in records if "records" not in r]
-            assert not missing, f"{step}: records without raw execution results"
-        step_stats[step] = {"records": len(records), "failed": len(failed)}
-        print(f"  {step}: {len(records)} records, {len(failed)} explicit failures")
+            assert not missing, (
+                f"{step}: {len(missing)} records without raw execution results;"
+                f" first {REPORT_ID_LIMIT}: {missing[:REPORT_ID_LIMIT]}"
+            )
+            generated = json.loads(
+                (cache_dir / args.model / "sql_generate.json").read_text()
+            )
+            generated_by_id = {r["id"]: r for r in generated}
+            stale = [
+                r["id"]
+                for r in records
+                if r.get("sql_blocks")
+                != extract_sql_blocks(generated_by_id[r["id"]].get("content", ""))
+            ]
+            assert not stale, (
+                f"{step}: {len(stale)} records do not match current sql_generate;"
+                f" first {REPORT_ID_LIMIT}: {stale[:REPORT_ID_LIMIT]}"
+            )
+            misaligned = [
+                r["id"] for r in records if len(r["records"]) != len(r["sql_blocks"])
+            ]
+            assert not misaligned, (
+                f"{step}: {len(misaligned)} records are not aligned with their SQL"
+                f" blocks; first {REPORT_ID_LIMIT}: {misaligned[:REPORT_ID_LIMIT]}"
+            )
+            execution_failures = [
+                (r["id"], result["error"])
+                for r in records
+                for result in r["records"]
+                if result.get("error")
+            ]
+            execution_failed_ids = {rid for rid, _ in execution_failures}
+        stats = {"records": len(records), "failed": len(failed)}
+        if step == "sql_exec":
+            stats.update(
+                execution_failed_ids=len(execution_failed_ids),
+                execution_failed_statements=len(execution_failures),
+            )
+        step_stats[step] = stats
+        summary = f"  {step}: {len(records)} records, {len(failed)} explicit failures"
+        if step == "sql_exec":
+            summary += (
+                f", {len(execution_failed_ids)} IDs /"
+                f" {len(execution_failures)} statements with SQL errors"
+            )
+        print(summary)
 
     # ── Minimal manifest ─────────────────────────────────────────────────────
     manifest = {

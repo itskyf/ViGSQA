@@ -36,16 +36,21 @@ import os
 import random
 import re
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack
 from functools import cache
 from glob import glob
 from pathlib import Path
+from typing import NamedTuple
 
 import pandas as pd
 import psycopg
 from geopy.geocoders import Nominatim
+from langchain_core.caches import BaseCache
 from langchain_core.documents import Document
 from langchain_core.globals import get_llm_cache
+from langchain_core.load import dumps
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from num2words import num2words
@@ -215,6 +220,90 @@ def invoke_or_capture(model, messages) -> tuple[str, str | None]:
         return "", str(e)
 
 
+# Stage output validation (opt-in). A successful transport call is not
+# automatically a successful step: callers that pass a `StageValidation` get
+# each completion checked, and invalid ones retried on the identical request.
+# The LLM cache write happens inside `.invoke()` *before* this check, so
+# every invalid result must also evict its own cache row — otherwise the
+# retry would replay the poisoned entry instead of generating.
+
+
+class StageValidation(NamedTuple):
+    """One stage's output-validation policy.
+
+    `check(content, finish_reason)` returns `None` for a valid completion,
+    else an error label; `max_attempts` bounds the identical-request retries.
+    """
+
+    check: Callable[[str, str | None], str | None]
+    max_attempts: int = 1
+
+
+def _finish_reason(message) -> str | None:
+    """Termination status the backend reported ("stop", "length", …), or `None`.
+
+    Preserved into stage validation as a termination fact only; the cause of a
+    `length` finish (reasoning, truncation, repetition) is deliberately not
+    assumed.
+    """
+    metadata = getattr(message, "response_metadata", None)
+    return metadata.get("finish_reason") if isinstance(metadata, dict) else None
+
+
+def evict_llm_request(model, messages) -> None:
+    """Drop the LLM-cache row for exactly this request so the next attempt is
+    a real generation.
+
+    Recomputes the key the way LangChain's `_generate_with_cache` does
+    (id-stripped message copies, `dumps(...)`, `model._get_llm_string()`).
+    A configured cache without an `evict` method fails loudly: silently
+    keeping the row would make every retry replay the poisoned value. With no
+    cache configured there is nothing to poison — every invoke already
+    reaches the model.
+    """
+    llm_cache = getattr(model, "cache", None)
+    if not isinstance(llm_cache, BaseCache):
+        llm_cache = get_llm_cache()
+    if llm_cache is None:
+        return
+    evict = getattr(llm_cache, "evict", None)
+    if not callable(evict):
+        raise RuntimeError(
+            "stage validation requires an evictable LLM cache, got "
+            f"{type(llm_cache).__name__}"
+        )
+    normalized = [
+        (m.model_copy(update={"id": None}) if getattr(m, "id", None) is not None else m)
+        for m in messages
+    ]
+    evict(dumps(normalized), model._get_llm_string())
+
+
+def invoke_validated_or_capture(model, messages, stage: StageValidation):
+    """`invoke_or_capture` plus stage validation: bounded retries of the
+    identical request, each invalid result evicted from the LLM cache first
+    so every retry is a real generation.
+
+    Transport exceptions keep the plain explicit-error path; exhaustion
+    becomes a terminal validation error (a scored benchmark failure, not an
+    outage).
+    """
+    attempts = max(1, stage.max_attempts)
+    label = None
+    for _ in range(attempts):
+        try:
+            message = invoke_with_retry(model, messages)
+        except Exception as e:  # noqa: BLE001 — the error is frozen into the cache
+            return "", str(e)
+        label = stage.check(message.content, _finish_reason(message))
+        if label is None:
+            return message.content, None
+        # Also runs after the final attempt: no invalid value may survive as
+        # the canonical cache entry.
+        evict_llm_request(model, messages)
+    return "", f"{label} after {attempts} attempts"
+
+
 # Client-side bound on concurrent LLM calls, threaded from `--llm-concurrency`
 # through the step functions like every other CLI setting (default 1 = the
 # exact sequential path). Server-side slots live in config/models.ini.
@@ -226,19 +315,47 @@ def _llm_pool(max_workers: int) -> ThreadPoolExecutor:
 
 
 def invoke_or_capture_many(
-    model, calls, llm_concurrency=1
+    model, calls, llm_concurrency=1, stage: StageValidation | None = None
 ) -> list[tuple[str, str | None]]:
     """`invoke_or_capture` over a batch of message lists, bounded by
     `llm_concurrency`. `Executor.map` preserves input order, so record
-    processing and the JSON write-through stay on the calling thread."""
+    processing and the JSON write-through stay on the calling thread.
+
+    With a `stage`, completions are stage-validated and invalid ones retried
+    on the identical request (`invoke_validated_or_capture`); without it the
+    behavior is exactly the plain path."""
+
+    def run_one(messages):
+        if stage is None:
+            return invoke_or_capture(model, messages)
+        return invoke_validated_or_capture(model, messages, stage)
+
     if llm_concurrency <= 1:
-        return [invoke_or_capture(model, messages) for messages in calls]
+        return [run_one(messages) for messages in calls]
     pool = _llm_pool(llm_concurrency)
-    return list(pool.map(lambda m: invoke_or_capture(model, m), calls))
+    try:
+        return list(pool.map(run_one, calls))
+    except KeyboardInterrupt:
+        pool.shutdown(wait=False, cancel_futures=True)
+        _llm_pool.cache_clear()
+        raise
+
+
+def _is_validation_error(error: str | None) -> bool:
+    """Stage-validation labels share the `invalid_` prefix. They are scored
+    benchmark failures, not the systemic outages `TERMINAL_FAILURE_STREAK`
+    guards against."""
+    return bool(error) and error.startswith("invalid_")
 
 
 def run_llm_step(
-    questions, model, model_name, cache_key, build_messages, llm_concurrency=1
+    questions,
+    model,
+    model_name,
+    cache_key,
+    build_messages,
+    llm_concurrency=1,
+    stage: StageValidation | None = None,
 ):
     """Shared driver for the LLM steps: skip layer, bounded calls, write-through.
 
@@ -248,7 +365,8 @@ def run_llm_step(
     a complete write-through artifact either way (the completion checks read it).
 
     `build_messages(i)` returns the message list for `questions[i]`; each step
-    keeps its own prompt construction.
+    keeps its own prompt construction. `stage` opts the step into output
+    validation with bounded identical-request retries.
     """
     cache = load_cache(model_name, cache_key)
     skip_json = get_llm_cache() is None
@@ -260,7 +378,7 @@ def run_llm_step(
         for start in range(0, len(todo), batch):
             idxs = todo[start : start + batch]
             contents = invoke_or_capture_many(
-                model, [build_messages(i) for i in idxs], llm_concurrency
+                model, [build_messages(i) for i in idxs], llm_concurrency, stage
             )
             for i, (content, error) in zip(idxs, contents, strict=True):
                 record = {"id": questions[i]["id"], "content": content}
@@ -272,7 +390,12 @@ def run_llm_step(
                 if cache.get(questions[i]["id"]) != record:
                     cache[questions[i]["id"]] = record
                     save_cache(model_name, cache_key, list(cache.values()))
-                consecutive_failures = consecutive_failures + 1 if error else 0
+                # Validation failures are benchmark results, not outage signals.
+                consecutive_failures = (
+                    consecutive_failures + 1
+                    if error and not _is_validation_error(error)
+                    else 0
+                )
                 if consecutive_failures >= TERMINAL_FAILURE_STREAK:
                     raise RuntimeError(
                         f"{cache_key}: {consecutive_failures} consecutive model"
@@ -438,7 +561,7 @@ def flatten_if_nested(array):
     return array
 
 
-def extract_json_blocks(text: str, idx: int) -> list:
+def extract_json_blocks(text: str, idx: int = -1) -> list:
     matches = re.findall(r"```[\s]*json(.*?)```", text, re.DOTALL)
     blocks = []
     for match in matches:
@@ -520,7 +643,13 @@ def extract_sql_blocks(text: str) -> list:
 
 
 def step_generate_answers(
-    questions, model, model_name, cache_key, system_prompt, llm_concurrency=1
+    questions,
+    model,
+    model_name,
+    cache_key,
+    system_prompt,
+    llm_concurrency=1,
+    stage: StageValidation | None = None,
 ):
     """Step: question → text answer."""
 
@@ -531,7 +660,7 @@ def step_generate_answers(
         ]
 
     return run_llm_step(
-        questions, model, model_name, cache_key, build_messages, llm_concurrency
+        questions, model, model_name, cache_key, build_messages, llm_concurrency, stage
     )
 
 
@@ -543,6 +672,7 @@ def step_parse_to_json(
     cache_key,
     json_prompt_key,
     llm_concurrency=1,
+    stage: StageValidation | None = None,
 ):
     """Step: question + text answer → JSON answer (always uses local parser model)."""
     base_prompt = load_prompt(json_prompt_key)
@@ -560,12 +690,23 @@ def step_parse_to_json(
         ]
 
     return run_llm_step(
-        questions, parser_model, model_name, cache_key, build_messages, llm_concurrency
+        questions,
+        parser_model,
+        model_name,
+        cache_key,
+        build_messages,
+        llm_concurrency,
+        stage,
     )
 
 
 def step_execute_sql(questions, sql_answers, model_name):
-    """Step: SQL text → database records."""
+    """Step: SQL text → database records.
+
+    Execution records include their exact extracted SQL blocks. A question ID
+    alone is not a safe cache key because a repaired generation can retain the
+    same ID while changing the SQL that must be executed.
+    """
     cache = load_cache(model_name, "sql_exec")
     results = []
     conn = None
@@ -574,12 +715,13 @@ def step_execute_sql(questions, sql_answers, model_name):
         total=len(questions),
         desc="  sql_exec",
     ):
-        if q["id"] in cache:
-            results.append(cache[q["id"]])
+        sql_blocks = extract_sql_blocks(a["content"])
+        cached = cache.get(q["id"])
+        if cached is not None and cached.get("sql_blocks") == sql_blocks:
+            results.append(cached)
             continue
         if conn is None:
             conn = make_db_conn()
-        sql_blocks = extract_sql_blocks(a["content"])
         records = []
         for sql in sql_blocks:
             try:
@@ -592,7 +734,7 @@ def step_execute_sql(questions, sql_answers, model_name):
                     pass
                 conn = make_db_conn()
                 records.append(run_sql(sql, conn))
-        record = {"id": q["id"], "records": records}
+        record = {"id": q["id"], "sql_blocks": sql_blocks, "records": records}
         results.append(record)
         cache[q["id"]] = record
         save_cache(model_name, "sql_exec", list(cache.values()))
@@ -602,7 +744,13 @@ def step_execute_sql(questions, sql_answers, model_name):
 
 
 def step_answer_from_records(
-    questions, sql_answers, sql_outputs, model, model_name, llm_concurrency=1
+    questions,
+    sql_answers,
+    sql_outputs,
+    model,
+    model_name,
+    llm_concurrency=1,
+    stage: StageValidation | None = None,
 ):
     """Step: question + SQL records → text answer."""
     base_prompt = load_prompt("sql_answer")
@@ -615,7 +763,13 @@ def step_answer_from_records(
         ]
 
     return run_llm_step(
-        questions, model, model_name, "sql_answer", build_messages, llm_concurrency
+        questions,
+        model,
+        model_name,
+        "sql_answer",
+        build_messages,
+        llm_concurrency,
+        stage,
     )
 
 
@@ -1435,6 +1589,14 @@ def main():
     model = build_model(args.model)
     parser_model = build_parser_model(args.parser_model or args.model)
 
+    # `ChatOpenAI` itself is not a context manager; its public root clients
+    # are. Closing them on Ctrl-C interrupts blocked HTTP workers so Python
+    # does not wait for ThreadPoolExecutor requests before exiting.
+    model_clients = ExitStack()
+    for llm in (model, parser_model):
+        if isinstance(llm, ChatOpenAI):
+            model_clients.enter_context(llm.root_client)
+
     # Load questions
     questions = load_questions(mode=args.mode)
     print(f"Loaded {len(questions)} questions from {QUESTIONS_DIR}")
@@ -1448,52 +1610,53 @@ def main():
     geod = Geod(ellps="WGS84")
 
     # Run baseline(s)
-    if args.baseline in ("direct", "all"):
-        run_direct(
-            questions,
-            model,
-            parser_model,
-            args.model,
-            evaluate_mod,
-            geocoder,
-            geod,
-            llm_concurrency=args.llm_concurrency,
-        )
+    with model_clients:
+        if args.baseline in ("direct", "all"):
+            run_direct(
+                questions,
+                model,
+                parser_model,
+                args.model,
+                evaluate_mod,
+                geocoder,
+                geod,
+                llm_concurrency=args.llm_concurrency,
+            )
 
-    if args.baseline in ("text2sql", "all"):
-        run_text2sql(
-            questions,
-            model,
-            parser_model,
-            args.model,
-            evaluate_mod,
-            geocoder,
-            geod,
-            llm_concurrency=args.llm_concurrency,
-        )
+        if args.baseline in ("text2sql", "all"):
+            run_text2sql(
+                questions,
+                model,
+                parser_model,
+                args.model,
+                evaluate_mod,
+                geocoder,
+                geod,
+                llm_concurrency=args.llm_concurrency,
+            )
 
-    if args.baseline in ("rag", "all"):
-        run_rag(
-            questions,
-            model,
-            parser_model,
-            args.model,
-            evaluate_mod,
-            geocoder,
-            geod,
-            embeddings_name=args.embeddings,
-        )
+        if args.baseline in ("rag", "all"):
+            run_rag(
+                questions,
+                model,
+                parser_model,
+                args.model,
+                evaluate_mod,
+                geocoder,
+                geod,
+                embeddings_name=args.embeddings,
+            )
 
-    if args.baseline in ("shuffled", "all"):
-        run_shuffled(
-            questions,
-            parser_model,
-            args.model,
-            evaluate_mod,
-            geocoder,
-            geod,
-            llm_concurrency=args.llm_concurrency,
-        )
+        if args.baseline in ("shuffled", "all"):
+            run_shuffled(
+                questions,
+                parser_model,
+                args.model,
+                evaluate_mod,
+                geocoder,
+                geod,
+                llm_concurrency=args.llm_concurrency,
+            )
 
     print("\nDone.")
 

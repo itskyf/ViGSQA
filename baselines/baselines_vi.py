@@ -33,9 +33,11 @@ from urllib.parse import quote_plus
 import psycopg
 from langchain_community.cache import SQLAlchemyMd5Cache
 from langchain_core.globals import set_llm_cache
+from langchain_core.load import loads
 from langchain_openai import ChatOpenAI
 from shapely import from_wkt
 from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 from baselines import evaluate, pipeline
 from vigsqa.settings import PostgresSettings
@@ -411,6 +413,11 @@ LLM_CACHE_DBNAME = os.environ.get("LLM_CACHE_DBNAME", "llm_cache")
 # exactly these transport-only fields are stripped before lookup/update.
 _TRANSPORT_ONLY_KEYS = ("openai_api_base", "openai_api_key")
 
+# Allowlist for deserializing cached rows: what langchain falls back to when
+# none is passed, stated explicitly so a lookup does not emit a deprecation
+# warning. Changing this changes what a stored row may revive.
+CACHE_ALLOWED_OBJECTS = "core"
+
 
 def _normalize_llm_string(llm_string: str) -> str:
     """Drop transport-only fields from a LangChain cache key.
@@ -443,10 +450,39 @@ class TransportNormalizedMd5Cache(SQLAlchemyMd5Cache):
     Model name, quantization tag, temperature, and max_tokens stay keyed."""
 
     def lookup(self, prompt, llm_string):
-        return super().lookup(prompt, _normalize_llm_string(llm_string))
+        """Cached generations for the normalized request key, or `None` on a miss.
+
+        Overrides the upstream body only to deserialize with an explicit
+        `allowed_objects`: the upstream `SQLAlchemyMd5Cache.lookup` passes none,
+        which makes langchain warn on every hit and then fall back to `"core"` —
+        the same allowlist, stated explicitly.
+
+        Version-pinned internal dependency, as in `evict()`: delegates to the
+        locked `SQLAlchemyMd5Cache._search_rows` (langchain-community 0.4.2;
+        selects `response` by `prompt_md5` + `llm` + `prompt`, ordered by `idx`).
+        """
+        rows = self._search_rows(prompt, _normalize_llm_string(llm_string))
+        if rows:
+            return [
+                loads(row[0], allowed_objects=CACHE_ALLOWED_OBJECTS) for row in rows
+            ]
+        return None
 
     def update(self, prompt, llm_string, return_val):
         super().update(prompt, _normalize_llm_string(llm_string), return_val)
+
+    def evict(self, prompt: str, llm_string: str) -> None:
+        """Delete the rows for exactly one request key, normalized like
+        lookup/update — the runtime retry loop calls this so an invalid
+        completion can never survive as the canonical cache entry.
+
+        Version-pinned internal dependency: delegates to the locked
+        `SQLAlchemyMd5Cache._delete_previous` (langchain-community 0.4.2;
+        deletes by `prompt_md5` + `llm` + `prompt`). A locked-version upgrade
+        must re-verify this method and the T09 probes.
+        """
+        with Session(self.engine) as session, session.begin():
+            self._delete_previous(session, prompt, _normalize_llm_string(llm_string))
 
 
 def llm_cache_engine():
@@ -470,6 +506,141 @@ def setup_llm_cache() -> None:
     s = PostgresSettings()
     set_llm_cache(TransportNormalizedMd5Cache(llm_cache_engine()))
     print(f"[llm-cache] normalized md5 cache -> {s.host}:{s.port}/{LLM_CACHE_DBNAME}")
+
+
+# ── Text2SQL stage output validation ─────────────────────────────────────────
+# ViGSQA policy on top of pipeline's opt-in mechanism: a successful transport
+# call is not automatically a successful step. Only the Text2SQL steps below
+# pass a StageValidation — Direct keys resolve to None and keep the exact
+# upstream path, and upstream/non-Vietnamese runs never import this layer.
+
+TEXT2SQL_MAX_ATTEMPTS = 3
+
+
+def sql_block_error(content, finish_reason):
+    """`sql_generate` contract: at least one fenced SQL block accepted by the
+    same parser the execution step uses (`extract_sql_blocks`).
+
+    `finish_reason` is diagnostic only — a complete block stays accepted even
+    when the generation then hit the token limit.
+    """
+    if isinstance(content, str) and pipeline.extract_sql_blocks(content):
+        return None
+    return "invalid_sql_output: no parseable SQL block"
+
+
+def answer_text_error(content, finish_reason):
+    """`sql_answer` contract: non-empty free-form text that terminated
+    normally.
+
+    A `length` finish means the answer never terminated, which also rejects
+    runaway/repetitive answers by termination status — no repetition
+    heuristics.
+    """
+    if not isinstance(content, str) or not content.strip():
+        return "invalid_answer_output: empty completion"
+    if finish_reason == "length":
+        return "invalid_answer_output: token limit exhausted"
+    return None
+
+
+def json_block_error(content, finish_reason):
+    """`sql_json_parse` contract: at least one fenced JSON block accepted by
+    the same parser the evaluation step uses (`extract_json_blocks`).
+
+    A complete parseable block stays accepted even if trailing generation hit
+    the token limit.
+    """
+    if isinstance(content, str) and pipeline.extract_json_blocks(content):
+        return None
+    return "invalid_json_output: no parseable JSON block"
+
+
+def _text2sql_stage(cache_key):
+    """The stage's validation policy, or `None` for non-Text2SQL keys."""
+    checks = {
+        "sql_generate": sql_block_error,
+        "sql_answer": answer_text_error,
+        "sql_json_parse": json_block_error,
+    }
+    check = checks.get(cache_key)
+    return pipeline.StageValidation(check, TEXT2SQL_MAX_ATTEMPTS) if check else None
+
+
+_orig_step_generate_answers = pipeline.step_generate_answers
+
+
+def _step_generate_answers_vi(
+    questions,
+    model,
+    model_name,
+    cache_key,
+    system_prompt,
+    llm_concurrency=1,
+    stage=None,
+):
+    return _orig_step_generate_answers(
+        questions,
+        model,
+        model_name,
+        cache_key,
+        system_prompt,
+        llm_concurrency,
+        stage if stage is not None else _text2sql_stage(cache_key),
+    )
+
+
+_orig_step_answer_from_records = pipeline.step_answer_from_records
+
+
+def _step_answer_from_records_vi(
+    questions,
+    sql_answers,
+    sql_outputs,
+    model,
+    model_name,
+    llm_concurrency=1,
+    stage=None,
+):
+    return _orig_step_answer_from_records(
+        questions,
+        sql_answers,
+        sql_outputs,
+        model,
+        model_name,
+        llm_concurrency,
+        stage if stage is not None else _text2sql_stage("sql_answer"),
+    )
+
+
+_orig_step_parse_to_json = pipeline.step_parse_to_json
+
+
+def _step_parse_to_json_vi(
+    questions,
+    answers,
+    parser_model,
+    model_name,
+    cache_key,
+    json_prompt_key,
+    llm_concurrency=1,
+    stage=None,
+):
+    return _orig_step_parse_to_json(
+        questions,
+        answers,
+        parser_model,
+        model_name,
+        cache_key,
+        json_prompt_key,
+        llm_concurrency,
+        stage if stage is not None else _text2sql_stage(cache_key),
+    )
+
+
+pipeline.step_generate_answers = _step_generate_answers_vi
+pipeline.step_answer_from_records = _step_answer_from_records_vi
+pipeline.step_parse_to_json = _step_parse_to_json_vi
 
 
 # ── Run ───────────────────────────────────────────────────────────────────────

@@ -1,14 +1,37 @@
 #!/usr/bin/env bash
 # T07 G6: raw, untuned official baseline runs.
-# Ornith Text2SQL → Ornith Direct → Qwen Text2SQL → Qwen Direct, matching the
-# llama.cpp preset's 4 slots (config/models.ini). Extra script arguments are
-# passed through to the pipeline. Never --clear-cache — write-through caching
-# makes every rerun resume. Logs and manifests land in logs/official/.
+# Ornith Text2SQL → Ornith Direct → Qwen Text2SQL → Qwen Direct.
+# Extra script arguments are passed through to the pipeline. Never --clear-cache —
+# write-through caching makes every rerun resume. Logs and manifests land in logs/official/.
 set -o errexit -o nounset -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${ROOT_DIR}"
+
+LLM_CONCURRENCY="${LLM_CONCURRENCY:-1}"
+EXTRA_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+	--llm-concurrency)
+		if [[ $# -lt 2 ]]; then
+			echo "[ERROR] --llm-concurrency requires an argument" >&2
+			exit 2
+		fi
+		LLM_CONCURRENCY="$2"
+		shift 2
+		;;
+	--llm-concurrency=*)
+		LLM_CONCURRENCY="${1#*=}"
+		shift
+		;;
+	*)
+		EXTRA_ARGS+=("$1")
+		shift
+		;;
+	esac
+done
 
 export LLAMACPP_URL="${LLAMACPP_URL:-http://localhost:8080}"
 export PGHOST="${PGHOST:-127.0.0.1}"
@@ -34,15 +57,17 @@ if [[ -n "${COLAB_RELEASE_TAG:-}" ]]; then
 	echo "[INFO] Preflight: llama.cpp..."
 	./scripts/bootstrap_llama.sh
 else
-	echo "[INFO] Waiting for HAProxy at ${LLAMACPP_URL}..."
+	# Probe /v1/models, not /health: monitor-uri answers /health on the
+	# frontend itself, so it stays 200 even with every backend down.
+	echo "[INFO] Waiting for a servable backend at ${LLAMACPP_URL}..."
 	if ! curl --fail --silent --show-error --output /dev/null \
 		--max-time 2 --retry 180 --retry-all-errors --retry-delay 5 \
 		--retry-max-time "${HAPROXY_WAIT_SECONDS:-900}" \
-		"${LLAMACPP_URL}/health"; then
+		"${LLAMACPP_URL}/v1/models"; then
 		podman compose logs --tail=40 haproxy >&2 || true
 		exit 1
 	fi
-	echo "[INFO] HAProxy is ready."
+	echo "[INFO] Backend pool is ready."
 fi
 
 echo "[INFO] Preflight: frozen dataset..."
@@ -64,8 +89,8 @@ for MODEL in "${MODELS[@]}"; do
 			--model "${MODEL}" \
 			--baseline "${BASELINE}" \
 			--mode full \
-			--llm-concurrency 4 \
-			"$@" \
+			--llm-concurrency "${LLM_CONCURRENCY}" \
+			"${EXTRA_ARGS[@]}" \
 			>"${RUN_LOG}.out" 2>"${RUN_LOG}.err"
 		python scripts/run_check.py \
 			--model "${MODEL}" \

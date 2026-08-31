@@ -13,6 +13,10 @@ Replace the file-based LLM request cache (JSON step files) with a PostgreSQL-bac
 
 Changing model / quantization / generation parameters / prompt → miss. Changing only `base_url` (same model served elsewhere) → hit. API key / transport-only configuration must not affect cache identity.
 
+**Eviction extension (2026-08-31, T07/G6)**: `TransportNormalizedMd5Cache.evict(prompt, llm_string)` deletes the rows for exactly one request key (normalized like lookup/update), so an invalid Text2SQL generation can be removed without touching any other row. Version-pinned internal dependency: it delegates to the locked `SQLAlchemyMd5Cache._delete_previous` (langchain-community 0.4.2; deletes by `prompt_md5` + `llm` + `prompt`) — a locked-version upgrade must re-verify this method and the probes. The runtime retry loop (`pipeline.invoke_validated_or_capture`) evicts before every retry: an invalid completion may never survive as the canonical cache entry, and a retry may never replay a poisoned row. `update` is untouched — valid rows replay byte-identically, and non-validating steps (Direct, upstream) keep exactly the previous write behavior, empty completions included.
+
+**Deserialization allowlist (2026-08-31)**: `lookup` is overridden to deserialize rows with an explicit `allowed_objects="core"` — the allowlist langchain falls back to when none is passed, stated explicitly because `SQLAlchemyMd5Cache.lookup` calls `loads()` with none and langchain then warns on every hit (thousands of lines per official run in `logs/official/*.err`). Same rows, same set of revivable classes; `lookup` now pins `SQLAlchemyMd5Cache._search_rows` alongside `_delete_previous`. Because `loads` is called from project code instead of from `langchain_community.cache`, langchain emits one `LangChainBetaWarning` per process at the first hit — accepted, like the sunset warning on import.
+
 ## Decisions
 
 - **51 empty-content records are pruned, not migrated** (user decision): the live `sql_generate.json` held 1,564 records of which 51 had `content: ""` with no `error` key — successful invokes that returned empty completions (0 error records). They would fail the G6 ```` ```sql ````-presence check regardless; they regenerate during the future official resume. G5 precedent applied: targeted prune, never `--clear-cache`. Pristine 1,564-record backup: `logs/official/pre_t09_sql_generate_1564.json` (sha256 `be106a35…`).
@@ -32,7 +36,16 @@ Changing model / quantization / generation parameters / prompt → miss. Changin
 - **Concurrency (`--concurrency`)**: N=4 → 64/64 byte-identical hits, observed concurrency exactly 4; N=1 → 64/64 hits, observed exactly 1; 16 concurrent idempotent re-updates left the table at 1,513 rows / 1,513 distinct prompts.
 - **Restore round trip**: `export_llm_cache.sh` (271 KB dump + sha256) → `DROP DATABASE` → bootstrap's guard recreates → `restore_llm_cache.sh` → re-validate green (1,513/1,513 byte-identical on both URLs). Restore proven both ways: over an existing DB (replace) and cold (creates the DB itself).
 - **Infrastructure**: `podman compose down --volumes` → clean stack; OSM restore green with exact T07-G1 counts (pois 38,223 / regions 8,535 / parks 1,492 / lakes 7,973 / roads 175,318); bootstrap idempotent; `restart: always` on both services confirmed via `podman inspect` + `podman compose config`.
-- **Compose startup cleanup**: the local official runner starts the complete compose stack once (Postgres, llama.cpp, and HAProxy) without `--wait`, passes `--wait-only` to the PostgreSQL bootstrap, then waits on HAProxy's `/health` endpoint. HAProxy already depends on a healthy llama.cpp service, so no second llama.cpp poll runs locally; Colab retains its direct llama.cpp bootstrap and health wait.
+- **Compose startup cleanup**: the local official runner starts the complete compose stack once (Postgres, llama.cpp, and HAProxy) without `--wait`, passes `--wait-only` to the PostgreSQL bootstrap, then waits on HAProxy's `/v1/models` endpoint. HAProxy already depends on a healthy llama.cpp service, so no second llama.cpp poll runs locally; Colab retains its direct llama.cpp bootstrap and health wait.
+- **Three-service health contract (2026-08-31)**: Compose now gives HAProxy
+  its own `CMD` healthcheck against `/v1/models`, which proves that at least one
+  pooled backend can answer; `/health` remains frontend liveness only. HAProxy
+  still checks every local/remote pool member at its `/health` endpoint, with
+  the SSH remote optional. PostgreSQL uses bounded `pg_isready`, llama.cpp uses
+  bounded `curl` against its direct `/health`, and the Colab PostgreSQL path now
+  explicitly waits with the same connection parameters after `service start`.
+  The official runner retains its bounded `/v1/models` probe because it checks
+  the effective, overrideable `LLAMACPP_URL`, not merely one container's state.
 - **No-regression**: with the cache not configured (in-process import without `setup_llm_cache()`), `get_llm_cache() is None` → JSON-skip fallback active (asserted).
 
 ## Session notes
@@ -48,8 +61,17 @@ Changing model / quantization / generation parameters / prompt → miss. Changin
   total, so `214/2800` at concurrency 4 represented about 856 completed
   questions. It now updates by the actual batch length, including a short final
   batch; cache behavior and artifacts are unchanged.
+- **Runtime cache audit (2026-08-31)**: the live PostgreSQL cache held 8,233
+  unique rows, with zero empty contents, HTTP 503 responses, or server-error
+  responses. Its sole `finish_reason=length` row contains a complete fenced SQL
+  block and remains valid under the frozen stage policy. Transport and terminal
+  validation failures remain only in JSON artifacts and therefore retry on
+  resume; no PostgreSQL rows were cleared. Separately, the ID-only `sql_exec`
+  JSON cache could outlive a changed generation, so T07 now binds those records
+  to their exact extracted SQL blocks.
 - **Locked-version verification (before any code)**: langchain-core 1.6.1 / langchain-openai 1.6.0 / langchain-community 0.4.2 / sqlalchemy 2.0.52 / psycopg 3.3.4. Verified live: `.invoke()` consults `self.cache` (or the global) before `_generate`; the cache key = (`dumps(messages)` with ids stripped, `model._get_llm_string()`); the llm_string is `json.dumps(lc-constructor serialization, sort_keys=True) + "---" + str(stop)` with the model kwargs NESTED under a `"kwargs"` key — the first `_normalize_llm_string` draft assumed flat kwargs and P2 caught it immediately (probe did its job). `openai_api_key` serializes as a secret *reference* (`{"id": ["OPENAI_API_KEY"], "type": "secret"}`), so the api-key value never reaches the key even before normalization; stripping it keeps the invariant explicit. langchain-community emits a sunset `DeprecationWarning` on import — accepted, it is the locked set.
 - **Bugs found by validation**: (1) the flat-kwargs normalizer assumption (above); (2) `restore_llm_cache.sh`'s `psql_admin()` helper dropped its arguments (missing `"$@"`), silently no-op'ing the create-DB guard — caught by observing "Creating" print on an existing DB; fixed and both branches re-proven.
+- **Cache-hit warning fix (2026-08-31)**: every `lookup` printed `LangChainPendingDeprecationWarning` because `SQLAlchemyMd5Cache.lookup` calls `loads()` without `allowed_objects`. `TransportNormalizedMd5Cache.lookup` now deserializes with `"core"` — the implicit default, so what a row may revive is unchanged (verified over all 8,164 live rows: each holds exactly a `ChatGeneration` and its `AIMessage`, nothing else). A strict class allowlist (`ChatGeneration`, `AIMessage`) was possible on that evidence but rejected: it would change behavior for any unexpected class instead of only silencing a warning; deserialization quietness is validated against the cache engine. Not re-run: `migrate_sql_generate_cache.py --validate` is stale independent of this change — its `_assert_row_counts` expects one row per `sql_generate.json` record (2,723) while the live table now holds 8,164 rows from the resumed runs.
 - **User coding-standards feedback applied**: no `noqa` suppressions (root-cause fixes instead — the lazy-import factory became top-level imports and a module-level class; the mutable `LLM_CONCURRENCY` global and the env-var variant became explicit parameter threading); no inline heredoc/`python -c` scripts for repo work. Full validation chain re-run green after the refactor (validate 1,513/1,513 both URLs; concurrency N=4 observed 4, N=1 observed 1, writes intact; no-regression assert).
 - **Driver parity check (offline, stub model, 5 cases)**: fresh sequential run freezes errors; JSON-skip resume makes zero calls and returns identical results; partial resume calls only uncached ids and retries past error records; N=4 through the pool produces byte-identical outcomes; identical replays no longer rewrite the JSON (the `cache.get(id) != record` guard — added after the driver landed, it removes ~1 GB of rewrite I/O on the 1,513-record PG replay while leaving the file's content unchanged).
 - The 51 empty ids are NOT silently dropped from history: the prune prints them, and the pristine 1,564-record JSON stays in `logs/official/`.
