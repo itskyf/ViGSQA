@@ -35,6 +35,7 @@ import operator as op
 import os
 import random
 import re
+import threading
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -616,6 +617,7 @@ DB_PARAMS = dict(
     port=int(os.getenv("PGPORT", "5432")),
 )
 SQL_TIMEOUT_MS = 100_000
+DEFAULT_SQL_CONCURRENCY = 4
 
 
 def make_db_conn():
@@ -712,28 +714,86 @@ def step_parse_to_json(
     )
 
 
-def step_execute_sql(questions, sql_answers, model_name):
+def step_execute_sql(
+    questions,
+    sql_answers,
+    model_name,
+    sql_concurrency: int = DEFAULT_SQL_CONCURRENCY,
+):
     """Step: SQL text → database records.
 
     Execution records include their exact extracted SQL blocks. A question ID
     alone is not a safe cache key because a repaired generation can retain the
     same ID while changing the SQL that must be executed.
+    When `sql_concurrency` > 1, queries execute on a bounded thread pool
+    with one persistent connection per worker thread.
     """
     cache = load_cache(model_name, "sql_exec")
-    results = []
-    conn = None
-    for q, a in tqdm(
-        zip(questions, sql_answers, strict=False),
-        total=len(questions),
-        desc="  sql_exec",
-    ):
+    results = [None] * len(questions)
+    todo = []
+
+    for i, (q, a) in enumerate(zip(questions, sql_answers, strict=False)):
         sql_blocks = extract_sql_blocks(a["content"])
         cached = cache.get(q["id"])
         if cached is not None and cached.get("sql_blocks") == sql_blocks:
-            results.append(cached)
-            continue
-        if conn is None:
+            results[i] = cached
+        else:
+            todo.append((i, q, sql_blocks))
+
+    if not todo:
+        return [r for r in results if r is not None]
+
+    dirty = False
+    workers = max(1, sql_concurrency)
+
+    if workers <= 1:
+        conn = None
+        try:
+            for i, q, sql_blocks in tqdm(
+                todo,
+                total=len(todo),
+                desc="  sql_exec",
+            ):
+                if conn is None:
+                    conn = make_db_conn()
+                records = []
+                for sql in sql_blocks:
+                    try:
+                        records.append(run_sql(sql, conn))
+                    except psycopg.OperationalError as e:
+                        print(
+                            f"\n  [db] connection lost (q {q['id']}): {e} "
+                            "— reconnecting"
+                        )
+                        try:
+                            conn.close()
+                        except psycopg.Error:
+                            pass
+                        conn = make_db_conn()
+                        records.append(run_sql(sql, conn))
+                record = {"id": q["id"], "sql_blocks": sql_blocks, "records": records}
+                results[i] = record
+                cache[q["id"]] = record
+                dirty = True
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except psycopg.Error:
+                    pass
+            if dirty:
+                save_cache(model_name, "sql_exec", list(cache.values()))
+        return [r for r in results if r is not None]
+
+    # Parallel execution with thread-local persistent connection per worker
+    thread_local = threading.local()
+
+    def _exec_one(item):
+        idx, q, sql_blocks = item
+        conn = getattr(thread_local, "conn", None)
+        if conn is None or conn.closed:
             conn = make_db_conn()
+            thread_local.conn = conn
         records = []
         for sql in sql_blocks:
             try:
@@ -745,14 +805,25 @@ def step_execute_sql(questions, sql_answers, model_name):
                 except psycopg.Error:
                     pass
                 conn = make_db_conn()
+                thread_local.conn = conn
                 records.append(run_sql(sql, conn))
-        record = {"id": q["id"], "sql_blocks": sql_blocks, "records": records}
-        results.append(record)
-        cache[q["id"]] = record
-        save_cache(model_name, "sql_exec", list(cache.values()))
-    if conn:
-        conn.close()
-    return results
+        return idx, {"id": q["id"], "sql_blocks": sql_blocks, "records": records}
+
+    try:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            for idx, record in tqdm(
+                pool.map(_exec_one, todo),
+                total=len(todo),
+                desc="  sql_exec",
+            ):
+                results[idx] = record
+                cache[record["id"]] = record
+                dirty = True
+    finally:
+        if dirty:
+            save_cache(model_name, "sql_exec", list(cache.values()))
+
+    return [r for r in results if r is not None]
 
 
 def step_answer_from_records(
@@ -1088,7 +1159,12 @@ def run_text2sql(
     )
 
     # Step 2: execute SQL
-    sql_outputs = step_execute_sql(questions, sql_answers, model_name)
+    sql_outputs = step_execute_sql(
+        questions,
+        sql_answers,
+        model_name,
+        sql_concurrency=max(llm_concurrency, DEFAULT_SQL_CONCURRENCY),
+    )
 
     # Step 3: generate answer from records
     answers = step_answer_from_records(

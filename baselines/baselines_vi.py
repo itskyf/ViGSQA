@@ -218,23 +218,49 @@ importlib.reload = _reload_with_patch
 _orig_evaluate_answers = pipeline.evaluate_answers
 
 
-def _loc_from_db(poi_name: str):
+def _loc_from_db(
+    poi_name: str,
+    conn: psycopg.Connection | None = None,
+    cache: dict[str, dict[str, float] | None] | None = None,
+) -> dict[str, float] | None:
     """Look up POI centroid lon/lat by name in the VN PostGIS DB."""
+    if cache is not None and poi_name in cache:
+        return cache[poi_name]
+
+    close_conn = False
+    active_conn = conn
+    if active_conn is None or active_conn.closed:
+        try:
+            active_conn = psycopg.connect(**pipeline.DB_PARAMS, autocommit=True)
+            active_conn.read_only = True
+            close_conn = True
+        except psycopg.Error:
+            return None
+
+    res = None
     try:
-        conn = psycopg.connect(**pipeline.DB_PARAMS)
-        conn.read_only = True
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT ST_X(ST_Centroid(geometry::geometry)), "
-            "ST_Y(ST_Centroid(geometry::geometry))"
-            " FROM pois WHERE poi_name ILIKE %s LIMIT 1",
-            (f"%{poi_name}%",),
-        )
-        row = cur.fetchone()
-        conn.close()
-        return {"lon": float(row[0]), "lat": float(row[1])} if row else None
+        with active_conn.cursor() as cur:
+            cur.execute(
+                "SELECT ST_X(ST_Centroid(geometry::geometry)), "
+                "ST_Y(ST_Centroid(geometry::geometry))"
+                " FROM pois WHERE poi_name ILIKE %s LIMIT 1",
+                (f"%{poi_name}%",),
+            )
+            row = cur.fetchone()
+            if row:
+                res = {"lon": float(row[0]), "lat": float(row[1])}
     except (psycopg.Error, TypeError, ValueError):
-        return None
+        res = None
+    finally:
+        if close_conn and active_conn:
+            try:
+                active_conn.close()
+            except psycopg.Error:
+                pass
+
+    if cache is not None:
+        cache[poi_name] = res
+    return res
 
 
 def _vn_evaluate_answers(
@@ -247,6 +273,13 @@ def _vn_evaluate_answers(
     # Load sql_exec cache — provides raw lon/lat or poi_name from SQL results.
     # Only for text2sql runs; direct/rag should not use SQL execution results.
     exec_by_id: dict = {}
+    eval_conn = None
+    poi_cache: dict[str, dict[str, float] | None] = {}
+    try:
+        eval_conn = psycopg.connect(**pipeline.DB_PARAMS, autocommit=True)
+        eval_conn.read_only = True
+    except psycopg.Error:
+        pass
 
     _model_arg = ""
     _baseline_arg = ""
@@ -264,113 +297,126 @@ def _vn_evaluate_answers(
             except (KeyError, OSError, ValueError):
                 pass
 
-    for i, q in enumerate(questions):
-        qtype = q["type"]
+    try:
+        for i, q in enumerate(questions):
+            qtype = q["type"]
 
-        # Fix 1: loc-type — compare predicted coordinates to true geo_wkt.
-        # Priority: (a) parsed JSON lon/lat, (b) sql_exec lon/lat,
-        # (c) DB lookup by poi_name.
-        if "loc" in qtype:
-            for ans in q["answers"]:
-                true_loc = _vn_get_osm_value(ans, "location")
-                if true_loc is None:
-                    continue
-                pred_loc = None
+            # Fix 1: loc-type — compare predicted coordinates to true geo_wkt.
+            # Priority: (a) parsed JSON lon/lat, (b) sql_exec lon/lat,
+            # (c) DB lookup by poi_name.
+            if "loc" in qtype:
+                for ans in q["answers"]:
+                    true_loc = _vn_get_osm_value(ans, "location")
+                    if true_loc is None:
+                        continue
+                    pred_loc = None
 
-                # (a) parsed JSON lon/lat
-                for p in parsed_answers[i]:
-                    try:
-                        pred_loc = {
-                            "lon": float(p.get("lon", p.get("longitude", None))),
-                            "lat": float(p.get("lat", p.get("latitude", None))),
-                        }
-                        break
-                    except (TypeError, ValueError):
-                        pass
-
-                # (b) sql_exec result has lon/lat columns
-                if pred_loc is None and q["id"] in exec_by_id:
-                    for rec in exec_by_id[q["id"]]:
-                        out = rec.get("output", [])
-                        if out and "lon" in out[0] and "lat" in out[0]:
+                    # (a) parsed JSON lon/lat
+                    for p in parsed_answers[i]:
+                        try:
                             pred_loc = {
-                                "lon": float(out[0]["lon"]),
-                                "lat": float(out[0]["lat"]),
+                                "lon": float(p.get("lon", p.get("longitude", None))),
+                                "lat": float(p.get("lat", p.get("latitude", None))),
                             }
                             break
+                        except (TypeError, ValueError):
+                            pass
 
-                # (c) sql_exec has poi_name only — DB lookup for coordinates
-                if pred_loc is None and q["id"] in exec_by_id:
-                    for rec in exec_by_id[q["id"]]:
-                        out = rec.get("output", [])
-                        if out and "poi_name" in out[0]:
-                            pred_loc = _loc_from_db(out[0]["poi_name"])
+                    # (b) sql_exec result has lon/lat columns
+                    if pred_loc is None and q["id"] in exec_by_id:
+                        for rec in exec_by_id[q["id"]]:
+                            out = rec.get("output", [])
+                            if out and "lon" in out[0] and "lat" in out[0]:
+                                pred_loc = {
+                                    "lon": float(out[0]["lon"]),
+                                    "lat": float(out[0]["lat"]),
+                                }
+                                break
+
+                    # (c) sql_exec has poi_name only — DB lookup for coordinates
+                    if pred_loc is None and q["id"] in exec_by_id:
+                        for rec in exec_by_id[q["id"]]:
+                            out = rec.get("output", [])
+                            if out and "poi_name" in out[0]:
+                                pred_loc = _loc_from_db(
+                                    out[0]["poi_name"],
+                                    conn=eval_conn,
+                                    cache=poi_cache,
+                                )
+                                break
+
+                    # (d) raw text answer — regex extract decimal coordinates
+                    # Matches patterns like "10.123, 106.456" or "106.456 10.123"
+                    if pred_loc is None:
+                        text = answers[i].get("content", "")
+                        coords = re.findall(r"(-?\d{1,3}\.\d{3,})", text)
+                        if len(coords) >= MIN_COORDS_FOR_PAIR:
+                            nums = [float(c) for c in coords[:4]]
+                            # Heuristic: lat in [8, 24], lon in [100, 110] for Vietnam
+                            pairs = [
+                                (nums[j], nums[j + 1]) for j in range(len(nums) - 1)
+                            ]
+                            for a_val, b_val in pairs:
+                                if (
+                                    VN_LAT_MIN <= a_val <= VN_LAT_MAX
+                                    and VN_LON_MIN <= b_val <= VN_LON_MAX
+                                ):
+                                    pred_loc = {"lat": a_val, "lon": b_val}
+                                    break
+                                if (
+                                    VN_LAT_MIN <= b_val <= VN_LAT_MAX
+                                    and VN_LON_MIN <= a_val <= VN_LON_MAX
+                                ):
+                                    pred_loc = {"lat": b_val, "lon": a_val}
+                                    break
+
+                    if pred_loc is None:
+                        continue
+                    dists = evaluate_mod.evaluate_location(geod, [pred_loc], [true_loc])
+                    dist_err = min(dists[0] / DISTANCE_ERROR_NORM_M, 1.0)
+                    cur = parsed_eval[i].get("distance_error", float("inf"))
+                    if dist_err < cur:
+                        parsed_eval[i]["distance_error"] = dist_err
+                        parsed_eval[i]["attempted"] = True
+
+            # Fix 2: count/distance/area/length text eval — digit-matching
+            # (model outputs digits, not English words)
+            if any(k in qtype for k in ("count", "distance", "area", "length")):
+                mkey = next(
+                    k for k in ("area", "length", "count", "distance") if k in qtype
+                )
+                text_answer = answers[i].get("content", "")
+                pred_nums = [
+                    float(n) for n in re.findall(r"\b\d+(?:\.\d+)?\b", text_answer)
+                ]
+                if not pred_nums:
+                    continue
+                for ans in q["answers"]:
+                    true_val = _vn_get_osm_value(ans, mkey)
+                    if true_val is None:
+                        continue
+                    true_num = round(float(true_val))
+                    for pn in pred_nums:
+                        match = (
+                            pn == 0
+                            if true_num == 0
+                            else abs(pn - true_num) / true_num < MATCH_REL_TOLERANCE
+                        )
+                        if match:
+                            if 1.0 > text_eval[i].get("F1", 0.0):
+                                text_eval[i] = {
+                                    "attempted": True,
+                                    "P": 1.0,
+                                    "R": 1.0,
+                                    "F1": 1.0,
+                                }
                             break
-
-                # (d) raw text answer — regex extract decimal coordinates
-                # Matches patterns like "10.123, 106.456" or "106.456 10.123"
-                if pred_loc is None:
-                    text = answers[i].get("content", "")
-                    coords = re.findall(r"(-?\d{1,3}\.\d{3,})", text)
-                    if len(coords) >= MIN_COORDS_FOR_PAIR:
-                        nums = [float(c) for c in coords[:4]]
-                        # Heuristic: lat in [8, 24], lon in [100, 110] for Vietnam
-                        pairs = [(nums[j], nums[j + 1]) for j in range(len(nums) - 1)]
-                        for a_val, b_val in pairs:
-                            if (
-                                VN_LAT_MIN <= a_val <= VN_LAT_MAX
-                                and VN_LON_MIN <= b_val <= VN_LON_MAX
-                            ):
-                                pred_loc = {"lat": a_val, "lon": b_val}
-                                break
-                            if (
-                                VN_LAT_MIN <= b_val <= VN_LAT_MAX
-                                and VN_LON_MIN <= a_val <= VN_LON_MAX
-                            ):
-                                pred_loc = {"lat": b_val, "lon": a_val}
-                                break
-
-                if pred_loc is None:
-                    continue
-                dists = evaluate_mod.evaluate_location(geod, [pred_loc], [true_loc])
-                dist_err = min(dists[0] / DISTANCE_ERROR_NORM_M, 1.0)
-                cur = parsed_eval[i].get("distance_error", float("inf"))
-                if dist_err < cur:
-                    parsed_eval[i]["distance_error"] = dist_err
-                    parsed_eval[i]["attempted"] = True
-
-        # Fix 2: count/distance/area/length text eval — digit-matching
-        # (model outputs digits, not English words)
-        if any(k in qtype for k in ("count", "distance", "area", "length")):
-            mkey = next(
-                k for k in ("area", "length", "count", "distance") if k in qtype
-            )
-            text_answer = answers[i].get("content", "")
-            pred_nums = [
-                float(n) for n in re.findall(r"\b\d+(?:\.\d+)?\b", text_answer)
-            ]
-            if not pred_nums:
-                continue
-            for ans in q["answers"]:
-                true_val = _vn_get_osm_value(ans, mkey)
-                if true_val is None:
-                    continue
-                true_num = round(float(true_val))
-                for pn in pred_nums:
-                    match = (
-                        pn == 0
-                        if true_num == 0
-                        else abs(pn - true_num) / true_num < MATCH_REL_TOLERANCE
-                    )
-                    if match:
-                        if 1.0 > text_eval[i].get("F1", 0.0):
-                            text_eval[i] = {
-                                "attempted": True,
-                                "P": 1.0,
-                                "R": 1.0,
-                                "F1": 1.0,
-                            }
-                        break
+    finally:
+        if eval_conn:
+            try:
+                eval_conn.close()
+            except psycopg.Error:
+                pass
 
     return text_eval, parsed_eval
 
