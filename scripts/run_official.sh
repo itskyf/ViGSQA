@@ -73,13 +73,19 @@ fi
 echo "[INFO] Preflight: frozen dataset..."
 ./scripts/restore_dataset.sh
 
+echo "[INFO] Preflight: Qwen runtime identity..."
+python scripts/check_qwen_runtime.py "${LLAMACPP_URL}/v1/models"
+
 MODELS=(
 	"llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M"
-	"llamacpp:unsloth/Qwen3.5-9B-GGUF:UD-Q4_K_XL"
+	"llamacpp:unsloth/Qwen3.5-9B-GGUF:Q4_K_XL"
 )
 
 for MODEL in "${MODELS[@]}"; do
 	for BASELINE in text2sql direct; do
+		if [[ "${MODEL}" == "llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M" && "${BASELINE}" == direct ]]; then
+			python scripts/backup_direct_repair.py --model "${MODEL}"
+		fi
 		SAFE="${MODEL//[:\/]/_}"
 		STAMP="$(date +%Y%m%d-%H%M%S)"
 		RUN_LOG="${LOG_DIR}/${SAFE}_${BASELINE}_${STAMP}"

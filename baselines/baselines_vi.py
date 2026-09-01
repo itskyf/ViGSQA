@@ -510,11 +510,11 @@ def setup_llm_cache() -> None:
 
 # ── Text2SQL stage output validation ─────────────────────────────────────────
 # ViGSQA policy on top of pipeline's opt-in mechanism: a successful transport
-# call is not automatically a successful step. Only the Text2SQL steps below
-# pass a StageValidation — Direct keys resolve to None and keep the exact
-# upstream path, and upstream/non-Vietnamese runs never import this layer.
+# call is not automatically a successful step. Corresponding Direct and
+# Text2SQL stages share the answer/JSON contracts; upstream/non-Vietnamese runs
+# never import this layer.
 
-TEXT2SQL_MAX_ATTEMPTS = 3
+STAGE_MAX_ATTEMPTS = 3
 
 
 def sql_block_error(content, finish_reason):
@@ -556,15 +556,17 @@ def json_block_error(content, finish_reason):
     return "invalid_json_output: no parseable JSON block"
 
 
-def _text2sql_stage(cache_key):
-    """The stage's validation policy, or `None` for non-Text2SQL keys."""
+def _stage_validation(cache_key):
+    """The stage's structural validation policy, if it is an LLM stage."""
     checks = {
+        "direct_answer": answer_text_error,
+        "direct_json_parse": json_block_error,
         "sql_generate": sql_block_error,
         "sql_answer": answer_text_error,
         "sql_json_parse": json_block_error,
     }
     check = checks.get(cache_key)
-    return pipeline.StageValidation(check, TEXT2SQL_MAX_ATTEMPTS) if check else None
+    return pipeline.StageValidation(check, STAGE_MAX_ATTEMPTS) if check else None
 
 
 _orig_step_generate_answers = pipeline.step_generate_answers
@@ -586,7 +588,7 @@ def _step_generate_answers_vi(
         cache_key,
         system_prompt,
         llm_concurrency,
-        stage if stage is not None else _text2sql_stage(cache_key),
+        stage if stage is not None else _stage_validation(cache_key),
     )
 
 
@@ -609,7 +611,7 @@ def _step_answer_from_records_vi(
         model,
         model_name,
         llm_concurrency,
-        stage if stage is not None else _text2sql_stage("sql_answer"),
+        stage if stage is not None else _stage_validation("sql_answer"),
     )
 
 
@@ -634,7 +636,7 @@ def _step_parse_to_json_vi(
         cache_key,
         json_prompt_key,
         llm_concurrency,
-        stage if stage is not None else _text2sql_stage(cache_key),
+        stage if stage is not None else _stage_validation(cache_key),
     )
 
 

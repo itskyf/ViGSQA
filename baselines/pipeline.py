@@ -371,7 +371,19 @@ def run_llm_step(
     cache = load_cache(model_name, cache_key)
     skip_json = get_llm_cache() is None
     results: list = [None] * len(questions)
-    todo = [i for i, q in enumerate(questions) if not (skip_json and q["id"] in cache)]
+    # Exhausted structural failures are final raw results. Transport/config
+    # errors remain resumable, including when PostgreSQL is the normal skip layer.
+    todo = [
+        i
+        for i, q in enumerate(questions)
+        if not (
+            q["id"] in cache
+            and (
+                _is_validation_error(cache[q["id"]].get("error"))
+                or (skip_json and not cache[q["id"]].get("error"))
+            )
+        )
+    ]
     consecutive_failures = 0
     batch = max(1, llm_concurrency)
     with tqdm(total=len(todo), desc=f"  {cache_key}") as progress:

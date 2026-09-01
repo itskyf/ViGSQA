@@ -36,6 +36,8 @@ STEPS = {
 # `finish_reason` enforcement is the runtime validator's job — the JSON
 # artifact does not store it.
 STAGE_CONTENT_CHECKS = {
+    "direct_answer": lambda r: bool(r.get("content", "").strip()),
+    "direct_json_parse": lambda r: bool(extract_json_blocks(r.get("content", ""))),
     "sql_generate": lambda r: bool(extract_sql_blocks(r.get("content", ""))),
     "sql_answer": lambda r: bool(r.get("content", "").strip()),
     "sql_json_parse": lambda r: bool(extract_json_blocks(r.get("content", ""))),
@@ -124,6 +126,9 @@ def main() -> int:
     step_stats = {}
     for step in STEPS[args.baseline]:
         records = json.loads((cache_dir / args.model / f"{step}.json").read_text())
+        assert len(records) == EXPECTED_QUESTIONS, (
+            f"{step}: expected {EXPECTED_QUESTIONS} records, found {len(records)}"
+        )
         record_ids = {r["id"] for r in records}
         missing_ids = sorted(question_ids - record_ids)
         assert not missing_ids, (
