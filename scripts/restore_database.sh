@@ -11,8 +11,8 @@ SQL_DIR="${REPO_ROOT}/sql"
 
 # Pinned like scripts/download_osm.sh: URL and checksum are a verification
 # pair, so neither is env-overridable.
-DB_ASSET_URL="https://github.com/itskyf/ViGSQA/releases/download/data-v2.0.0/osm-vn.sql.gz"
-DB_ASSET_SHA256="377976f2bc3e8a78ea17f46bebfec8413123d44221100e773da8d70053fc2e16"
+DB_ASSET_URL="https://github.com/itskyf/ViGSQA/releases/download/data-v3.0.0/osm-vn.sql.gz"
+DB_ASSET_SHA256="ae06f7c2ae7808235682371e03017a9da6ce6b323ec962cd06f99c0bb2ef53e6"
 DB_ASSET_FILE="${REPO_ROOT}/osm-vn.sql.gz"
 PART_FILE="${DB_ASSET_FILE}.part"
 

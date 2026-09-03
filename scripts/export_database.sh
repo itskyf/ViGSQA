@@ -6,7 +6,7 @@ set -o errexit -o nounset -o pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd -P)"
 
-DUMP_VERSION="v2.0.0"
+DUMP_VERSION="v3.0.0"
 RELEASE_TAG="data-${DUMP_VERSION}"
 DUMP_FILE="${REPO_ROOT}/osm-vn.sql.gz"
 PART_FILE="${DUMP_FILE}.part"

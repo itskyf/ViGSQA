@@ -5,7 +5,7 @@
 # present; always verifies sha256 (scripts/<version>.sha256) before exiting.
 set -euo pipefail
 
-VERSION="${DATASET_VERSION:-v2.0.0}"
+VERSION="${DATASET_VERSION:-v3.0.0}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DATA_DIR="${ROOT}/data/questions_vi"
 URL="${DATASET_URL:-https://github.com/itskyf/ViGSQA/releases/download/data-${VERSION}/vn-geoqa.zip}"
