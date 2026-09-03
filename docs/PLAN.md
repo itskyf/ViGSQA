@@ -34,7 +34,7 @@ Build and evaluate a reproducible Vietnamese adaptation of GS-QA (`docs/context/
 | T07 | Complete the v2 benchmark and capture raw baseline runs | `done` | All four v2 runs G6-valid and sealed (2026-09-03); superseded as evidence by v3 before evaluation. Record: `docs/plans/T07-benchmark-v2-raw-runs.md`. |
 | T08 | Fast database bootstrap via prebuilt release dump | `done` | Restore>build flow reused for the v3 dump republish inside T10. |
 | T09 | PostgreSQL LangChain LLM cache + bounded LLM concurrency | `done` | Architecture preserved unchanged in v3. Record: `docs/plans/T09-llm-cache-postgres.md`. |
-| T10 | v3.0.0 benchmark refactor | `in_progress` | Rebuild DB on `vietnam-260901.osm.pbf` with native address columns, fix Location gold at the source, restore T7/T8 out-of-schema semantics, regenerate + QC 2,800 questions, freeze prompts, publish `data-v3.0.0`, prepare (not run) the official runner. Record: `docs/plans/T10-benchmark-v3-refactor.md`. |
+| T10 | v3.0.0 benchmark refactor | `done` | v3 frozen and published (`data-v3.0.0`: dataset + DB dump, both restores verified from the release); all gates G1′–G6′ passed including byte-identical regeneration, human QC approval, prompt freeze `pv-8394cd22`, v2-seal negative test; no official inference launched. Record: `docs/plans/T10-benchmark-v3-refactor.md`. |
 
 ## Cross-Task Contracts
 
@@ -50,7 +50,7 @@ G1′ DB rebuild (five tables non-empty, representative spatial ops, address cov
 
 ## Active Next Action
 
-T10: execute the phase plan in `docs/plans/T10-benchmark-v3-refactor.md`. After QC approval, freeze/publish v3 assets, then **user review → user manually launches the four v3 official baseline runs.**
+**User review → user manually launches the four v3 official baseline runs** (`scripts/run_official.sh` for Ornith direct/text2sql, `scripts/run_qwen_official.sh` for Qwen direct/text2sql). T10 is complete; T03 (evaluation) starts only after the four raw runs are sealed.
 
 ## Session Prompt
 
