@@ -36,10 +36,16 @@ SELECT
     outdoor_seating,
     delivery,
     emergency,
-    capacity,
     wikidata,
     wikipedia,
+    addr_housenumber,
+    addr_street,
+    addr_place,
+    addr_suburb,
+    addr_district,
     addr_city,
+    addr_province,
+    addr_postcode,
     ST_TRANSFORM(way, 4326)::geography AS geometry,
     ST_ASTEXT(ST_TRANSFORM(way, 4326)) AS geo_wkt
 FROM planet_osm_point;

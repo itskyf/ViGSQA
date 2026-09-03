@@ -2,5 +2,5 @@
 Vị trí của [1] gần [2] nhất là gì?
 Cho tôi biết vị trí [1] gần [2] nhất.
 [1] nào gần [2] nhất và nó nằm ở đâu?
-[1] gần [2] nhất tọa độ bao nhiêu?
+Địa chỉ của [1] gần [2] nhất là gì?
 Tôi cần biết [1] gần [2] nhất nằm ở đâu.

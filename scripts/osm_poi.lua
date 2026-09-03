@@ -1,4 +1,4 @@
--- osm2pgsql flex style for the ViGSQA reference database (v2.0.0).
+-- osm2pgsql flex style for the ViGSQA reference database (v3.0.0).
 --
 -- Five tables back the 28 GS-QA templates: POI nodes (enriched with the
 -- non-spatial filter, multi-source and disambiguation columns) plus region,
@@ -44,7 +44,11 @@ local allowed = {
 }
 
 -- Extra POI tags kept verbatim: non-spatial filters (T2/T6/T14/T18),
--- multi-source anchors (T7/T8) and anchor disambiguation.
+-- multi-source anchors (T7/T8) and anchor disambiguation. Address
+-- components back the v3 Location gold (canonical address strings are
+-- derived from them at generation time). `capacity` is deliberately not
+-- extracted: it is a T7/T8 external-Wikipedia attribute, and keeping it as
+-- a column would leak the multi-source answer into the reference schema.
 local poi_extra_tags = {
 	"cuisine",
 	"museum",
@@ -52,10 +56,16 @@ local poi_extra_tags = {
 	"outdoor_seating",
 	"delivery",
 	"emergency",
-	"capacity",
 	"wikidata",
 	"wikipedia",
+	"addr:housenumber",
+	"addr:street",
+	"addr:place",
+	"addr:suburb",
+	"addr:district",
 	"addr:city",
+	"addr:province",
+	"addr:postcode",
 }
 
 local park_leisure = {

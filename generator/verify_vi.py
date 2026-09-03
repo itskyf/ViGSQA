@@ -26,6 +26,13 @@ Vietnamese GeoQA verification pipeline — 3 layers:
     k) Answer payload sanity: `angle` in [0,360), `area`/`length` > 0,
        `count` >= 1, `distance` key present; T7 answers carry the frozen
        multi_source_* fields
+    l) v3 Location contract: every loc answer row freezes `geo_wkt` and a
+       non-empty canonical `address` that recomputes exactly from its frozen
+       addr_* components, and the gold SQL restricts candidates to
+       address-bearing POIs
+    m) T7/T8 external attributes are not `pois` view columns (parsed from
+       sql/refresh_views.sql, fail-closed) — a multi-source fact answerable
+       by plain Text2SQL would change the task
 
   Layer 3 — Human spot-check sample:
     Stratified 5% sample per tid, printed as TSV for annotators.
@@ -44,7 +51,12 @@ import re
 import sys
 import unicodedata
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
+
+# Single source of truth for the canonical address semantics (importing it
+# also pins the check to the exact composition the generator froze).
+from generator_vi import canonical_address
 
 # Record count every question file is expected to hold.
 EXPECTED_RECORD_COUNT = 100
@@ -119,6 +131,32 @@ def check_limit_ordered(sql: str) -> bool:
     planner-dependent."""
     s = sql.upper()
     return "LIMIT" not in s or "ORDER BY" in s
+
+
+# ── Reference-schema overlap guard (v3) ─────────────────────────────────────
+# The `pois` view in sql/refresh_views.sql is the schema the Text2SQL prompt
+# exposes. Parsing it (fail-closed on any parse surprise) keeps the check
+# tied to the real schema instead of a hand-copied column list that can
+# drift when the view changes.
+VIEW_SQL_PATH = Path(__file__).resolve().parent.parent / "sql" / "refresh_views.sql"
+
+
+@lru_cache(maxsize=1)
+def pois_view_columns() -> frozenset[str]:
+    """Column names the `pois` view exposes to the baseline."""
+    text = VIEW_SQL_PATH.read_text(encoding="utf-8")
+    match = re.search(r"VIEW pois AS(.*?)FROM", text, re.DOTALL | re.IGNORECASE)
+    if not match:
+        raise ValueError("pois view definition not found in refresh_views.sql")
+    block = match.group(1)
+    columns = {m.lower() for m in re.findall(r"\bAS\s+(\w+)", block, re.IGNORECASE)}
+    columns.update(
+        m.group(1).lower()
+        for m in re.finditer(r"^\s*(\w+)\s*,?\s*$", block, re.MULTILINE)
+    )
+    if not columns:
+        raise ValueError("pois view definition parsed to zero columns")
+    return frozenset(columns)
 
 
 @dataclass
@@ -294,6 +332,44 @@ def run_layer2(entry: dict, idx: int, expected_type: str | None = None) -> Check
         ):
             if not answers or not answers[0].get(field):
                 failures.append(f"MISSING_MULTI_SOURCE: answers[0] lacks {field}")
+
+    # T7/T8 external attributes must stay out-of-schema: a fact that is also
+    # an ordinary pois column turns the multi-source question into a plain
+    # Text2SQL lookup (v3 removed `capacity` from the view for this reason).
+    if qtype in ("knn+name+multi_source1", "knn+name+multi_source2"):
+        anchor_entity = entities.get("[2]") or {}
+        attr = (
+            (answers[0].get("multi_source_attribute") if answers else None)
+            or entities.get("attribute")
+            or (
+                anchor_entity.get("attribute")
+                if isinstance(anchor_entity, dict)
+                else None
+            )
+        )
+        if not attr:
+            failures.append("MISSING_MULTI_SOURCE: no frozen attribute key")
+        elif str(attr).lower() in pois_view_columns():
+            failures.append(
+                f"ATTRIBUTE_IN_SCHEMA: external attribute {attr!r} is a pois column"
+            )
+
+    # v3 Location contract: geometry stays authoritative while the textual
+    # representation is the canonical address; every gold row carries both
+    # and the stored string must recompute from its frozen components.
+    if entry.get("answer_type") == "loc":
+        if "ADDR_STREET IS NOT NULL" not in sql.upper():
+            failures.append(
+                "SQL_NO_ADDRESS_PREDICATE: loc gold not restricted to "
+                "address-bearing POIs"
+            )
+        for ans in answers:
+            if not ans.get("geo_wkt") or not ans.get("address"):
+                failures.append("LOC_MISSING_ADDRESS: answer lacks address/geo_wkt")
+            elif ans["address"] != canonical_address(ans):
+                failures.append(
+                    f"LOC_ADDRESS_MISMATCH: {ans['address']!r} != canonical form"
+                )
 
     # the two surfaces must agree with the canonical question
     if full != q:

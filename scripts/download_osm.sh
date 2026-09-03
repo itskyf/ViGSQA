@@ -4,7 +4,7 @@ set -o errexit -o nounset -o pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd -P)"
 
-OSM_URL="https://download.geofabrik.de/asia/vietnam-260825.osm.pbf"
+OSM_URL="https://download.geofabrik.de/asia/vietnam-260901.osm.pbf"
 # Geofabrik publishes the integrity reference alongside every extract; using
 # it avoids duplicating a pinned hash that drifts from upstream's own record.
 MD5_URL="${OSM_URL}.md5"

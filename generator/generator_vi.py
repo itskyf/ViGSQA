@@ -1,5 +1,5 @@
 """
-Vietnamese GS-QA generator — v2.0.0, all 28 canonical template types.
+Vietnamese GS-QA generator — v3.0.0, all 28 canonical template types.
 
 Families:
 - POI family (20 types): {knn|range} x {plain|filter|direction|towards} with
@@ -9,10 +9,16 @@ Families:
 - Intersects family (T11/T12/T24/T27/T28): region-anchored area/length/count.
 - Multi-source (T7/T8) live in multisource_vi.py.
 
-Vietnamese adaptations (documented in the v2.0.0 MANIFEST): regions are named
+Vietnamese adaptations (documented in the v3.0.0 MANIFEST): regions are named
 admin-boundary relations (VN has no postal-code boundaries); park/lake/road/
 region display names come from native name columns, not Wikipedia; POI anchors
 are always excluded from their own answer set (id <> anchor).
+
+v3 Location contract: T13-T20 gold freezes geometry (`geo_wkt`) plus native
+OSM address components and one deterministic canonical address string; only
+address-bearing POIs are candidates (GS-QA evaluates address text geocoded
+against the expected geometry). The candidate predicate is stated verbatim
+in the Text2SQL prompt so the baseline can reproduce the gold set exactly.
 """
 
 import argparse
@@ -219,6 +225,32 @@ VN_DIRECTIONS = [
 
 RANGE_RADIUS_KM = [1, 2, 3, 5, 10, 20, 50]
 
+# ── v3 Location address contract ────────────────────────────────────────────
+# Native OSM address components frozen into every loc gold record, in
+# canonical composition order (street-level locator first, then progressively
+# broader units, postcode last). Must stay in sync with the `pois` view in
+# sql/refresh_views.sql.
+ADDR_COLUMNS = (
+    "addr_housenumber",
+    "addr_street",
+    "addr_place",
+    "addr_suburb",
+    "addr_district",
+    "addr_city",
+    "addr_province",
+    "addr_postcode",
+)
+
+# A candidate carries a scorable native address when it has a street-level
+# locator plus at least one broader locator — the least restrictive
+# deterministic criterion that stays geocodable, fixed by the v3 coverage
+# audit (T10). Stated verbatim in the Text2SQL prompt.
+ADDR_PREDICATE = (
+    "((addr_street IS NOT NULL OR addr_place IS NOT NULL) "
+    "AND (addr_suburb IS NOT NULL OR addr_district IS NOT NULL "
+    "OR addr_city IS NOT NULL OR addr_province IS NOT NULL))"
+)
+
 # Sample random ref POI from the base table. REPEATABLE(x) makes the page sample
 # deterministic for an unchanged table; the seed is drawn per call from the
 # seeded Python RNG so the anchor sequence reproduces from --seed alone.
@@ -234,6 +266,29 @@ REF_SQL = """
     WHERE (p.amenity IS NOT NULL OR p.tourism IS NOT NULL
            OR p.shop IS NOT NULL OR p.leisure IS NOT NULL)
       AND p.name IS NOT NULL
+    LIMIT 1;
+"""
+
+# v3 loc anchors: drawn only from address-bearing POIs so candidate pools
+# around the anchor contain scorable locations. Vietnamese address coverage
+# is urban-clustered; drawing anchors from the mapped subset keeps loc types
+# inside MAX_CONSECUTIVE_FAILURES without biasing the answer SQL itself
+# (documented v3 adaptation in the MANIFEST).
+REF_LOC_SQL = """
+    SELECT p.osm_id AS id,
+           ST_AsText(ST_Transform(p.way,4326)) AS geo_wkt,
+           ST_X(ST_Transform(p.way,4326)) AS lon,
+           ST_Y(ST_Transform(p.way,4326)) AS lat,
+           p.name AS poi_name,
+           p.addr_city,
+           p.amenity, p.tourism, p.shop, p.leisure
+    FROM planet_osm_point p TABLESAMPLE SYSTEM(10) REPEATABLE({sample_seed})
+    WHERE (p.amenity IS NOT NULL OR p.tourism IS NOT NULL
+           OR p.shop IS NOT NULL OR p.leisure IS NOT NULL)
+      AND p.name IS NOT NULL
+      AND ((p.addr_street IS NOT NULL OR p.addr_place IS NOT NULL)
+           AND (p.addr_suburb IS NOT NULL OR p.addr_district IS NOT NULL
+                OR p.addr_city IS NOT NULL OR p.addr_province IS NOT NULL))
     LIMIT 1;
 """
 
@@ -314,6 +369,31 @@ def display_name(poi: dict) -> str:
     return f"{poi['poi_name']}, {nfc(city)}" if city else poi["poi_name"]
 
 
+def canonical_address(row: dict) -> str:
+    """Deterministic canonical address from frozen native components only.
+
+    Composition: `[housenumber street | place], suburb, district, city,
+    province, postcode` — empty components are skipped and a component
+    identical to an already-emitted one is collapsed (Vietnamese centrally
+    governed cities repeat the city name as province). No synthesis and no
+    reverse geocoding: the string is a pure function of the components.
+    """
+    parts: list[str] = []
+    street = " ".join(
+        nfc(x) for x in (row.get("addr_housenumber"), row.get("addr_street")) if x
+    )
+    specific = street or (nfc(row["addr_place"]) if row.get("addr_place") else "")
+    if specific:
+        parts.append(specific)
+    for col in ("addr_suburb", "addr_district", "addr_city", "addr_province"):
+        value = row.get(col)
+        if value and nfc(value) not in parts:
+            parts.append(nfc(value))
+    if row.get("addr_postcode"):
+        parts.append(nfc(row["addr_postcode"]))
+    return ", ".join(parts)
+
+
 def poi_main_category(poi: dict) -> str | None:
     for cat in ("amenity", "tourism", "shop", "leisure"):
         if poi.get(cat):
@@ -322,9 +402,11 @@ def poi_main_category(poi: dict) -> str | None:
 
 
 # ── Entity samplers ──────────────────────────────────────────────────────────
-def get_ref() -> dict | None:
+def get_ref(loc: bool = False) -> dict | None:
+    """Random anchor POI; `loc=True` draws from address-bearing POIs only."""
     try:
-        rows = run_sql(REF_SQL.format(sample_seed=random.random()))
+        template = REF_LOC_SQL if loc else REF_SQL
+        rows = run_sql(template.format(sample_seed=random.random()))
         if not rows:
             return None
         r = rows[0]
@@ -406,7 +488,7 @@ def generate_poi_type(type_str: str, tid: str, n: int = 100) -> list[dict]:
     while len(results) < n:
         if fails > MAX_CONSECUTIVE_FAILURES:
             break
-        ref = get_ref()
+        ref = get_ref(loc=(output == "loc"))
         if not ref:
             fails += 1
             continue
@@ -459,6 +541,9 @@ def generate_poi_type(type_str: str, tid: str, n: int = 100) -> list[dict]:
             subst["[2]"] = anchor
 
         select_cols = "id, geo_wkt, poi_name"
+        if output == "loc":
+            # v3: freeze the native address components alongside geometry.
+            select_cols += ", " + ", ".join(ADDR_COLUMNS)
         extra_select = ""
         if output == "distance":
             extra_select = (
@@ -514,6 +599,11 @@ def generate_poi_type(type_str: str, tid: str, n: int = 100) -> list[dict]:
             anchor_geom_sql = f"{geom_4326}::geography"
 
         where = [f"id <> {ref['id']}", cat_predicate]
+        if output == "loc":
+            # v3 Location contract: only address-bearing POIs are gold
+            # candidates; the same predicate is stated verbatim in the
+            # Text2SQL prompt so the baseline reproduces the gold set.
+            where.append(ADDR_PREDICATE)
         if towards is not None:
             # The described reference must not answer its own question either.
             where.append(f"id <> {towards['id']}")
@@ -590,6 +680,17 @@ def generate_poi_type(type_str: str, tid: str, n: int = 100) -> list[dict]:
                         # % 360 after rounding: 359.96 must not round up to 360
                         # (azimuths are [0,360); 360 would break angle errors).
                         "angle": round(float(r["angle"]), 1) % 360,
+                    }
+                    for r in rows
+                ]
+            elif output == "loc":
+                answers = [
+                    {
+                        "id": r.get("id"),
+                        "poi_name": r.get("poi_name"),
+                        "geo_wkt": r.get("geo_wkt"),
+                        "address": canonical_address(r),
+                        **{c: r[c] for c in ADDR_COLUMNS if r.get(c)},
                     }
                     for r in rows
                 ]
@@ -765,9 +866,9 @@ def generate_intersects_type(type_str: str, tid: str, n: int = 100) -> list[dict
 
 
 def main() -> None:
-    """Generate all 28 VN-GeoQA v2.0.0 types from the `osm_vn` database."""
+    """Generate all 28 VN-GeoQA v3.0.0 types from the `osm_vn` database."""
     parser = argparse.ArgumentParser(
-        description="Generate VN-GeoQA v2.0.0 benchmark questions from PostGIS."
+        description="Generate VN-GeoQA v3.0.0 benchmark questions from PostGIS."
     )
     parser.add_argument(
         "--seed",
