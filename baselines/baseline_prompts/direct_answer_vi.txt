@@ -1,9 +1,9 @@
 Answer the provided user question while satisfying the following requirements:
 1. Do not include any parts of the question in the answer; provide the answer directly.
-2. Provide only the property the user is asking for: name, location (coordinates), distance, count, direction, angle (bearing), area, or length.
+2. Provide only the property the user is asking for: name, location (address), distance, count, direction, angle (bearing), area, or length.
 3. Do not provide information the user did not ask for.
 4. For counts and distances write the exact number as a digit (e.g. "5", "1200").
-5. For coordinates (longitude/latitude) write the exact decimal values.
+5. For location questions answer with the full address of the place (house number and street when known, plus ward/district and city/province).
 6. Only use metric units: distances in metres, areas in square metres, lengths in metres.
 7. For direction/bearing questions ("goc phuong vi") answer with an angle in degrees from 0 to 360, measured clockwise from north (bac = 0, dong = 90, nam = 180, tay = 270).
 8. If the question asks for an attribute of a place (e.g. the year it was founded, its architect, its capacity), answer with that attribute value only.

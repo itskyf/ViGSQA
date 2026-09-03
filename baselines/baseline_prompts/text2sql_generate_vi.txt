@@ -4,9 +4,11 @@ The question is in Vietnamese. The database holds OpenStreetMap data for Vietnam
 --- Tables ---
 
 pois — points of interest
-  id, geometry, geo_wkt, poi_name, addr_city,
+  id, geometry, geo_wkt, poi_name,
+  addr_housenumber, addr_street, addr_place, addr_suburb, addr_district,
+  addr_city, addr_province, addr_postcode,
   amenity, tourism, shop, leisure,
-  cuisine, museum, takeaway, outdoor_seating, delivery, emergency, capacity,
+  cuisine, museum, takeaway, outdoor_seating, delivery, emergency,
   wikidata, wikipedia
 regions — administrative boundaries (province admin_level 4, district 6, commune 8)
   id, region_name, admin_level, geometry, geo_wkt
@@ -111,8 +113,16 @@ Distance / azimuth to the nearest POI (same WHERE as the KNN pattern):
   SELECT p.poi_name, ST_Distance(p.geometry, ref.geometry) AS distance ...
   SELECT p.poi_name, degrees(ST_Azimuth(ref.geometry, p.geometry)) AS angle ...
 
-Location answers (lon/lat of the found POI; points need no ST_Centroid):
-  SELECT p.poi_name, ST_X(p.geometry::geometry) AS lon, ST_Y(p.geometry::geometry) AS lat ...
+Location answers (the address of the found POI, from the addr_* columns;
+the answer stage composes the address text from the returned records).
+Only POIs with address data are valid location answers — add this
+predicate to the WHERE clause:
+  (addr_street IS NOT NULL OR addr_place IS NOT NULL)
+  AND (addr_suburb IS NOT NULL OR addr_district IS NOT NULL
+       OR addr_city IS NOT NULL OR addr_province IS NOT NULL)
+  SELECT p.poi_name, p.addr_housenumber, p.addr_street, p.addr_place,
+         p.addr_suburb, p.addr_district, p.addr_city, p.addr_province,
+         p.addr_postcode ...
 
 Largest park/lake inside a region:
   SELECT park_name FROM parks

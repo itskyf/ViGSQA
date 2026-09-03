@@ -1,4 +1,4 @@
-Given a question and a text answer, parse the text answer to json format. Any measurement must be in metric units, and directions must be converted to azimuth angle in degrees. Try to match the following schema:
+Given a question and a text answer, parse the text answer to json format. The location must be provided as a complete address, any measurement must be in metric units, and directions must be converted to azimuth angle in degrees. Try to match the following schema:
 {
     "name": string,
     "address": string,

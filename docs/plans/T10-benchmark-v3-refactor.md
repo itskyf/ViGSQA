@@ -54,6 +54,14 @@ Freeze a corrected v3.0.0 benchmark contract and prepare the runtime so the four
 - Human QC TSV: `docs/qc_spot_check_v3.0.0.tsv` (5 per TID, seed 42) → user review.
 - **Byte-identical regeneration: second seed-42 run (`data/v3-stage/regen2`) `diff -r` clean across all 28 files (2,800 questions).**
 
+### 2026-09-03 — G4′ + prompt freeze
+
+- User approved the QC gate after the spot-check TSV was made answer-type-aware (v2 column always showed `poi_name`, hiding loc addresses, T7 facts and numeric gold; same seeded 140-row sample regenerated).
+- **Prompt freeze `pv-8394cd22`** (aggregate sha256 `8394cd22f8e227778968be0169351e7b7d42fca238fced28693c55649da4091f`, supersedes `pv-b383e117`). Per-file sha256: `direct_answer_vi` `8a1fc088…2a98a`, `direct_json_parse_vi` = `text2sql_json_parse_vi` `7de156f0…874b2`, `text2sql_generate_vi` `8962be4a…df6cd`, `text2sql_answer_vi` `811d781c…d3873`.
+- Semantic changes only (G4′-approved, no accuracy tuning): Text2SQL schema exposes the 8 `addr_*` columns and drops `capacity`; Location pattern selects address columns and states the address-bearing candidate predicate verbatim (replacing the `ST_X/ST_Y` lon/lat idiom); Direct/Text2SQL answer rule 5 asks for the full address instead of coordinate decimals; both JSON parse prompts restore upstream's "The location must be provided as a complete address" while keeping `lon`/`lat` as optional keys.
+- Upstream parity audit (paper §5 + `references/main.tex`, upstream prompts): upstream's `direct_json_parse.txt` is address-primary — restored verbatim. Upstream's "numbers as words rounded to nearest ten" quirk stays replaced by exact digits (T02 decision: the benchmark scores exact digits); upstream exposes `capacity` as both column and multi-source attribute — v3 deliberately does not.
+- Interim evaluation degradation (documented, not fixed — T03 owns the evaluator): after the prompt change, predictions for the 800 loc questions are address text, which `_vn_evaluate_answers`' lon/lat fallbacks do not consume; interim eval CSVs must not be quoted as v3 Location evidence. T03 requirements recorded in PLAN.
+
 ## Open questions / next
 
 - Interim loc evaluation (`_vn_evaluate_answers` lon/lat fallbacks) will not match address-text predictions after the prompt change — documented degradation; T03 owns the evaluator (requirements recorded in PLAN/T03 row).
