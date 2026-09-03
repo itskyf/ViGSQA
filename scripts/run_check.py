@@ -1,9 +1,8 @@
-"""G6 completion asserts + minimal run manifest for one official baseline run.
+"""G6 completion asserts, manifest, and seal for one official baseline run.
 
 Run by scripts/run_official.sh right after each baseline finishes. Asserts
 the raw caches are complete against the frozen questions, then writes a
-minimal manifest (git commit, dataset/OSM provenance, model, prompt hash,
-baseline, timestamps, completed/failed counts).
+minimal manifest and a stable checksum-bound completion seal.
 
 Usage:
     python scripts/run_check.py --model llamacpp:org/repo:QUANT \
@@ -19,6 +18,7 @@ import sys
 from pathlib import Path
 
 from baselines.pipeline import extract_json_blocks, extract_sql_blocks
+from vigsqa.sealing import create_seal
 
 ROOT = Path(__file__).resolve().parent.parent
 QUESTIONS_DIR = ROOT / "generator" / "questions_vi"
@@ -124,8 +124,14 @@ def main() -> int:
     # ── Cache-side asserts ───────────────────────────────────────────────────
     cache_dir = namespaced_cache_dir()
     step_stats = {}
+    artifact_sha256 = {}
+    step_records = {}
     for step in STEPS[args.baseline]:
-        records = json.loads((cache_dir / args.model / f"{step}.json").read_text())
+        artifact_path = cache_dir / args.model / f"{step}.json"
+        artifact_bytes = artifact_path.read_bytes()
+        artifact_sha256[step] = hashlib.sha256(artifact_bytes).hexdigest()
+        records = json.loads(artifact_bytes)
+        step_records[step] = records
         assert len(records) == EXPECTED_QUESTIONS, (
             f"{step}: expected {EXPECTED_QUESTIONS} records, found {len(records)}"
         )
@@ -152,9 +158,7 @@ def main() -> int:
                 f"{step}: {len(missing)} records without raw execution results;"
                 f" first {REPORT_ID_LIMIT}: {missing[:REPORT_ID_LIMIT]}"
             )
-            generated = json.loads(
-                (cache_dir / args.model / "sql_generate.json").read_text()
-            )
+            generated = step_records["sql_generate"]
             generated_by_id = {r["id"]: r for r in generated}
             stale = [
                 r["id"]
@@ -214,10 +218,14 @@ def main() -> int:
             ["date", "--iso-8601=seconds"], capture_output=True, text=True, check=False
         ).stdout.strip(),
         "steps": step_stats,
+        "artifact_sha256": artifact_sha256,
+        "g6_passed": True,
     }
     out_path = Path(f"{log_prefix}.manifest.json")
     out_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
     print(f"  manifest: {out_path}")
+    seal_path = create_seal(manifest)
+    print(f"  seal: {seal_path}")
     return 0
 
 

@@ -22,9 +22,9 @@ ViGSQA extends GS-QA to Vietnamese OSM data and investigates whether database gr
 | T04 | Improve what the frozen baselines fail at | `planned` | Select the intervention from full-baseline error evidence; the typed deterministic renderer stays a hypothesis until then. Plugs into the `baselines_vi.py` patch layer without a pipeline rewrite. |
 | T05 | Analyze Vietnamese-specific behavior and errors | `planned` | Full/stripped diacritic surfaces exist; robustness, error taxonomy, and the final demonstration on new Vietnamese questions remain. |
 | T06 | Tell the story as an ACL paper | `planned` | Course requires the official ACL style files; the current Typst placeholder is replaced in T06. |
-| T07 | Complete the benchmark and capture raw baseline runs | `in_progress` | Ornith is unchanged. Qwen Text2SQL preserves 2,800 SQL generations/executions and 1,900 answers after fixing live PostgreSQL `Decimal` serialization; resume remains. Record: `docs/plans/T07-benchmark-v2-raw-runs.md`. |
+| T07 | Complete the benchmark and capture raw baseline runs | `in_progress` | Ornith Direct and Text2SQL are G6-valid and sealed. Qwen inference/resume remains in progress and is not sealed. T07 finishes only after all four official pairs pass G6 and their seals verify. Record: `docs/plans/T07-benchmark-v2-raw-runs.md`. |
 | T08 | Fast database bootstrap via prebuilt release dump | `done` | `bootstrap_postgres.sh` restores `osm-vn.sql.gz` (release `data-v2.0.0`, SHA-256 pinned) before falling back to the osm2pgsql import; verified on PostgreSQL 18 and 14/PostGIS 3.5 with exact reference counts. |
-| T09 | PostgreSQL LangChain LLM cache + bounded LLM concurrency | `in_progress` | Cache infrastructure, migration, and offline validation complete: `llm_cache` DB beside `osm_vn`, transport-normalized cache keys, 1,513 records migrated and validated byte-identically from two different `base_url`s, dump/restore round trip green. All three Compose services expose native healthchecks; HAProxy readiness requires a real `/v1/models` backend round trip. Official rerun stays in the T07 resume. Record: `docs/plans/T09-llm-cache-postgres.md`. |
+| T09 | PostgreSQL LangChain LLM cache + bounded LLM concurrency | `in_progress` | PostgreSQL remains request-level resume/repair state and is excluded from run seals. Release publication of the completed cache dump is deferred until explicit confirmation that Qwen has finished. Record: `docs/plans/T09-llm-cache-postgres.md`. |
 
 ## Cross-Task Discoveries
 
@@ -33,10 +33,11 @@ ViGSQA extends GS-QA to Vietnamese OSM data and investigates whether database gr
 - All pre-freeze result artifacts (`baselines/*_eval.csv`, `baselines/REPORT_VN_GEOQA.md`, `docs/results.md`) are archived and describe a superseded dataset; never use them as benchmark evidence.
 - Range-type gold answers are full distance-ordered sets (up to ~1254 candidates): score predictions by best applicable match against the complete gold set. T03 owns metric semantics.
 - T09's cache-key contract governs every cache interaction: same semantic model request at a different transport endpoint → cache reuse; different model/quantization/generation parameters/prompt → separate cache. JSON step caches remain write-through raw artifacts and PostgreSQL `llm_cache` is the LLM-step skip layer. Exhausted structural-validation failures remain stable explicit raw artifacts; transport/configuration failures remain distinguishable and retryable on resume. Structurally valid but incorrect outputs are never retried.
+- Official completion is a valid G6 seal bound to model/baseline, frozen dataset and prompt identities, repository-pinned OSM/database provenance, and raw artifact hashes. Git commit is provenance-only; an all-sealed official run exits before infrastructure startup.
 
 ## Active Next Action
 
-T07: resume `./scripts/run_qwen_official.sh` from the preserved Qwen caches, complete both G6 checks, then validate `main.ipynb` with Run All.
+T07: **finish Qwen → G6 each Qwen baseline → seal each → verify all four seals → mark T07 done → activate T03.** Do not Run All `main.ipynb` against the canonical sealed cache before T03; defer notebook cleanup and final execution until official evaluation can consume the sealed raw artifacts safely.
 
 ## Session Prompt
 

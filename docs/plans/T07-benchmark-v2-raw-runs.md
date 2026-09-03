@@ -24,7 +24,8 @@ Extend the Vietnamese benchmark from 8 to all 28 canonical GS-QA template types 
 | Caches | Namespaced `cache_vi/pv-{prompt_version}/{model}/{step}.json` — one prompt freeze can never reuse another's results; write-through after every question; never `--clear-cache`. Corresponding Direct and Text2SQL LLM stages use the same bounded structural validation: retry only structurally invalid completions, for at most three identical requests, and preserve exhausted validation failures explicitly. Structurally valid but incorrect answers or SQL are never retried. Transport/configuration failures remain distinguishable and retryable on resume. JSON step files are the raw artifacts read by G6; PostgreSQL `llm_cache` is the LLM-step skip layer. |
 | Prompts | One pre-run schema/answer-type compatibility rewrite, frozen before the smoke gate; never changed based on smoke accuracy or full-run results (that is tuning) |
 | Authoritative artifacts | Question IDs, raw model answers, generated SQL, raw SQL execution output/errors, parser output, explicit inference errors, and run manifest/counts. T07 preserves sufficient raw evidence for T03; scoring and evaluator policy belong entirely to T03. |
-| Notebook | `main.ipynb` gitignored (authoritative copy in Drive/Colab); off the critical path — fixed/cleaned during inference; final executed copy in the submission ZIP |
+| Completion | A `(model, baseline)` is complete only when G6 succeeds and atomically writes its stable seal. The seal binds the frozen dataset and prompt, the repository-pinned OSM URL and database dump URL/SHA-256, and every required raw step's SHA-256. Git commit is provenance only. |
+| Notebook | `main.ipynb` gitignored (authoritative copy in Drive/Colab); do not Run All against the canonical sealed cache before T03. Cleanup and final execution wait until official evaluation can consume sealed raw artifacts safely. |
 | Runs | Sequential: Ornith Text2SQL → Ornith Direct → Qwen Text2SQL → Qwen Direct; temperature 0; resumable; no `parallel > 1` optimization |
 
 ## Gates
@@ -35,7 +36,7 @@ Extend the Vietnamese benchmark from 8 to all 28 canonical GS-QA template types 
 - **G3 (mandatory)** — 2,800/2,800 automated verification; 100/type; all answer types present (`name, loc, count, distance, angle, area, length` + multi_source). Byte-identical regeneration attempted once, desirable, not a gate.
 - **G4** — human QC in two parts: (1) all Vietnamese phrase-template files reviewed for naturalness/semantic fidelity; (2) ~5 instantiated question+SQL+gold per TID (140 total) checking that substitutions and SQL results actually answer the question. Not a replication of GS-QA's manual-QC protocol.
 - **G5** — 28-question CLI smoke (one per TID) for Text2SQL then Direct; both CSVs cover 28 ids; on pass, launch overnight inference immediately.
-- **G6 (artifact-integrity only)** — each of the four raw runs has exactly 2,800 unique question ids and 100/tid; stage and cache lineage match; successful stages satisfy their structural contracts; exhausted structural failures and transport/configuration failures are explicit; generated SQL, execution results, and execution errors are preserved; and a minimal run manifest records model, dataset, prompt, and cache provenance. G6 does not score answer correctness.
+- **G6 (artifact-integrity only)** — each of the four raw runs has exactly 2,800 unique question ids and 100/tid; stage and cache lineage match; successful stages satisfy their structural contracts; exhausted structural failures and transport/configuration failures are explicit; generated SQL, execution results, and execution errors are preserved; and a minimal run manifest records model, dataset, prompt, and cache provenance. After these checks succeed, `run_check.py` creates or replaces that run's seal; a failed check never seals the run. G6 does not score answer correctness.
 
 ## Scope Freeze
 
@@ -111,14 +112,11 @@ Once G2 passes, no new OSM fields, template families, model backends, evaluation
 
 ## Next
 
-Run `./scripts/run_qwen_official.sh`. It exposes the Compose llama.cpp service
-only on `127.0.0.1:8000` and bypasses HAProxy, then performs the uncached
-28-TID preflight, Qwen Text2SQL, its G6 check, Qwen Direct, and its G6 check in
-that order with four client/server inference slots. It creates a fresh
-timestamped run-log namespace and resumes from the canonical Qwen
-caches; it never uses `--clear-cache` or changes prompts/decoding. Set
-`QWEN_RUN_DIR` only when a specific log directory is needed. Finally execute
-`main.ipynb` with Run All, mark T07 `done`, and move immediately to T03.
+**Finish Qwen → G6 each Qwen baseline → seal each → verify all four
+seals → mark T07 done → activate T03.** Preserve the active Qwen JSON,
+PostgreSQL, and raw-artifact resume state exactly. After inference finishes,
+perform only G6, sealing, and four individual `check_run_seal.py` calls. Do not
+Run All `main.ipynb` against the canonical sealed cache before T03.
 
 **Qwen clean-profile reset (2026-09-02):** Qwen's preset now supplies the server argument `--chat-template-kwargs '{"enable_thinking":false}'`; Ornith's preset and all five frozen prompt files are unchanged. Both Qwen baselines and their parser stages already share the same `llamacpp:unsloth/Qwen3.5-9B-GGUF:Q4_K_XL` model construction, so no pipeline fork was added. Removed all prior Qwen JSON caches, official/diagnostic outputs, and 4,307 Qwen-keyed rows from PostgreSQL `llm_cache`; a post-delete query returned zero Qwen rows. No benchmark command was run.
 
@@ -129,3 +127,5 @@ caches; it never uses `--clear-cache` or changes prompts/decoding. Set
 **Qwen local-only route (2026-09-03):** Because the non-thinking profile will run locally, Compose now publishes llama.cpp directly at `127.0.0.1:8000`. The Qwen runner fixes `LLAMACPP_URL` to that endpoint, recreates only `llamacpp`, and bypasses HAProxy and its remote backend entirely. Server `parallel=4` and client `--llm-concurrency 4` remain matched; no benchmark parameter changed.
 
 **Qwen Text2SQL `Decimal` interruption (2026-09-03):** The first local run completed all 2,800 `sql_generate` and `sql_exec` records, then stopped at 1,900/2,800 `sql_answer` records when a live psycopg result contained `Decimal` under `distance_meters`. `save_cache` already converts psycopg `Decimal` values to JSON numbers with `_JSONEncoder`, but `step_answer_from_records` used the default encoder on the same objects before a cache reload. The shared answer-prompt serialization now uses `_JSONEncoder`, making fresh execution byte-semantically consistent with resume from `sql_exec.json`; no SQL, prompt, decoding, cache record, or benchmark rule changed. Existing Qwen caches remain intact for normal resume.
+
+**Run-level sealing (2026-09-03):** `vigsqa.sealing` owns the small seal contract, and `check_run_seal.py` is the exit-code-only bridge used by the shell runner. A valid seal matches model/baseline, dataset and full prompt identities, the pinned OSM URL, the pinned `data-v2.0.0/osm-vn.sql.gz` URL and SHA-256, and the hashes of the exact raw bytes accepted by G6; Git commit is recorded but never invalidates a seal. `run_official.sh` checks all four pairs before startup, exits 0 without PostgreSQL, llama.cpp, HAProxy, cache replay, or evaluation when all are sealed, and otherwise preserves order while running only incomplete pairs. Ornith Text2SQL and Direct are G6-valid and their seals verify; a one-byte mutation of a temporary artifact copy is rejected. Before/after hashes, sizes, and mtimes confirm that pair verification is read-only. An isolated runner harness confirms that sealed pairs are filtered before bootstrap and an unsealed pair follows the normal full resume path without `--clear-cache`. Static Python, Ruff, shell-syntax, and diff checks pass. Qwen inference/resume remains in progress and is not sealed; its live caches and raw artifacts were not touched.
