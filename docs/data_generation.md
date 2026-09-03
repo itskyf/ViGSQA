@@ -44,8 +44,9 @@ podman compose up -d postgres
 `install_dependencies.sh` only installs or verifies dependencies. In Google
 Colab it uses apt for PostgreSQL/PostGIS and the required import tools; service
 startup and database initialization are separate steps. The course notebook
-runs the PostgreSQL/OSM workflow independently from llama.cpp and waits for
-both branches before exploration or experiments. After bootstrap, bounded
+runs the PostgreSQL/OSM workflow and waits for it before exploration or
+experiments; the LLM endpoint is an external OpenAI-compatible vLLM server the
+notebook only probes. After bootstrap, bounded
 readiness and PostGIS checks use psycopg3; `psql` is used only where Colab
 already provides it or container execution is simpler.
 

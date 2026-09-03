@@ -1,6 +1,6 @@
 # T02 — End-to-End Experiment Workflow
 
-**Status: done (2026-08-29).** All downstream coursework cells (§1 health checks, §2 dataset + EDA, §3 baselines + comparison, §4 error analysis + demo + extension point) are implemented and pass a full local run, and the same smoke path passed end-to-end on a fresh Colab VM — the exit criterion.
+**Status: done (2026-08-29); reopened for the v3 re-proof (see `docs/PLAN.md`).** All downstream coursework cells (§1 health checks, §2 dataset + EDA, §3 baselines + comparison, §4 error analysis + demo + extension point) are implemented and pass a full local run, and the same smoke path passed end-to-end on a fresh Colab VM — the exit criterion. **2026-09-04 addendum (T11):** the llama.cpp-era invariants and bootstrap branch below are superseded by the external vLLM endpoint contract in `docs/plans/T11-vllm-official-inference.md`; T11 also bumped the notebook pins to v3 and rewired its model client, so the remaining T02 scope is the end-to-end v3 re-run itself.
 
 ## Goal
 

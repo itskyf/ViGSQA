@@ -9,8 +9,8 @@ Build and evaluate a reproducible Vietnamese adaptation of GS-QA (`docs/context/
 - Dataset `v3.0.0`: 28 canonical GS-QA TIDs × 100 = 2,800 questions, seed 42, generated from the pinned Geofabrik snapshot `vietnam-260901.osm.pbf` (md5 verified against the Geofabrik sidecar in `download_osm.sh`; never `vietnam-latest`).
 - Location gold (T13–T20): frozen geometry (`geo_wkt`) **and** native OSM address components **and** one deterministic canonical address string built only from those components; candidates are restricted to address-bearing POIs by a criterion fixed by the coverage audit; geometry stays the authoritative spatial reference.
 - T7/T8 external facts (frozen viwiki/enwiki infobox values) are genuinely out-of-schema: no T7/T8 answer attribute is exposed as a reference-DB column (verifier-enforced).
-- Official baselines: Ornith/Qwen × Direct/Text2SQL, temperature 0, frozen prompts, bounded concurrency, raw QID-indexed JSON artifacts under `cache_vi/pv-<prompt_sha256>/`, G6 artifact-integrity seal binding dataset + prompt + OSM/DB provenance.
-- v1/v2 artifacts (releases, raw JSONs, logs, seals, QC records) are historical evidence only; old seals can never satisfy v3; the PostgreSQL semantic LLM cache is never cleared (v3 requests miss naturally because prompts change).
+- Official baselines: Ornith/Qwen × Direct/Text2SQL over an external OpenAI-compatible vLLM endpoint (`ornith-ai/Ornith-1.5-9B-NVFP4`, `AxionML/Qwen3.5-9B-NVFP4`), frozen decoding profile (T11: temperature 1.0, top_p 0.95, top_k 20, min_p 0, presence_penalty 1.5, repetition_penalty 1.0, max_completion_tokens 32768, seed 42, thinking on), frozen prompts, bounded concurrency, raw QID-indexed JSON artifacts under `cache_vi/pv-<prompt_sha256>/`, G6 artifact-integrity seal binding dataset + prompt + OSM/DB provenance.
+- v1/v2 artifacts (releases, raw JSONs, logs, seals, QC records) are historical evidence only; old seals can never satisfy v3; the PostgreSQL semantic LLM cache was purged once at T11 (v2 rows and file caches deleted — the llama.cpp/temperature-0 era ended), after which the T09 cache-key contract again guarantees natural misses across profile changes.
 
 ## Why v1/v2 were superseded
 
@@ -26,7 +26,7 @@ Build and evaluate a reproducible Vietnamese adaptation of GS-QA (`docs/context/
 | ID | Goal | Status | Current state |
 | --- | --- | --- | --- |
 | T01 | Establish a trustworthy Vietnamese benchmark | `done` | Satisfied **at v3**: T10 re-validated the frozen benchmark (2,800/2,800 automated verification, byte-identical regeneration, human QC approval). The v1/v2 freezes remain Git/history evidence. |
-| T02 | Make the whole experiment runnable end-to-end | `planned` | **Reopened for v3.** The v2 proof (fresh Colab VM) is tooling evidence only. v3 re-proof pending: `main.ipynb` still pins v2 provenance (`pv-b383e117`); refresh the notebook to v3 pins and re-run bootstrap → dataset → baseline on v3 assets. Rides with T03/T05 once the four v3 raw runs exist. |
+| T02 | Make the whole experiment runnable end-to-end | `planned` | **Reopened for v3.** The v2 proof (fresh Colab VM) is tooling evidence only. v3 re-proof pending: T11 bumped the notebook's v3 pins and vLLM endpoint plumbing; the end-to-end re-run (bootstrap → dataset → baseline on v3 assets) rides with T03/T05 once the four v3 raw runs exist. |
 | T03 | Measure correctly and establish official baselines | `planned` | Validate metric semantics per answer type over the v3 raw artifacts. v3 requirements recorded in T10: Location predictions are address text geocoded against gold geometry; no POI-name/SQL/DB-lookup fallback may synthesize a location prediction; range gold sets are scored by best match against the complete set. |
 | T04 | Improve what the frozen baselines fail at | `planned` | Intervention selected from full-baseline error evidence; typed deterministic rendering remains a hypothesis until then. |
 | T05 | Analyze Vietnamese-specific behavior and errors | `planned` | Robustness, error taxonomy, and the final Vietnamese demo remain. |
@@ -35,6 +35,7 @@ Build and evaluate a reproducible Vietnamese adaptation of GS-QA (`docs/context/
 | T08 | Fast database bootstrap via prebuilt release dump | `done` | Version-agnostic capability, re-verified **at v3** inside T10: clean-DB restore from the published `data-v3.0.0` dump matched all G1′ counts (five tables + import marker). |
 | T09 | PostgreSQL LangChain LLM cache + bounded LLM concurrency | `done` | Architecture preserved unchanged in v3; the prompt-version namespace (`pv-8394cd22`) isolates v3 keys from the v2 rows. First v3 exercise happens with the official runs. Record: `docs/plans/T09-llm-cache-postgres.md`. |
 | T10 | v3.0.0 benchmark refactor | `done` | v3 frozen and published (`data-v3.0.0`: dataset + DB dump, both restores verified from the release); all gates G1′–G6′ passed including byte-identical regeneration, human QC approval, prompt freeze `pv-8394cd22`, v2-seal negative test; no official inference launched. Record: `docs/plans/T10-benchmark-v3-refactor.md`. |
+| T11 | Official inference on an external vLLM endpoint | `done` | All llama.cpp code/config/docs removed from the official path; `baselines_vi.build_model_vi` serves both NVFP4 models through standard OpenAI env vars with one frozen decoding profile; `run_official.sh` probes the endpoint per model (curl `/v1/models` gate), compose keeps an optional `vllm` service (`--reasoning-parser qwen3`); step records gained diagnostic `gen` metadata; all LLM caches purged. Record: `docs/plans/T11-vllm-official-inference.md`. |
 
 ## Cross-Task Contracts
 
@@ -50,7 +51,7 @@ G1′ DB rebuild (five tables non-empty, representative spatial ops, address cov
 
 ## Active Next Action
 
-**User review → user manually launches the four v3 official baseline runs** (`scripts/run_official.sh` for Ornith direct/text2sql, `scripts/run_qwen_official.sh` for Qwen direct/text2sql). T10 is complete; after the four raw runs are sealed, T03 (evaluation) starts and T02's v3 re-proof (notebook refresh + end-to-end re-run) rides with it.
+**User review → user launches the four v3 official baseline runs against the external vLLM endpoint, one model at a time**: with vLLM serving Ornith (`VLLM_MODEL=ornith-ai/Ornith-1.5-9B-NVFP4 podman compose up -d --force-recreate vllm` or any equivalent server), run `MODELS="ornith-ai/Ornith-1.5-9B-NVFP4" ./scripts/run_official.sh`; then restart vLLM with `VLLM_MODEL=AxionML/Qwen3.5-9B-NVFP4` and run `MODELS="AxionML/Qwen3.5-9B-NVFP4" ./scripts/run_official.sh`. After the four raw runs are sealed, T03 (evaluation) starts and T02's v3 re-proof (end-to-end notebook re-run) rides with it.
 
 ## Session Prompt
 

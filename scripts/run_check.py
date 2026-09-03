@@ -5,7 +5,7 @@ the raw caches are complete against the frozen questions, then writes a
 minimal manifest and a stable checksum-bound completion seal.
 
 Usage:
-    python scripts/run_check.py --model llamacpp:org/repo:QUANT \
+    python scripts/run_check.py --model AxionML/Qwen3.5-9B-NVFP4 \
         --baseline text2sql --log logs/official/<run_prefix>
 """
 
@@ -33,8 +33,8 @@ STEPS = {
 }
 # Non-failed records must satisfy their stage's output contract, judged by the
 # same parsers the pipeline consumes artifacts with (never a raw substring).
-# `finish_reason` enforcement is the runtime validator's job — the JSON
-# artifact does not store it.
+# `gen.finish_reason` in a record is diagnostic metadata only; enforcement
+# stays with the runtime validator.
 STAGE_CONTENT_CHECKS = {
     "direct_answer": lambda r: bool(r.get("content", "").strip()),
     "direct_json_parse": lambda r: bool(extract_json_blocks(r.get("content", ""))),

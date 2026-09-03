@@ -10,10 +10,10 @@ This fork adds **VN-GeoQA**, a Vietnamese-language geospatial QA benchmark built
 | Version | **v3.0.0 (frozen)** — [`data/questions_vi/MANIFEST.json`](data/questions_vi/MANIFEST.json) |
 | Questions | 2,800 (100 × 28 canonical GS-QA types), stable `{type}-NNN` ids + `tid` |
 | Source | Geofabrik `vietnam-260901.osm.pbf` (sha256 in MANIFEST) → PostGIS `osm_vn` |
-| Database | OSM Vietnam (PostGIS `osm_vn` + llama.cpp via [`compose.yaml`](compose.yaml)) |
+| Database | OSM Vietnam (PostGIS `osm_vn` via [`compose.yaml`](compose.yaml)); LLM = external OpenAI-compatible vLLM (optional compose service) |
 | Dataset | `data/questions_vi/` — **not in git** by design; restore with `scripts/restore_dataset.sh` (public GitHub Release asset, sha256-verified) or regenerate with seed 42. Symlinked at `generator/questions_vi/` |
 | QC | automated checks 2,800/2,800 + human review of a 140-record seeded sample |
-| Baselines | direct, text2sql — llama.cpp OpenAI-compatible `/v1` via `langchain-openai` |
+| Baselines | direct, text2sql — external OpenAI-compatible vLLM `/v1` via `langchain-openai` (frozen decoding profile, thinking on) |
 | Results | [`baselines/REPORT_VN_GEOQA.md`](baselines/REPORT_VN_GEOQA.md) *(archived, pre-freeze)* |
 
 Generation is reproducible: `python generator/generator_vi.py --seed 42 --count 100` against the imported snapshot regenerates the dataset byte-identically; seed, command, snapshot hash, and validation evidence are recorded in the MANIFEST. Range questions store the **full** answer set ordered by distance (GS-QA range semantics: multiple valid answers). Location questions (T13–T20) keep `geo_wkt` as the authoritative spatial gold alongside native OSM address components and one deterministic canonical address string; candidates are restricted to address-bearing POIs (criterion recorded in the MANIFEST).
@@ -29,7 +29,7 @@ Quick start:
 
 Open and run `main.ipynb` in the local notebook environment or Google Colab.
 
-The notebook starts two independent bootstrap branches and waits for both before coursework begins. Locally, `compose.yaml` owns PostgreSQL/PostGIS and llama.cpp; on Colab, apt supplies PostgreSQL/PostGIS and the official llama.cpp installer is used only when needed. Dependency installation, service startup/readiness, database initialization, and the pinned OSM import remain separate idempotent steps. Post-bootstrap checks and notebook queries use psycopg3.
+The notebook starts the PostgreSQL/PostGIS bootstrap branch and waits for it before coursework begins. The LLM endpoint is an external, already-running OpenAI-compatible vLLM server the notebook never starts: point `OPENAI_BASE_URL` (default `http://127.0.0.1:8000/v1`) and `OPENAI_API_KEY` at it, or start the optional local service with `podman compose up -d vllm`. Dependency installation, service startup/readiness, database initialization, and the pinned OSM import remain separate idempotent steps. Post-bootstrap checks and notebook queries use psycopg3.
 
 ---
 
@@ -59,7 +59,7 @@ Our results show that existing solutions have very low accuracy, which warrants 
 - Python 3.8+
 - PostgreSQL with PostGIS extension enabled
 - Dependencies listed in `requirements.txt`
-- llama.cpp serving `ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M` (provided by compose locally; installed by the notebook on Colab)
+- An OpenAI-compatible vLLM endpoint serving `ornith-ai/Ornith-1.5-9B-NVFP4` and `AxionML/Qwen3.5-9B-NVFP4` (one model per server; the optional local compose service runs `--reasoning-parser qwen3`, and any external vLLM reached via `OPENAI_BASE_URL` works)
 
 ## Installation
 
@@ -87,7 +87,7 @@ Our results show that existing solutions have very low accuracy, which warrants 
 
    - Create a database and configure connection parameters in the config file
 
-4. Start llama.cpp through the notebook bootstrap (or the local compose service).
+4. Start vLLM externally (or via the local compose service) with `--reasoning-parser qwen3` and point `OPENAI_BASE_URL`/`OPENAI_API_KEY` at it; the notebook and the official runners only probe the endpoint.
 
 OpenAI API is required to evaluate GPT4o.
 

@@ -11,7 +11,7 @@ Bộ dữ liệu gồm **2.800 câu hỏi tiếng Việt** về không gian đ�
 ```text
 ViGSQA/
 ├── main.ipynb                          # Notebook end-to-end (local + Colab)
-├── compose.yaml                        # PostGIS + llama.cpp (Ornith Q4_K_M)
+├── compose.yaml                        # PostGIS + vLLM (NVFP4, tùy chọn local)
 ├── scripts/
 │   ├── install_dependencies.sh         # Cài công cụ (Colab: apt; local: pixi)
 │   ├── init_database.sh                # Tạo database osm_vn + PostGIS
@@ -36,7 +36,7 @@ ViGSQA/
 
 - Pixi (local) hoặc Google Colab
 - Docker/Podman (local) — hoặc PostgreSQL + PostGIS do notebook cài bằng apt trên Colab
-- GPU cho llama.cpp (model ~6 GB Q4_K_M)
+- GPU cho vLLM (model NVFP4 ~6 GB + KV cache)
 
 ---
 
@@ -44,7 +44,7 @@ ViGSQA/
 
 Mở và chạy `main.ipynb` trong môi trường notebook local hoặc Google Colab.
 
-Notebook chạy hai nhánh bootstrap độc lập rồi đợi cả hai hoàn tất trước khi bắt đầu phần coursework. Ở local, `compose.yaml` quản lý PostgreSQL/PostGIS và llama.cpp; trên Colab, apt cung cấp PostgreSQL/PostGIS và llama.cpp chỉ được cài bằng installer chính thức khi còn thiếu. Cài dependency, khởi động/chờ service, khởi tạo database và import snapshot OSM đã pin là các bước riêng, chạy lại an toàn. Các kiểm tra sau bootstrap và truy vấn notebook dùng psycopg3.
+Notebook chạy nhánh bootstrap PostgreSQL/PostGIS rồi đợi hoàn tất trước khi bắt đầu phần coursework. Endpoint LLM là server vLLM tương thích OpenAI chạy bên ngoài, notebook không tự khởi động: trỏ `OPENAI_BASE_URL` (mặc định `http://127.0.0.1:8000/v1`) và `OPENAI_API_KEY` tới nó, hoặc khởi động service local tùy chọn bằng `podman compose up -d vllm`. Cài dependency, khởi động/chờ service, khởi tạo database và import snapshot OSM đã pin là các bước riêng, chạy lại an toàn. Các kiểm tra sau bootstrap và truy vấn notebook dùng psycopg3.
 
 **Lưu ý:** bộ dữ liệu nằm ngoài git (`data/` bị gitignore). Sau khi clone repo, symlink `generator/questions_vi` sẽ treo cho tới khi chạy `scripts/restore_dataset.sh` (script có sha256 kiểm tra, chạy lại vô hại). Muốn sinh lại từ đầu: xem [docs/plans/T01-dataset-quality.md](docs/plans/T01-dataset-quality.md).
 
@@ -52,16 +52,17 @@ Notebook chạy hai nhánh bootstrap độc lập rồi đợi cả hai hoàn t�
 
 ## 2. Chạy Baseline
 
-Model duy nhất được hỗ trợ chạy local: llama.cpp qua endpoint tương thích OpenAI `/v1`, client là `langchain-openai.ChatOpenAI` (không dùng Ollama, không tự dựng chat template).
+Inference chính thức đi qua endpoint vLLM tương thích OpenAI chạy bên ngoài (một model mỗi server), client là `langchain-openai.ChatOpenAI` với profile giải mã đóng băng trong `baselines_vi.build_model_vi` (không dùng Ollama, không tự dựng chat template, thinking bật mặc định).
 
 ```bash
 # chạy từ thư mục gốc repo
-# smoke: 8 câu (1/loại) — chỉ để kiểm tra integration, không phải bằng chứng benchmark
-python -m baselines.baselines_vi --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M --baseline direct   --mode smoke
-python -m baselines.baselines_vi --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M --baseline text2sql --mode smoke
+# smoke: 28 câu (1/TID) — chỉ để kiểm tra integration, không phải bằng chứng benchmark
+python -m baselines.baselines_vi --model ornith-ai/Ornith-1.5-9B-NVFP4 --baseline direct   --mode smoke
+python -m baselines.baselines_vi --model ornith-ai/Ornith-1.5-9B-NVFP4 --baseline text2sql --mode smoke
 
 # full: 2.800 câu — số liệu chính thức thuộc T03
-python -m baselines.baselines_vi --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M --baseline text2sql --mode full
+python -m baselines.baselines_vi --model ornith-ai/Ornith-1.5-9B-NVFP4 --baseline text2sql --mode full
+# Qwen: restart vLLM với VLLM_MODEL=AxionML/Qwen3.5-9B-NVFP4 rồi dùng id đó
 ```
 
 Kết quả lưu tại `baselines/<model>_<baseline>_{text,parsed}_eval.csv`.
@@ -70,13 +71,14 @@ Kết quả lưu tại `baselines/<model>_<baseline>_{text,parsed}_eval.csv`.
 
 | Biến | Mặc định | Mô tả |
 |------|----------|-------|
-| `LLAMACPP_URL` | `http://localhost:8000` | Địa chỉ llama.cpp server |
+| `OPENAI_BASE_URL` | `http://127.0.0.1:8000/v1` | Địa chỉ endpoint vLLM tương thích OpenAI |
+| `OPENAI_API_KEY` | `not-needed` (fallback) | API key/token của endpoint; server local không cần key |
 | `PGHOST` / `PGPORT` | `127.0.0.1` / `5432` | Postgres (giống `scripts/*.sh`) |
 | `PGDATABASE` | `osm_vn` | Database |
 | `PGUSER` / `PGPASSWORD` | `postgres` / `postgres` | Chứng thực local |
 | `LLM_CACHE_DBNAME` | `llm_cache` | Tên DB cache LLM (tách biệt DB OSM `osm_vn`) |
 
-Cờ `--llm-concurrency N` (bắt buộc) giới hạn số lời gọi LLM đồng thời phía client; `scripts/run_official.sh` truyền `4` để khớp 4 slot của preset server trong `config/models.ini`.
+Cờ `--llm-concurrency N` (bắt buộc) giới hạn số lời gọi LLM đồng thời phía client; đặt theo throughput của server vLLM. `scripts/run_official.sh` chỉ dò endpoint (curl `${OPENAI_BASE_URL}/models`), không tự khởi động server — muốn đổi model đang phục vụ, restart vLLM với `VLLM_MODEL=<id>`.
 
 SQL do model sinh luôn chạy trong transaction **read-only** kèm statement timeout.
 

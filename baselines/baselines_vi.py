@@ -7,17 +7,18 @@ Patches the upstream pipeline module at runtime:
   - CACHE_DIR      → cache_vi/pv-{prompt_version}/
   - PROMPT_FILES   → Vietnamese prompts for direct and text2sql baselines
   - evaluate.get_osm_value → handles geo_wkt / dist_km field names
-  - build_model    → llamacpp:<tag> routes to ChatOpenAI against llama.cpp /v1
+  - build_model    → every model is served by the external OpenAI-compatible
+                     vLLM endpoint (standard OPENAI_* env vars, frozen profile)
 
 Step caches are namespaced by the prompt version (sha256-8 of the active
 Vietnamese prompts), so a prompt change never reuses another freeze's results.
 
 Usage (run from the repo root; same flags as pipeline.py):
   python -m baselines.baselines_vi \
-    --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M \
+    --model ornith-ai/Ornith-1.5-9B-NVFP4 \
     --baseline direct --mode smoke
   python -m baselines.baselines_vi \
-    --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M \
+    --model ornith-ai/Ornith-1.5-9B-NVFP4 \
     --baseline text2sql --mode full
 """
 
@@ -423,32 +424,38 @@ def _vn_evaluate_answers(
 
 pipeline.evaluate_answers = _vn_evaluate_answers
 
-# ── Model routing: llama.cpp via its OpenAI-compatible /v1 endpoint ──────────
-# Model name syntax:  llamacpp:<tag>
-# Example: --model llamacpp:ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M
-# The server (compose service or Colab llama-server) applies the GGUF's own
-# chat template, so no per-model prompt formatting lives here.
-# Reads LLAMACPP_URL env var (default http://localhost:8000).
+# ── Model routing: external OpenAI-compatible vLLM endpoint ──────────────────
+# The model name is the id the server serves, e.g.
+#   --model ornith-ai/Ornith-1.5-9B-NVFP4
+# The endpoint is assumed already running and is addressed only through the
+# standard OpenAI env vars (OPENAI_API_BASE / OPENAI_BASE_URL, OPENAI_API_KEY);
+# the key fallback keeps keyless local vLLM usable without secrets. vLLM-only
+# samplers ride in extra_body; thinking stays on via the server-side chat
+# template's default behavior (no chat_template_kwargs). No tool calls.
 
-_orig_build_model = pipeline.build_model
-
-
-def _build_model_vi(model_name: str):
-    if model_name.startswith("llamacpp:"):
-        tag = model_name[len("llamacpp:") :]
-        base_url = os.environ.get("LLAMACPP_URL", "http://localhost:8000")
-        return ChatOpenAI(
-            model=tag,
-            base_url=f"{base_url}/v1",
-            api_key="not-needed",
-            temperature=0,
-            max_tokens=4096,
-        )
-    return _orig_build_model(model_name)
+# Frozen inference profile, identical for both official models. It is part of
+# the LangChain cache key through `_get_llm_string()`, so a profile change
+# re-keys the cache without any extra machinery.
+INFERENCE_PROFILE = dict(
+    temperature=1.0,
+    top_p=0.95,
+    presence_penalty=1.5,
+    seed=42,
+    max_completion_tokens=32768,
+    extra_body={"top_k": 20, "min_p": 0.0, "repetition_penalty": 1.0},
+)
 
 
-pipeline.build_model = _build_model_vi
-pipeline.build_parser_model = _build_model_vi
+def build_model_vi(model_name: str):
+    return ChatOpenAI(
+        model=model_name,
+        api_key=os.environ.get("OPENAI_API_KEY") or "not-needed",
+        **INFERENCE_PROFILE,
+    )
+
+
+pipeline.build_model = build_model_vi
+pipeline.build_parser_model = build_model_vi
 
 # ── PostgreSQL LLM cache (LangChain) ─────────────────────────────────────────
 # The cache is the skip layer for LLM steps; the JSON step files remain
@@ -493,7 +500,8 @@ def _normalize_llm_string(llm_string: str) -> str:
 class TransportNormalizedMd5Cache(SQLAlchemyMd5Cache):
     """`SQLAlchemyMd5Cache` that keys on the model request, ignoring endpoint.
 
-    Model name, quantization tag, temperature, and max_tokens stay keyed."""
+    Model name, temperature, and the other generation kwargs
+    (`max_completion_tokens`, `extra_body`) stay keyed."""
 
     def lookup(self, prompt, llm_string):
         """Cached generations for the normalized request key, or `None` on a miss.

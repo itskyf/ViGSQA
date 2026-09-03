@@ -31,6 +31,7 @@ import datetime
 import decimal
 import importlib
 import json
+import logging
 import operator as op
 import os
 import random
@@ -58,6 +59,8 @@ from num2words import num2words
 from psycopg.rows import dict_row
 from pyproj import Geod
 from tqdm import tqdm
+
+logger = logging.getLogger(__name__)
 
 # Optional model backends: only the selected model/provider needs them, so a
 # missing package must not break importing this module.
@@ -214,11 +217,13 @@ def invoke_with_retry(model, messages, max_retries: int = 8):
 TERMINAL_FAILURE_STREAK = 10
 
 
-def invoke_or_capture(model, messages) -> tuple[str, str | None]:
+def invoke_or_capture(model, messages) -> tuple[str, str | None, dict]:
     try:
-        return invoke_with_retry(model, messages).content, None
-    except Exception as e:  # noqa: BLE001 — the error is frozen into the cache
-        return "", str(e)
+        message = invoke_with_retry(model, messages)
+        return message.content, None, _gen_metadata(message)
+    except Exception as e:  # the error is frozen into the cache below
+        logger.exception("LLM invoke failed; freezing the error into the cache")
+        return "", str(e), {}
 
 
 # Stage output validation (opt-in). A successful transport call is not
@@ -249,6 +254,24 @@ def _finish_reason(message) -> str | None:
     """
     metadata = getattr(message, "response_metadata", None)
     return metadata.get("finish_reason") if isinstance(metadata, dict) else None
+
+
+def _gen_metadata(message) -> dict:
+    """Minimal generation diagnostics for the step records: termination status
+    and token usage (incl. reasoning tokens) only — completion/reasoning text
+    is never recorded.
+    """
+    metadata = getattr(message, "response_metadata", None)
+    if not isinstance(metadata, dict):
+        return {}
+    usage = metadata.get("token_usage") or {}
+    details = usage.get("completion_tokens_details") or {}
+    gen = {"finish_reason": metadata.get("finish_reason")}
+    if usage.get("completion_tokens") is not None:
+        gen["completion_tokens"] = usage["completion_tokens"]
+    if details.get("reasoning_tokens") is not None:
+        gen["reasoning_tokens"] = details["reasoning_tokens"]
+    return gen
 
 
 def evict_llm_request(model, messages) -> None:
@@ -294,20 +317,21 @@ def invoke_validated_or_capture(model, messages, stage: StageValidation):
     for _ in range(attempts):
         try:
             message = invoke_with_retry(model, messages)
-        except Exception as e:  # noqa: BLE001 — the error is frozen into the cache
-            return "", str(e)
+        except Exception as e:  # the error is frozen into the cache below
+            logger.exception("LLM invoke failed; freezing the error into the cache")
+            return "", str(e), {}
         label = stage.check(message.content, _finish_reason(message))
         if label is None:
-            return message.content, None
+            return message.content, None, _gen_metadata(message)
         # Also runs after the final attempt: no invalid value may survive as
         # the canonical cache entry.
         evict_llm_request(model, messages)
-    return "", f"{label} after {attempts} attempts"
+    return "", f"{label} after {attempts} attempts", {}
 
 
 # Client-side bound on concurrent LLM calls, threaded from `--llm-concurrency`
 # through the step functions like every other CLI setting (default 1 = the
-# exact sequential path). Server-side slots live in config/models.ini.
+# exact sequential path).
 
 
 @cache
@@ -317,7 +341,7 @@ def _llm_pool(max_workers: int) -> ThreadPoolExecutor:
 
 def invoke_or_capture_many(
     model, calls, llm_concurrency=1, stage: StageValidation | None = None
-) -> list[tuple[str, str | None]]:
+) -> list[tuple[str, str | None, dict]]:
     """`invoke_or_capture` over a batch of message lists, bounded by
     `llm_concurrency`. `Executor.map` preserves input order, so record
     processing and the JSON write-through stay on the calling thread.
@@ -393,10 +417,12 @@ def run_llm_step(
             contents = invoke_or_capture_many(
                 model, [build_messages(i) for i in idxs], llm_concurrency, stage
             )
-            for i, (content, error) in zip(idxs, contents, strict=True):
+            for i, (content, error, gen) in zip(idxs, contents, strict=True):
                 record = {"id": questions[i]["id"], "content": content}
                 if error:
                     record["error"] = error
+                if gen:
+                    record["gen"] = gen
                 results[i] = record
                 # Write-through after every item so partial runs are recoverable;
                 # identical replays (cache hits) skip the rewrite.
@@ -1650,8 +1676,7 @@ def parse_args():
         required=True,
         help=(
             "Client-side bound on concurrent LLM calls, shared by all LLM "
-            "steps; the official runner passes 4 (the llama.cpp preset in "
-            "config/models.ini serves 4 slots)."
+            "steps; set it to what the serving endpoint's throughput allows."
         ),
     )
     return parser.parse_args()

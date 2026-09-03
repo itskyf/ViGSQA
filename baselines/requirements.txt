@@ -3,7 +3,7 @@
 # baselines and their heavy extras (torch, faiss, chroma, sentence-transformers)
 # are not part of the Vietnamese pipeline.
 
-# LLM client — llama.cpp OpenAI-compatible /v1 endpoint
+# LLM client — OpenAI-compatible /v1 endpoint (vLLM) via langchain-openai
 langchain-core>=1.2.19
 langchain-openai>=1.0.0
 
