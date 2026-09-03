@@ -2,42 +2,55 @@
 
 ## Project Goal
 
-Build and evaluate a reproducible Vietnamese adaptation of GS-QA that satisfies the course requirements and supports defensible experimental conclusions. The authoritative requirements and initial audit are in `docs/context/00a_context.md` and `docs/context/00b_missing.md`.
+Build and evaluate a reproducible Vietnamese adaptation of GS-QA (`docs/context/00a_context.md`) that satisfies the course requirements — a runnable notebook, baseline comparison, evaluation, error analysis, and a Vietnamese demo — and supports defensible experimental conclusions.
 
-## Target Scientific Contribution
+## v3.0.0 Reproducibility Contract
 
-ViGSQA extends GS-QA to Vietnamese OSM data and investigates whether database grounding plus output-type-aware handling can address failures of direct LLM answering and vanilla Text2SQL. The exact improvement is selected from frozen-baseline error evidence; typed deterministic rendering is the current primary hypothesis, not a committed method. Vietnamese-specific robustness and error analysis form a second contribution axis.
+- Dataset `v3.0.0`: 28 canonical GS-QA TIDs × 100 = 2,800 questions, seed 42, generated from the pinned Geofabrik snapshot `vietnam-260901.osm.pbf` (md5 verified against the Geofabrik sidecar in `download_osm.sh`; never `vietnam-latest`).
+- Location gold (T13–T20): frozen geometry (`geo_wkt`) **and** native OSM address components **and** one deterministic canonical address string built only from those components; candidates are restricted to address-bearing POIs by a criterion fixed by the coverage audit; geometry stays the authoritative spatial reference.
+- T7/T8 external facts (frozen viwiki/enwiki infobox values) are genuinely out-of-schema: no T7/T8 answer attribute is exposed as a reference-DB column (verifier-enforced).
+- Official baselines: Ornith/Qwen × Direct/Text2SQL, temperature 0, frozen prompts, bounded concurrency, raw QID-indexed JSON artifacts under `cache_vi/pv-<prompt_sha256>/`, G6 artifact-integrity seal binding dataset + prompt + OSM/DB provenance.
+- v1/v2 artifacts (releases, raw JSONs, logs, seals, QC records) are historical evidence only; old seals can never satisfy v3; the PostgreSQL semantic LLM cache is never cleared (v3 requests miss naturally because prompts change).
+
+## Why v1/v2 were superseded
+
+- **v1 (8 template families, `data-v1.0.0`)** — first frozen benchmark; subsumed by v2's all-28-TID expansion.
+- **v2 (28 TIDs, `data-v2.0.0`)** — spatial semantics validated and all four raw runs sealed, but Location gold was coordinates-only (importer kept `addr:city` alone), which cannot reproduce GS-QA's address-text Location evaluation; additionally the `capacity` column leaked a T7/T8 external fact into the Text2SQL schema. v3 rebuilds the benchmark on `vietnam-260901.osm.pbf` with native address columns. v2 raw inference is superseded before official evaluation and preserved only as historical evidence.
 
 ## Naming rule
 
-`v2.0.0` appears only as release lineage: the `data-v2.0.0` release tag (download URLs), `scripts/v2.0.0.sha256`, and the dataset MANIFEST's `version` field. Asset filenames (`vn-geoqa.zip`, `osm-vn.sql.gz`), tools, and local paths carry no version.
+`v3.0.0` appears only as release lineage: the `data-v3.0.0` release tag (download URLs), `scripts/v3.0.0.sha256`, and the dataset MANIFEST `version` field. Asset filenames (`vn-geoqa.zip`, `osm-vn.sql.gz`), tools, and local paths carry no version. `scripts/v2.0.0.sha256` is retained so v2 stays restorable.
 
 ## Tasks
 
 | ID | Goal | Status | Current state |
 | --- | --- | --- | --- |
-| T01 | Establish a trustworthy Vietnamese benchmark | `done` | Frozen benchmark published (`data-v2.0.0` release, seed 42, 800/800 then 2,800/2,800 verified); restored by `scripts/restore_dataset.sh`. |
-| T02 | Make the whole experiment runnable end-to-end | `done` | All coursework cells implemented and proven end-to-end on a fresh Colab VM; `main.ipynb` is the executable notebook (Drive/Colab holds the authoritative copy). |
-| T03 | Measure correctly and establish official baselines | `planned` | Validate metric semantics per answer type (best-match against full gold candidate sets), then aggregate and report the official comparison over the raw artifacts (see T07). Raw caches are authoritative pre-evaluation evidence; interim eval CSVs are provisional. |
-| T04 | Improve what the frozen baselines fail at | `planned` | Select the intervention from full-baseline error evidence; the typed deterministic renderer stays a hypothesis until then. Plugs into the `baselines_vi.py` patch layer without a pipeline rewrite. |
-| T05 | Analyze Vietnamese-specific behavior and errors | `planned` | Full/stripped diacritic surfaces exist; robustness, error taxonomy, and the final demonstration on new Vietnamese questions remain. |
-| T06 | Tell the story as an ACL paper | `planned` | Course requires the official ACL style files; the current Typst placeholder is replaced in T06. |
-| T07 | Complete the benchmark and capture raw baseline runs | `in_progress` | Ornith Direct and Text2SQL are G6-valid and sealed. Qwen inference/resume remains in progress and is not sealed. T07 finishes only after all four official pairs pass G6 and their seals verify. Record: `docs/plans/T07-benchmark-v2-raw-runs.md`. |
-| T08 | Fast database bootstrap via prebuilt release dump | `done` | `bootstrap_postgres.sh` restores `osm-vn.sql.gz` (release `data-v2.0.0`, SHA-256 pinned) before falling back to the osm2pgsql import; verified on PostgreSQL 18 and 14/PostGIS 3.5 with exact reference counts. |
-| T09 | PostgreSQL LangChain LLM cache + bounded LLM concurrency | `in_progress` | PostgreSQL remains request-level resume/repair state and is excluded from run seals. Release publication of the completed cache dump is deferred until explicit confirmation that Qwen has finished. Record: `docs/plans/T09-llm-cache-postgres.md`. |
+| T01 | Establish a trustworthy Vietnamese benchmark | `done` | v1 freeze superseded by v2/v3 (Git history). |
+| T02 | Make the whole experiment runnable end-to-end | `done` | Proven on a fresh Colab VM; `main.ipynb` (Drive/Colab) still pins v2 provenance and is refreshed when official v3 evaluation lands (T03/T05). |
+| T03 | Measure correctly and establish official baselines | `planned` | Validate metric semantics per answer type over the v3 raw artifacts. v3 requirements recorded in T10: Location predictions are address text geocoded against gold geometry; no POI-name/SQL/DB-lookup fallback may synthesize a location prediction; range gold sets are scored by best match against the complete set. |
+| T04 | Improve what the frozen baselines fail at | `planned` | Intervention selected from full-baseline error evidence; typed deterministic rendering remains a hypothesis until then. |
+| T05 | Analyze Vietnamese-specific behavior and errors | `planned` | Robustness, error taxonomy, and the final Vietnamese demo remain. |
+| T06 | Tell the story as an ACL paper | `planned` | ACL style files replace the Typst placeholder. |
+| T07 | Complete the v2 benchmark and capture raw baseline runs | `done` | All four v2 runs G6-valid and sealed (2026-09-03); superseded as evidence by v3 before evaluation. Record: `docs/plans/T07-benchmark-v2-raw-runs.md`. |
+| T08 | Fast database bootstrap via prebuilt release dump | `done` | Restore>build flow reused for the v3 dump republish inside T10. |
+| T09 | PostgreSQL LangChain LLM cache + bounded LLM concurrency | `done` | Architecture preserved unchanged in v3. Record: `docs/plans/T09-llm-cache-postgres.md`. |
+| T10 | v3.0.0 benchmark refactor | `in_progress` | Rebuild DB on `vietnam-260901.osm.pbf` with native address columns, fix Location gold at the source, restore T7/T8 out-of-schema semantics, regenerate + QC 2,800 questions, freeze prompts, publish `data-v3.0.0`, prepare (not run) the official runner. Record: `docs/plans/T10-benchmark-v3-refactor.md`. |
 
-## Cross-Task Discoveries
+## Cross-Task Contracts
 
-- Official experiments use the frozen benchmark and the matching pinned OSM snapshot (`https://download.geofabrik.de/asia/vietnam-260825.osm.pbf`), verified against the Geofabrik md5 sidecar in `download_osm.sh`.
-- The dataset lives outside version control; restore with `scripts/restore_dataset.sh` (release asset) or byte-identical regeneration with the pinned seed. Read through the `generator/questions_vi` symlink; never commit `data/` or `main.ipynb`.
-- All pre-freeze result artifacts (`baselines/*_eval.csv`, `baselines/REPORT_VN_GEOQA.md`, `docs/results.md`) are archived and describe a superseded dataset; never use them as benchmark evidence.
-- Range-type gold answers are full distance-ordered sets (up to ~1254 candidates): score predictions by best applicable match against the complete gold set. T03 owns metric semantics.
-- T09's cache-key contract governs every cache interaction: same semantic model request at a different transport endpoint → cache reuse; different model/quantization/generation parameters/prompt → separate cache. JSON step caches remain write-through raw artifacts and PostgreSQL `llm_cache` is the LLM-step skip layer. Exhausted structural-validation failures remain stable explicit raw artifacts; transport/configuration failures remain distinguishable and retryable on resume. Structurally valid but incorrect outputs are never retried.
-- Official completion is a valid G6 seal bound to model/baseline, frozen dataset and prompt identities, repository-pinned OSM/database provenance, and raw artifact hashes. Git commit is provenance-only; an all-sealed official run exits before infrastructure startup.
+- Official experiments consume only published frozen assets (`data-v3.0.0` release) — never a mutable local DB/dataset — and the pinned snapshot verified by `download_osm.sh`.
+- The dataset lives outside version control; restore with `scripts/restore_dataset.sh` or byte-identical regeneration (seed 42, frozen `wikipedia_cache_vi.json`). Read through the `generator/questions_vi` symlink; never commit `data/` or `main.ipynb`.
+- T09's cache-key contract governs every cache interaction: same semantic model request at a different transport endpoint → cache reuse; different model/quantization/generation parameters/prompt → separate cache. JSON step caches are write-through raw artifacts; PostgreSQL `llm_cache` is the LLM-step skip layer. Exhausted structural-validation failures stay explicit; transport/configuration failures stay retryable; structurally valid but incorrect outputs are never retried.
+- Official completion is a valid G6 seal bound to model/baseline, frozen dataset and prompt identities, repository-pinned OSM/DB provenance, and raw artifact hashes. Git commit is provenance-only.
+- Range-type gold answers are full distance-ordered sets: score predictions by best applicable match against the complete gold set (T03).
+
+## Validation Gates (T10)
+
+G1′ DB rebuild (five tables non-empty, representative spatial ops, address coverage audit, T7/T8 overlap audit) → G2′ smoke 5×28 → G3′ full seed-42 generation, 2,800/2,800 automated verification, byte-identical regeneration → G4′ human QC (~5/TID) with user approval → prompt freeze (new `pv-*` hash; no official-runner invocations between prompt edit and dataset freeze) → G5′ runner static checks + v2-seal negative test → G6′ publish `data-v3.0.0` and verify dataset/DB restore. No official inference is launched inside T10.
 
 ## Active Next Action
 
-T07: **finish Qwen → G6 each Qwen baseline → seal each → verify all four seals → mark T07 done → activate T03.** Do not Run All `main.ipynb` against the canonical sealed cache before T03; defer notebook cleanup and final execution until official evaluation can consume the sealed raw artifacts safely.
+T10: execute the phase plan in `docs/plans/T10-benchmark-v3-refactor.md`. After QC approval, freeze/publish v3 assets, then **user review → user manually launches the four v3 official baseline runs.**
 
 ## Session Prompt
 
