@@ -2,7 +2,7 @@
 
 ## Overview
 
-VN-GeoQA contains 800 Vietnamese geospatial questions generated automatically from OpenStreetMap Vietnam data stored in a PostGIS database. Questions are paired with ground-truth SQL queries and answers verified against the live database.
+VN-GeoQA contains 2,800 Vietnamese geospatial questions (28 canonical GS-QA types × 100) generated automatically from OpenStreetMap Vietnam data stored in a PostGIS database. Questions are paired with ground-truth SQL queries and answers verified against the live database.
 
 ---
 
@@ -58,10 +58,12 @@ export them as shown above.
 | Table/View | Content |
 |-----------|---------|
 | `planet_osm_point` | POI nodes (amenity, tourism, shop, leisure) via `scripts/osm_poi.lua` |
-| `pois` | View over `planet_osm_point` exposing `id, poi_name, amenity, tourism, shop, leisure, geometry, geo_wkt` |
+| `pois` | View over `planet_osm_point`: identity + category columns, filter tags (`cuisine`, `museum`, `takeaway`, `outdoor_seating`, `delivery`, `emergency`), anchor identifiers (`wikidata`, `wikipedia`), 8 native address columns (`addr_housenumber`, `addr_street`, `addr_place`, `addr_suburb`, `addr_district`, `addr_city`, `addr_province`, `addr_postcode`), `geometry`, `geo_wkt` |
 
 The `geometry` column name is intentional: the upstream GS-QA schema and the
-text2sql prompts hard-code `pois.geometry`.
+text2sql prompts hard-code `pois.geometry`. `capacity` is deliberately absent:
+T7/T8 external (Wikipedia) attributes must be verifiably out-of-schema, and no
+filter label uses it.
 
 ---
 
@@ -70,13 +72,14 @@ text2sql prompts hard-code `pois.geometry`.
 The dataset lives at `data/questions_vi/` with `generator/questions_vi` as a
 symlink to it, so code and notebooks keep using the familiar path. `data/` is
 **not tracked by git** (`.gitignore`): the frozen dataset is published as a
-public GitHub Release asset (tag `data-v2.0.0`) and restored by:
+public GitHub Release asset (tag `data-v3.0.0`) and restored by:
 
 1. `./scripts/restore_dataset.sh` — downloads, unpacks, and sha256-verifies
-   `data/questions_vi` (idempotent; needs only `curl` + `unzip`), or
+   `data/questions_vi` against `scripts/v3.0.0.sha256` (idempotent; needs only
+   `curl` + `unzip`), or
 2. running the pipeline above against the **pinned snapshot** and regenerating
    with the pinned seed. `download_osm.sh` downloads the pinned
-   `vietnam-260825.osm.pbf` snapshot:
+   `vietnam-260901.osm.pbf` snapshot:
 
    ```bash
    export PGHOST=127.0.0.1 PGPORT=5432 PGDATABASE=osm_vn
@@ -90,15 +93,15 @@ public GitHub Release asset (tag `data-v2.0.0`) and restored by:
    Regeneration needs the running database and the pinned PBF; the Release
    asset needs neither.
 
-Either way, verify integrity against the sha256 table in
-`docs/plans/T01-dataset-quality.md`. To publish a new dataset version, generate
-into a new directory, verify, update the MANIFEST, then repoint the symlink and
-tag the release (the version lives only in the tag):
+To publish a new dataset version, **generate into a staging directory** (never
+in place — regeneration would briefly leave the old `MANIFEST.json` describing
+the new jsonl files), verify, then swap at freeze:
 
 ```bash
-cd generator
-python generator_vi.py --seed 42 --count 100 --output ../data/questions_vi_new
-# verify, update MANIFEST, then: ln -sfn ../data/questions_vi_new questions_vi
+python generator/generator_vi.py --seed 42 --count 100 --output data/<version>-stage/questions_vi
+# verify + byte-identical regen check + human QC, write MANIFEST, build the sha256 table
+mv data/questions_vi "data/questions_vi_$(old_version)_archive"
+mv data/<version>-stage/questions_vi data/questions_vi   # symlink unchanged
 ```
 
 The seed pins both the Python sampling and the per-call
@@ -132,7 +135,7 @@ Bạn có biết [1_type] gần [3] nhất là gì không?
 ## Step 3 — Quality Verification
 
 ```bash
-python verify_vi.py --input questions_vi/ --spot-check 0.05 --seed 42
+python verify_vi.py --input questions_vi/ --all --spot-check 0.05 --seed 42
 ```
 
 Automated checks (DB-free, per record):
@@ -142,6 +145,11 @@ Automated checks (DB-free, per record):
 - No `LIMIT` without `ORDER BY` (nondeterministic answer subsets)
 - Stable `{type}-NNN` id, record type matches the filename, no duplicate questions
 - `question == question_surfaces.full`; Vietnamese surface consistency; name sanity
+- Location answers carry a non-empty `address` and `geo_wkt`, the canonical
+  string recomputes from the stored components, and the gold SQL contains the
+  address-bearing predicate
+- T7/T8 external attribute keys never match live `pois` view columns
+  (`pois_view_columns()` parses `sql/refresh_views.sql` fail-closed)
 
 Stored answers are additionally re-executed against PostGIS at freeze time
 (see the `validation` block in `questions_vi/MANIFEST.json`).
@@ -150,17 +158,29 @@ Stored answers are additionally re-executed against PostGIS at freeze time
 
 ## Dataset Statistics
 
-| Type | Answer type | N |
-|------|------------|:-:|
-| `knn+name` | POI name | 100 |
-| `knn+loc` | Coordinates (lat/lon) | 100 |
-| `knn+distance` | Distance in km | 100 |
-| `knn:direction+name` | POI name | 100 |
-| `range+name` | POI name | 100 |
-| `range+loc` | Coordinates (lat/lon) | 100 |
-| `range+count` | Integer count | 100 |
-| `range:direction+name` | POI name | 100 |
-| **Total** | | **800** |
+28 canonical GS-QA types × 100 questions. Answer-type distribution:
+
+| Answer type | N | Notes |
+|------------|:-:|-------|
+| name | 1,200 | `poi_name` (single or full distance-ordered set) |
+| loc | 800 | T13–T20: canonical address + native components + `geo_wkt` |
+| angle | 200 | degrees clockwise from north |
+| count | 200 | exact integer |
+| distance | 200 | metres |
+| area | 100 | square metres |
+| length | 100 | metres |
+| **Total** | **2,800** | |
+
+The full `tid → type` mapping is recorded in `data/questions_vi/MANIFEST.json`.
+
+**Location semantics (v3):** location candidates are restricted to
+address-bearing POIs — `(addr_street IS NOT NULL OR addr_place IS NOT NULL)
+AND (addr_suburb IS NOT NULL OR addr_district IS NOT NULL OR addr_city IS NOT
+NULL OR addr_province IS NOT NULL)` — and the predicate is stated verbatim in
+the Text2SQL prompt, so gold SQL is reproducible by the model with no hidden
+filter. `geo_wkt` remains the authoritative spatial reference; the canonical
+address string is derived only from the frozen components (no reverse
+geocoding, no synthesis).
 
 ---
 
@@ -183,15 +203,18 @@ Each `questions_vi/<type>.jsonl` — 100 lines, one JSON object per line:
 }
 ```
 
-List-type questions (`range+name`, `range+loc`, `range:direction+name`) store the
-**full result set** ordered by distance to the anchor, with the anchor itself
-excluded.
+List-type questions store the **full result set** ordered by distance to the
+anchor, with the anchor itself excluded.
 
 Field variations by type:
 
 | Answer type | Key in `answers[]` | Format |
 |-------------|-------------------|--------|
 | name | `poi_name` | string |
-| location | `geo_wkt` | WKT `POINT(lon lat)` |
-| distance | `dist_km` | float (kilometres) |
+| location | `address` (+ `addr_*` components, `geo_wkt`) | canonical address string; e.g. `{"id": 123, "poi_name": "...", "geo_wkt": "POINT(...)", "address": "5B Nguyễn Thiện Thuật, Phường Hoàn Kiếm, Hà Nội, Thành phố Hà Nội", "addr_housenumber": "5B", ...}` |
+| distance | `distance` | number (metres) |
 | count | `count` | integer |
+| angle | `angle` | degrees |
+| area | `area` | square metres |
+| length | `length` | metres |
+| multihop (T7) | `multi_source_answer` (+ `multi_source_attribute`, `multi_source_long_answer`) | external (Wikipedia) fact |

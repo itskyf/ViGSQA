@@ -7,16 +7,16 @@ This fork adds **VN-GeoQA**, a Vietnamese-language geospatial QA benchmark built
 | | VN-GeoQA |
 |--|--|
 | Language | Vietnamese |
-| Version | **v2.0.0 (frozen)** — [`data/questions_vi/MANIFEST.json`](data/questions_vi/MANIFEST.json) |
+| Version | **v3.0.0 (frozen)** — [`data/questions_vi/MANIFEST.json`](data/questions_vi/MANIFEST.json) |
 | Questions | 2,800 (100 × 28 canonical GS-QA types), stable `{type}-NNN` ids + `tid` |
-| Source | Geofabrik `vietnam-260825.osm.pbf` (sha256 in MANIFEST) → PostGIS `osm_vn` |
+| Source | Geofabrik `vietnam-260901.osm.pbf` (sha256 in MANIFEST) → PostGIS `osm_vn` |
 | Database | OSM Vietnam (PostGIS `osm_vn` + llama.cpp via [`compose.yaml`](compose.yaml)) |
 | Dataset | `data/questions_vi/` — **not in git** by design; restore with `scripts/restore_dataset.sh` (public GitHub Release asset, sha256-verified) or regenerate with seed 42. Symlinked at `generator/questions_vi/` |
 | QC | automated checks 2,800/2,800 + human review of a 140-record seeded sample |
 | Baselines | direct, text2sql — llama.cpp OpenAI-compatible `/v1` via `langchain-openai` |
 | Results | [`baselines/REPORT_VN_GEOQA.md`](baselines/REPORT_VN_GEOQA.md) *(archived, pre-freeze)* |
 
-Generation is reproducible: `python generator/generator_vi.py --seed 42 --count 100` against the imported snapshot regenerates the dataset byte-identically; seed, command, snapshot hash, and validation evidence are recorded in the MANIFEST. Range questions store the **full** answer set ordered by distance (GS-QA range semantics: multiple valid answers).
+Generation is reproducible: `python generator/generator_vi.py --seed 42 --count 100` against the imported snapshot regenerates the dataset byte-identically; seed, command, snapshot hash, and validation evidence are recorded in the MANIFEST. Range questions store the **full** answer set ordered by distance (GS-QA range semantics: multiple valid answers). Location questions (T13–T20) keep `geo_wkt` as the authoritative spatial gold alongside native OSM address components and one deterministic canonical address string; candidates are restricted to address-bearing POIs (criterion recorded in the MANIFEST).
 
 **Full Vietnamese documentation: [README_VI.md](README_VI.md)**
 
