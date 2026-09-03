@@ -398,6 +398,42 @@ def spot_check_sample(entries: list[dict], rate: float = 0.05) -> list[dict]:
     return sample
 
 
+def expected_answer_text(entry: dict) -> str:
+    """Human-readable gold for the spot-check TSV, answer-type aware.
+
+    The v2 column always showed `poi_name`, hiding the gold for location
+    (canonical address), T7 (external fact) and numeric types.
+    """
+    answers = entry.get("answers", [])
+    if not answers:
+        return ""
+    first = answers[0]
+    if first.get("multi_source_answer"):
+        # T7: the frozen external Wikipedia value is the expected answer.
+        text = str(first["multi_source_answer"])
+    else:
+        key = {
+            "loc": "address",
+            "angle": "angle",
+            "distance": "distance",
+            "count": "count",
+            "area": "area",
+            "length": "length",
+        }.get(entry.get("answer_type"))
+        value = first.get(key) if key else None
+        if value is None:
+            value = (
+                first.get("poi_name")
+                or first.get("road_name")
+                or first.get("park_name")
+                or first.get("lake_name")
+            )
+        text = "" if value is None else str(value)
+    if len(answers) > 1:
+        text = f"{text} (+{len(answers) - 1} more)"
+    return text.replace("\t", " ").replace("\n", " ")
+
+
 def print_spot_check_tsv(sample: list[dict]):
     """One row per sampled question: full record fields an annotator needs to
     check that the SQL actually answers the Vietnamese question."""
@@ -406,18 +442,9 @@ def print_spot_check_tsv(sample: list[dict]):
         q = e.get("question", "")
         qtype = e.get("type", "")
         sql = e.get("sql", "").replace("\t", " ").replace("\n", " ")
-        ans = e.get("answers", [{}])
-        ans_name = (
-            ans[0].get("poi_name")
-            or ans[0].get("road_name")
-            or ans[0].get("park_name")
-            or ans[0].get("lake_name")
-            or str(ans[0])[:60]
-            if ans
-            else ""
-        )
         print(
-            f"{e.get('id', i)}\t{e.get('tid', '')}\t{qtype}\t{q}\t{sql}\t{ans_name}\t"
+            f"{e.get('id', i)}\t{e.get('tid', '')}\t{qtype}\t{q}\t{sql}\t"
+            f"{expected_answer_text(e)}\t"
         )
 
 
