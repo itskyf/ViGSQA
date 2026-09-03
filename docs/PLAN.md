@@ -9,7 +9,7 @@ Build and evaluate a reproducible Vietnamese adaptation of GS-QA (`docs/context/
 - Dataset `v3.0.0`: 28 canonical GS-QA TIDs × 100 = 2,800 questions, seed 42, generated from the pinned Geofabrik snapshot `vietnam-260901.osm.pbf` (md5 verified against the Geofabrik sidecar in `download_osm.sh`; never `vietnam-latest`).
 - Location gold (T13–T20): frozen geometry (`geo_wkt`) **and** native OSM address components **and** one deterministic canonical address string built only from those components; candidates are restricted to address-bearing POIs by a criterion fixed by the coverage audit; geometry stays the authoritative spatial reference.
 - T7/T8 external facts (frozen viwiki/enwiki infobox values) are genuinely out-of-schema: no T7/T8 answer attribute is exposed as a reference-DB column (verifier-enforced).
-- Official baselines: Ornith/Qwen × Direct/Text2SQL, temperature 0, frozen prompts, bounded concurrency, raw QID-indexed JSON artifacts under `cache_vi/pv-<prompt_sha256>/`, G6 artifact-integrity seal binding dataset + prompt + OSM/DB provenance.
+- Official baselines: Ornith/Qwen × Direct/Text2SQL, temperature 0, frozen prompts (`pv-8394cd22`), bounded concurrency, raw QID-indexed JSON artifacts under `cache_vi/pv-8394cd22/`, G6 artifact-integrity seal binding dataset + prompt + OSM/DB provenance.
 - v1/v2 artifacts (releases, raw JSONs, logs, seals, QC records) are historical evidence only; old seals can never satisfy v3; the PostgreSQL semantic LLM cache is never cleared (v3 requests miss naturally because prompts change).
 
 ## Why v1/v2 were superseded
@@ -27,7 +27,7 @@ Build and evaluate a reproducible Vietnamese adaptation of GS-QA (`docs/context/
 | --- | --- | --- | --- |
 | T01 | Establish a trustworthy Vietnamese benchmark | `done` | v1 freeze superseded by v2/v3 (Git history). |
 | T02 | Make the whole experiment runnable end-to-end | `done` | Proven on a fresh Colab VM; `main.ipynb` (Drive/Colab) still pins v2 provenance and is refreshed when official v3 evaluation lands (T03/T05). |
-| T03 | Measure correctly and establish official baselines | `planned` | Validate metric semantics per answer type over the v3 raw artifacts. v3 requirements recorded in T10: Location predictions are address text geocoded against gold geometry; no POI-name/SQL/DB-lookup fallback may synthesize a location prediction; range gold sets are scored by best match against the complete set. |
+| T03 | Measure correctly and establish official baselines | `planned` | Consumes the four user-launched v3 raw runs under `baselines/cache_vi/pv-8394cd22/`. Validate metric semantics per answer type; v3 requirements recorded in T10: Location predictions are address text geocoded against gold geometry; no POI-name/SQL/DB-lookup fallback may synthesize a location prediction; range gold sets are scored by best match against the complete set. |
 | T04 | Improve what the frozen baselines fail at | `planned` | Intervention selected from full-baseline error evidence; typed deterministic rendering remains a hypothesis until then. |
 | T05 | Analyze Vietnamese-specific behavior and errors | `planned` | Robustness, error taxonomy, and the final Vietnamese demo remain. |
 | T06 | Tell the story as an ACL paper | `planned` | ACL style files replace the Typst placeholder. |
@@ -44,9 +44,9 @@ Build and evaluate a reproducible Vietnamese adaptation of GS-QA (`docs/context/
 - Official completion is a valid G6 seal bound to model/baseline, frozen dataset and prompt identities, repository-pinned OSM/DB provenance, and raw artifact hashes. Git commit is provenance-only.
 - Range-type gold answers are full distance-ordered sets: score predictions by best applicable match against the complete gold set (T03).
 
-## Validation Gates (T10)
+## T10 Validation Gates (all passed 2026-09-03)
 
-G1′ DB rebuild (five tables non-empty, representative spatial ops, address coverage audit, T7/T8 overlap audit) → G2′ smoke 5×28 → G3′ full seed-42 generation, 2,800/2,800 automated verification, byte-identical regeneration → G4′ human QC (~5/TID) with user approval → prompt freeze (new `pv-*` hash; no official-runner invocations between prompt edit and dataset freeze) → G5′ runner static checks + v2-seal negative test → G6′ publish `data-v3.0.0` and verify dataset/DB restore. No official inference is launched inside T10.
+G1′ DB rebuild (five tables non-empty, representative spatial ops, address coverage audit, T7/T8 overlap audit) → G2′ smoke 5×28 → G3′ full seed-42 generation, 2,800/2,800 automated verification, byte-identical regeneration → G4′ human QC (~5/TID) with user approval → prompt freeze (`pv-8394cd22`; no official-runner invocations between prompt edit and dataset freeze) → G5′ runner static checks + v2-seal negative test → G6′ publish `data-v3.0.0` and verify dataset/DB restore. Evidence: `docs/plans/T10-benchmark-v3-refactor.md`.
 
 ## Active Next Action
 
