@@ -52,8 +52,7 @@ Freeze a corrected v3.0.0 benchmark contract and prepare the runtime so the four
 - G3′ full run (`--seed 42 --count 100 --output data/v3-stage/questions_vi`): **2,800/2,800 verifier pass**; 28 files × exactly 100; answer-type distribution identical to v2 (name 1200, **loc 800**, angle 200, count 200, distance 200, area 100, length 100); `wikipedia_cache_vi.json` unchanged (sha256 `09b74191…`).
 - Loc gold quality: knn types exactly 1 address-bearing answer; range types keep full distance-ordered sets (median 2–6, max 542); zero empty addresses; 65–89% of knn gold carries housenumbers. Canonical addresses read naturally (e.g. "5B Nguyễn Thiện Thuật, Phường Hoàn Kiếm, Hà Nội, Thành phố Hà Nội", "23 Đường Vạn Phúc, Hà Đông, Hà Nội"); mixed orthography in components ("Bắc Ninh" vs "Bac Ninh") is native OSM data frozen verbatim.
 - Human QC TSV: `docs/qc_spot_check_v3.0.0.tsv` (5 per TID, seed 42) → user review.
-
-(to be filled: byte-identical regen, G4′ approval, prompt freeze, G5′ runner checks + seal negative test, G6′ publish + restore verification)
+- **Byte-identical regeneration: second seed-42 run (`data/v3-stage/regen2`) `diff -r` clean across all 28 files (2,800 questions).**
 
 ## Open questions / next
 
