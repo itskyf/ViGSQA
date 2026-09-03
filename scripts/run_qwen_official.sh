@@ -33,12 +33,15 @@ run_baseline() {
 
 	date --iso-8601=seconds >"${log_prefix}.start_ts"
 	echo "[INFO] Running Qwen ${baseline} (logs: ${log_prefix}.out/.err)..."
-	python -m baselines.baselines_vi \
+	# tee keeps the .out/.err provenance files while showing progress live
+	# (tqdm writes stderr). The process substitution sits outside the
+	# pipeline, so pipefail still propagates the python exit status.
+	python -u -m baselines.baselines_vi \
 		--model "${QWEN_MODEL}" \
 		--baseline "${baseline}" \
 		--mode full \
 		--llm-concurrency 4 \
-		>"${log_prefix}.out" 2>"${log_prefix}.err"
+		2> >(tee "${log_prefix}.err" >&2) | tee "${log_prefix}.out"
 
 	echo "[INFO] Running G6 for Qwen ${baseline}..."
 	python scripts/run_check.py \

@@ -112,13 +112,16 @@ for INDEX in "${!PENDING_MODELS[@]}"; do
 	RUN_LOG="${LOG_DIR}/${SAFE}_${BASELINE}_${STAMP}"
 	date --iso-8601=seconds >"${RUN_LOG}.start_ts"
 	echo "[INFO] ${MODEL} — ${BASELINE} (logs: ${RUN_LOG}.out/.err)"
-	python -m baselines.baselines_vi \
+	# tee keeps the .out/.err provenance files while showing progress live
+	# (tqdm writes stderr). The process substitution sits outside the
+	# pipeline, so pipefail still propagates the python exit status.
+	python -u -m baselines.baselines_vi \
 		--model "${MODEL}" \
 		--baseline "${BASELINE}" \
 		--mode full \
 		--llm-concurrency "${LLM_CONCURRENCY}" \
 		"${EXTRA_ARGS[@]}" \
-		>"${RUN_LOG}.out" 2>"${RUN_LOG}.err"
+		2> >(tee "${RUN_LOG}.err" >&2) | tee "${RUN_LOG}.out"
 	python scripts/run_check.py \
 		--model "${MODEL}" \
 		--baseline "${BASELINE}" \
