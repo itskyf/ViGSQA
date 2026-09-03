@@ -839,7 +839,9 @@ def step_answer_from_records(
     base_prompt = load_prompt("sql_answer")
 
     def build_messages(i):
-        records_text = json.dumps(sql_outputs[i].get("records", []), indent=2)
+        records_text = json.dumps(
+            sql_outputs[i].get("records", []), indent=2, cls=_JSONEncoder
+        )
         return [
             SystemMessage(content=base_prompt + records_text),
             HumanMessage(content=questions[i]["question"]),

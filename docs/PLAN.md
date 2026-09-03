@@ -22,7 +22,7 @@ ViGSQA extends GS-QA to Vietnamese OSM data and investigates whether database gr
 | T04 | Improve what the frozen baselines fail at | `planned` | Select the intervention from full-baseline error evidence; the typed deterministic renderer stays a hypothesis until then. Plugs into the `baselines_vi.py` patch layer without a pipeline rewrite. |
 | T05 | Analyze Vietnamese-specific behavior and errors | `planned` | Full/stripped diacritic surfaces exist; robustness, error taxonomy, and the final demonstration on new Vietnamese questions remain. |
 | T06 | Tell the story as an ACL paper | `planned` | Course requires the official ACL style files; the current Typst placeholder is replaced in T06. |
-| T07 | Complete the benchmark and capture raw baseline runs | `in_progress` | Execution-integrity fixes are implemented and checked; Ornith Direct pre-repair artifacts/checksums are preserved. Qwen now uses llama.cpp's advertised `Q4_K_XL` identity end to end while preflight verifies the pinned UD artifact. Exit requires four artifact-only G6 passes and notebook Run All. Record: `docs/plans/T07-benchmark-v2-raw-runs.md`. |
+| T07 | Complete the benchmark and capture raw baseline runs | `in_progress` | Ornith is unchanged. Qwen Text2SQL preserves 2,800 SQL generations/executions and 1,900 answers after fixing live PostgreSQL `Decimal` serialization; resume remains. Record: `docs/plans/T07-benchmark-v2-raw-runs.md`. |
 | T08 | Fast database bootstrap via prebuilt release dump | `done` | `bootstrap_postgres.sh` restores `osm-vn.sql.gz` (release `data-v2.0.0`, SHA-256 pinned) before falling back to the osm2pgsql import; verified on PostgreSQL 18 and 14/PostGIS 3.5 with exact reference counts. |
 | T09 | PostgreSQL LangChain LLM cache + bounded LLM concurrency | `in_progress` | Cache infrastructure, migration, and offline validation complete: `llm_cache` DB beside `osm_vn`, transport-normalized cache keys, 1,513 records migrated and validated byte-identically from two different `base_url`s, dump/restore round trip green. All three Compose services expose native healthchecks; HAProxy readiness requires a real `/v1/models` backend round trip. Official rerun stays in the T07 resume. Record: `docs/plans/T09-llm-cache-postgres.md`. |
 
@@ -36,7 +36,7 @@ ViGSQA extends GS-QA to Vietnamese OSM data and investigates whether database gr
 
 ## Active Next Action
 
-T07: run `./scripts/run_official.sh --llm-concurrency 4` without clearing caches; it performs the bounded Ornith Direct repair, completes Qwen under its advertised `Q4_K_XL` identity after verifying the pinned UD artifact, and runs artifact-only G6 after each run. Then validate `main.ipynb` with Run All, mark T07 `done`, and move immediately to T03.
+T07: resume `./scripts/run_qwen_official.sh` from the preserved Qwen caches, complete both G6 checks, then validate `main.ipynb` with Run All.
 
 ## Session Prompt
 

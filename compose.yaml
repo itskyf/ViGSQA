@@ -19,6 +19,8 @@ services:
     command: [ --models-preset, /config/models.ini, --models-max, "1" ]
     devices:
       - nvidia.com/gpu=all
+    ports:
+      - 127.0.0.1:8000:8080
     volumes:
       - ./config/models.ini:/config/models.ini:ro,Z
       - ~/.cache/huggingface/:/root/.cache/huggingface/:Z

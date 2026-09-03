@@ -111,4 +111,21 @@ Once G2 passes, no new OSM fields, template families, model backends, evaluation
 
 ## Next
 
-Run `./scripts/run_official.sh --llm-concurrency 4` without clearing caches. It performs the bounded Ornith Direct repair through normal validated resume, verifies the pinned Qwen UD artifact behind the advertised Q4 identity, completes the remaining runs, and runs artifact-only G6 after each. Then execute and validate `main.ipynb` with Run All; mark T07 `done` and move immediately to T03.
+Run `./scripts/run_qwen_official.sh`. It exposes the Compose llama.cpp service
+only on `127.0.0.1:8000` and bypasses HAProxy, then performs the uncached
+28-TID preflight, Qwen Text2SQL, its G6 check, Qwen Direct, and its G6 check in
+that order with four client/server inference slots. It creates a fresh
+timestamped run-log namespace and resumes from the canonical Qwen
+caches; it never uses `--clear-cache` or changes prompts/decoding. Set
+`QWEN_RUN_DIR` only when a specific log directory is needed. Finally execute
+`main.ipynb` with Run All, mark T07 `done`, and move immediately to T03.
+
+**Qwen clean-profile reset (2026-09-02):** Qwen's preset now supplies the server argument `--chat-template-kwargs '{"enable_thinking":false}'`; Ornith's preset and all five frozen prompt files are unchanged. Both Qwen baselines and their parser stages already share the same `llamacpp:unsloth/Qwen3.5-9B-GGUF:Q4_K_XL` model construction, so no pipeline fork was added. Removed all prior Qwen JSON caches, official/diagnostic outputs, and 4,307 Qwen-keyed rows from PostgreSQL `llm_cache`; a post-delete query returned zero Qwen rows. No benchmark command was run.
+
+**Qwen reset repeated (2026-09-02):** At the user's request before another profile change, removed the newly created `sql_generate` cache, its three Text2SQL log/timestamp files, and 635 Qwen-keyed PostgreSQL LLM-cache rows. Targeted post-delete filesystem and database checks found zero Qwen cache/artifacts. Ornith was not touched. Do not run the current Qwen script until the pending change is supplied.
+
+**Qwen model-local non-thinking profile (2026-09-03):** The Qwen preset now supplies both `chat-template-kwargs = {"enable_thinking": false}` and the installed llama.cpp build's `reasoning = off`; neither is a global server flag. The advertised Q4 alias still resolves to the pinned UD-Q4 artifact. A raw-HTTP preflight used the unchanged frozen Direct prompt and decoding (`temperature=0`, `max_tokens=4096`) on the first question of each of 28 TIDs: **28/28 passed** with non-empty final content, no effective reasoning fields or `<think>` markup, and no `finish_reason=length`. Raw HTTP bypassed both benchmark JSON and PostgreSQL LLM caches; postflight checks found zero Qwen artifacts/cache rows. Ornith's six active JSON artifacts, PostgreSQL row count (14,154), preset, and routing configuration were unchanged. `scripts/run_qwen_official.sh` now packages preflight → Text2SQL → G6 → Direct → G6 with a fresh timestamped log namespace; `bash -n` passes. No full benchmark or G6 command was run.
+
+**Qwen local-only route (2026-09-03):** Because the non-thinking profile will run locally, Compose now publishes llama.cpp directly at `127.0.0.1:8000`. The Qwen runner fixes `LLAMACPP_URL` to that endpoint, recreates only `llamacpp`, and bypasses HAProxy and its remote backend entirely. Server `parallel=4` and client `--llm-concurrency 4` remain matched; no benchmark parameter changed.
+
+**Qwen Text2SQL `Decimal` interruption (2026-09-03):** The first local run completed all 2,800 `sql_generate` and `sql_exec` records, then stopped at 1,900/2,800 `sql_answer` records when a live psycopg result contained `Decimal` under `distance_meters`. `save_cache` already converts psycopg `Decimal` values to JSON numbers with `_JSONEncoder`, but `step_answer_from_records` used the default encoder on the same objects before a cache reload. The shared answer-prompt serialization now uses `_JSONEncoder`, making fresh execution byte-semantically consistent with resume from `sql_exec.json`; no SQL, prompt, decoding, cache record, or benchmark rule changed. Existing Qwen caches remain intact for normal resume.
