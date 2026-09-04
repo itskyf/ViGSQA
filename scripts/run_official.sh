@@ -4,8 +4,7 @@
 # serves one model at a time: restart it with VLLM_MODEL and re-run for the
 # other, or pass MODELS="<id>" for a single-model pass. The endpoint itself is
 # external; this script only probes it.
-# Extra script arguments are passed through to the pipeline. Never --clear-cache —
-# write-through caching makes every rerun resume. Logs and manifests land in logs/official/.
+# Write-through caching makes every rerun resume. Logs and manifests land in logs/official/.
 set -o errexit -o nounset -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,8 +12,6 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${ROOT_DIR}"
 
 LLM_CONCURRENCY="${LLM_CONCURRENCY:-1}"
-EXTRA_ARGS=()
-
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 	--llm-concurrency)
@@ -30,8 +27,8 @@ while [[ $# -gt 0 ]]; do
 		shift
 		;;
 	*)
-		EXTRA_ARGS+=("$1")
-		shift
+		echo "[ERROR] unknown argument: $1" >&2
+		exit 2
 		;;
 	esac
 done
@@ -105,12 +102,11 @@ for INDEX in "${!PENDING_MODELS[@]}"; do
 	# tee keeps the .out/.err provenance files while showing progress live
 	# (tqdm writes stderr). The process substitution sits outside the
 	# pipeline, so pipefail still propagates the python exit status.
-	python -u -m baselines.baselines_vi \
+	python -u scripts/run_raw_inference.py \
 		--model "${MODEL}" \
 		--baseline "${BASELINE}" \
 		--mode full \
 		--llm-concurrency "${LLM_CONCURRENCY}" \
-		"${EXTRA_ARGS[@]}" \
 		2> >(tee "${RUN_LOG}.err" >&2) | tee "${RUN_LOG}.out"
 	python scripts/run_check.py \
 		--model "${MODEL}" \

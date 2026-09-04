@@ -48,7 +48,6 @@ from typing import NamedTuple
 
 import pandas as pd
 import psycopg
-from geopy.geocoders import Nominatim
 from langchain_core.caches import BaseCache
 from langchain_core.documents import Document
 from langchain_core.globals import get_llm_cache
@@ -57,7 +56,6 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from num2words import num2words
 from psycopg.rows import dict_row
-from pyproj import Geod
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -1688,6 +1686,10 @@ def parse_args():
 
 
 def main():
+    # Legacy evaluation dependencies stay out of raw-inference imports.
+    from geopy.geocoders import Nominatim  # noqa: PLC0415
+    from pyproj import Geod  # noqa: PLC0415
+
     args = parse_args()
 
     # If --ollama-url / --ollama-key provided, set env vars so the ollama

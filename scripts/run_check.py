@@ -17,7 +17,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from baselines.pipeline import extract_json_blocks, extract_sql_blocks
+from baselines.pipeline import extract_sql_blocks
 from vigsqa.sealing import create_seal
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -28,8 +28,8 @@ EXPECTED_QUESTIONS = 2800
 EXPECTED_TIDS = 28
 EXPECTED_PER_TID = 100
 STEPS = {
-    "direct": ["direct_answer", "direct_json_parse"],
-    "text2sql": ["sql_generate", "sql_exec", "sql_answer", "sql_json_parse"],
+    "direct": ["direct_answer"],
+    "text2sql": ["sql_generate", "sql_exec", "sql_answer"],
 }
 # Non-failed records must satisfy their stage's output contract, judged by the
 # same parsers the pipeline consumes artifacts with (never a raw substring).
@@ -37,10 +37,8 @@ STEPS = {
 # stays with the runtime validator.
 STAGE_CONTENT_CHECKS = {
     "direct_answer": lambda r: bool(r.get("content", "").strip()),
-    "direct_json_parse": lambda r: bool(extract_json_blocks(r.get("content", ""))),
     "sql_generate": lambda r: bool(extract_sql_blocks(r.get("content", ""))),
     "sql_answer": lambda r: bool(r.get("content", "").strip()),
-    "sql_json_parse": lambda r: bool(extract_json_blocks(r.get("content", ""))),
 }
 REPORT_ID_LIMIT = 20
 # Must stay in sync with baselines_vi._prompt_version (same files, same order).

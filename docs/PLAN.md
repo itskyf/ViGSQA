@@ -27,10 +27,10 @@ Build and evaluate a reproducible Vietnamese adaptation of GS-QA (`docs/context/
 | --- | --- | --- | --- |
 | T01 | Establish a trustworthy Vietnamese benchmark | `done` | Satisfied **at v3**: T10 re-validated the frozen benchmark (2,800/2,800 automated verification, byte-identical regeneration, human QC approval). The v1/v2 freezes remain Git/history evidence. |
 | T02 | Make the whole experiment runnable end-to-end | `planned` | **Reopened for v3.** The v2 proof (fresh Colab VM) is tooling evidence only. v3 re-proof pending: T11 bumped the notebook's v3 pins and vLLM endpoint plumbing; the end-to-end re-run (bootstrap → dataset → baseline on v3 assets) rides with T03/T05 once the four v3 raw runs exist. |
-| T03 | Measure correctly and establish official baselines | `planned` | Validate metric semantics per answer type over the v3 raw artifacts. v3 requirements recorded in T10: Location predictions are address text geocoded against gold geometry; no POI-name/SQL/DB-lookup fallback may synthesize a location prediction; range gold sets are scored by best match against the complete set. |
-| T04 | Improve what the frozen baselines fail at | `planned` | Intervention selected from full-baseline error evidence; typed deterministic rendering remains a hypothesis until then. |
-| T05 | Analyze Vietnamese-specific behavior and errors | `planned` | Robustness, error taxonomy, and the final Vietnamese demo remain. |
-| T06 | Tell the story as an ACL paper | `planned` | ACL style files replace the Typst placeholder. |
+| T03 | Measure correctly and establish official baselines | `in_progress` | Raw/evaluation entrypoints and separate seals implemented; Qwen Text2SQL was cleanly paused at 2,052/2,800 `sql_answer` records with all raw hashes preserved. Offline contracts pass. Live resume/seal and the four official evaluation artifact sets remain. Record: `docs/plans/T03-official-v3-evaluation.md`. |
+| T04 | Improve what the frozen baselines fail at | `planned` | Starts from T03 sealed per-question evidence; no intervention is selected in advance. Record: `docs/plans/T04-baseline-improvement.md`. |
+| T05 | Analyze Vietnamese-specific behavior and errors | `planned` | Depends on official T03 evidence (and retained T04 results); covers robustness, error taxonomy, and the Vietnamese demo. Record: `docs/plans/T05-vietnamese-error-analysis.md`. |
+| T06 | Tell the story as an ACL paper | `planned` | Depends on T03–T05 evidence; ACL report claims and tables remain artifact-traceable. Record: `docs/plans/T06-acl-paper.md`. |
 | T07 | Complete the v2 benchmark and capture raw baseline runs | `done` | v2-scoped by goal: all four v2 runs G6-valid and sealed (2026-09-03), then superseded as evidence by v3 before evaluation. The v3 equivalent (four fresh raw runs) is launched manually by the user — its capture is tracked under T03. Record: `docs/plans/T07-benchmark-v2-raw-runs.md`. |
 | T08 | Fast database bootstrap via prebuilt release dump | `done` | Version-agnostic capability, re-verified **at v3** inside T10: clean-DB restore from the published `data-v3.0.0` dump matched all G1′ counts (five tables + import marker). |
 | T09 | PostgreSQL LangChain LLM cache + bounded LLM concurrency | `done` | Architecture preserved unchanged in v3; the prompt-version namespace (`pv-8394cd22`) isolates v3 keys from the v2 rows. First v3 exercise happens with the official runs. Record: `docs/plans/T09-llm-cache-postgres.md`. |
@@ -51,7 +51,7 @@ G1′ DB rebuild (five tables non-empty, representative spatial ops, address cov
 
 ## Active Next Action
 
-**User review → user launches the four v3 official baseline runs against the external vLLM endpoint, one model at a time**: with vLLM serving Ornith (`VLLM_MODEL=ornith-ai/Ornith-1.5-9B-NVFP4 podman compose up -d --force-recreate vllm` or any equivalent server), run `MODELS="ornith-ai/Ornith-1.5-9B-NVFP4" ./scripts/run_official.sh`; then restart vLLM with `VLLM_MODEL=AxionML/Qwen3.5-9B-NVFP4` and run `MODELS="AxionML/Qwen3.5-9B-NVFP4" ./scripts/run_official.sh`. After the four raw runs are sealed, T03 (evaluation) starts and T02's v3 re-proof (end-to-end notebook re-run) rides with it.
+**Resume Qwen Text2SQL through `scripts/run_official.sh --llm-concurrency 4`.** The raw-only path should reuse 2,800 `sql_generate`, 2,800 `sql_exec`, and 2,052 `sql_answer` records, fill only the missing answers, and seal without JSON parsing. Evaluate each raw-sealed run separately with `scripts/run_evaluation.py`; keep T03 open until all official evaluation artifacts/seals exist.
 
 ## Session Prompt
 

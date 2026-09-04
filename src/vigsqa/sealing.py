@@ -6,10 +6,10 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SEAL_VERSION = 1
+SEAL_VERSION = 2
 STEPS = {
-    "direct": ("direct_answer", "direct_json_parse"),
-    "text2sql": ("sql_generate", "sql_exec", "sql_answer", "sql_json_parse"),
+    "direct": ("direct_answer",),
+    "text2sql": ("sql_generate", "sql_exec", "sql_answer"),
 }
 PROMPT_FILES = (
     "direct_answer_vi.txt",
@@ -122,6 +122,50 @@ def validate_seal(model: str, baseline: str) -> tuple[bool, str]:
             artifact = run_dir / f"{step}.json"
             if artifacts[step] != _sha256(artifact):
                 return False, f"{path}: changed {step}.json"
+        return True, str(path)
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as error:
+        return False, str(error)
+
+
+def validate_evaluation_seal(model: str, baseline: str) -> tuple[bool, str]:
+    """Validate an evaluation seal against its raw seal and output bytes."""
+    try:
+        valid, reason = validate_seal(model, baseline)
+        if not valid:
+            return False, f"invalid raw seal: {reason}"
+        identity = _current_identity()
+        raw_dir = _run_dir(model, identity["prompt_sha256"])
+        output_dir = ROOT / "results" / "evaluation" / model / baseline
+        path = output_dir / "evaluation.seal.json"
+        seal = json.loads(path.read_text())
+        if seal.get("seal_version") != 1:
+            return False, f"{path}: mismatched seal_version"
+        if seal.get("model") != model or seal.get("baseline") != baseline:
+            return False, f"{path}: mismatched run identity"
+        raw_seal = raw_dir / f"{baseline}.seal.json"
+        if seal.get("raw_seal_sha256") != _sha256(raw_seal):
+            return False, f"{path}: changed raw seal"
+        parser = seal.get("parser")
+        prompt_name = {
+            "direct": "direct_json_parse_vi.txt",
+            "text2sql": "text2sql_json_parse_vi.txt",
+        }[baseline]
+        prompt = ROOT / "baselines" / "baseline_prompts" / prompt_name
+        if not isinstance(parser, dict) or parser.get("model") != model:
+            return False, f"{path}: mismatched parser identity"
+        if parser.get("prompt_sha256") != _sha256(prompt):
+            return False, f"{path}: changed parser prompt"
+        artifacts = seal.get("artifacts")
+        expected = {
+            "direct_json_parse.json" if baseline == "direct" else "sql_json_parse.json",
+            "geocodes.json",
+            "per_question.jsonl",
+        }
+        if not isinstance(artifacts, dict) or set(artifacts) != expected:
+            return False, f"{path}: incomplete artifact checksums"
+        for name in expected:
+            if artifacts[name] != _sha256(output_dir / name):
+                return False, f"{path}: changed {name}"
         return True, str(path)
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as error:
         return False, str(error)

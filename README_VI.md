@@ -57,15 +57,24 @@ Inference chính thức đi qua endpoint vLLM tương thích OpenAI chạy bên 
 ```bash
 # chạy từ thư mục gốc repo
 # smoke: 28 câu (1/TID) — chỉ để kiểm tra integration, không phải bằng chứng benchmark
-python -m baselines.baselines_vi --model ornith-ai/Ornith-1.5-9B-NVFP4 --baseline direct   --mode smoke
-python -m baselines.baselines_vi --model ornith-ai/Ornith-1.5-9B-NVFP4 --baseline text2sql --mode smoke
+python scripts/run_raw_inference.py --model ornith-ai/Ornith-1.5-9B-NVFP4 --baseline direct --mode smoke --llm-concurrency 4
+python scripts/run_raw_inference.py --model ornith-ai/Ornith-1.5-9B-NVFP4 --baseline text2sql --mode smoke --llm-concurrency 4
 
 # full: 2.800 câu — số liệu chính thức thuộc T03
-python -m baselines.baselines_vi --model ornith-ai/Ornith-1.5-9B-NVFP4 --baseline text2sql --mode full
+python scripts/run_raw_inference.py --model ornith-ai/Ornith-1.5-9B-NVFP4 --baseline text2sql --mode full --llm-concurrency 4
 # Qwen: restart vLLM với VLLM_MODEL=AxionML/Qwen3.5-9B-NVFP4 rồi dùng id đó
 ```
 
-Kết quả lưu tại `baselines/<model>_<baseline>_{text,parsed}_eval.csv`.
+`scripts/run_official.sh --llm-concurrency 4` chạy và đóng dấu từng raw run.
+Sau khi raw seal hợp lệ, đánh giá độc lập bằng:
+
+```bash
+python scripts/run_evaluation.py --model ornith-ai/Ornith-1.5-9B-NVFP4 --baseline direct --llm-concurrency 4
+python scripts/check_run_seal.py ornith-ai/Ornith-1.5-9B-NVFP4 direct --evaluation
+```
+
+Raw artifacts/seal nằm trong `baselines/cache_vi/pv-8394cd22/`; parse, geocode,
+metric theo câu và evaluation seal nằm trong `results/evaluation/<model>/<baseline>/`.
 
 ### Biến Môi Trường
 
