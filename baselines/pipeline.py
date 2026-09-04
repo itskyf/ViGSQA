@@ -38,7 +38,7 @@ import random
 import re
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from functools import cache
@@ -341,10 +341,12 @@ def _llm_pool(max_workers: int) -> ThreadPoolExecutor:
 
 def invoke_or_capture_many(
     model, calls, llm_concurrency=1, stage: StageValidation | None = None
-) -> list[tuple[str, str | None, dict]]:
+) -> Iterator[tuple[str, str | None, dict]]:
     """`invoke_or_capture` over a batch of message lists, bounded by
-    `llm_concurrency`. `Executor.map` preserves input order, so record
-    processing and the JSON write-through stay on the calling thread.
+    `llm_concurrency`. `Executor.map` submits all calls up front and yields
+    in input order: lazy consumers keep every worker busy (sliding window)
+    while record processing and the JSON write-through stay on the calling
+    thread. Aborting callers must cancel the pool's queued tail themselves.
 
     With a `stage`, completions are stage-validated and invalid ones retried
     on the identical request (`invoke_validated_or_capture`); without it the
@@ -356,14 +358,9 @@ def invoke_or_capture_many(
         return invoke_validated_or_capture(model, messages, stage)
 
     if llm_concurrency <= 1:
-        return [run_one(messages) for messages in calls]
-    pool = _llm_pool(llm_concurrency)
-    try:
-        return list(pool.map(run_one, calls))
-    except KeyboardInterrupt:
-        pool.shutdown(wait=False, cancel_futures=True)
-        _llm_pool.cache_clear()
-        raise
+        yield from map(run_one, calls)
+        return
+    yield from _llm_pool(llm_concurrency).map(run_one, calls)
 
 
 def _is_validation_error(error: str | None) -> bool:
@@ -410,14 +407,15 @@ def run_llm_step(
         )
     ]
     consecutive_failures = 0
-    batch = max(1, llm_concurrency)
+    # One submit for the whole step (sliding window, no per-chunk barrier);
+    # `map` still yields in todo order, so write-through and the streak
+    # check stay ordered on the calling thread.
+    contents = invoke_or_capture_many(
+        model, [build_messages(i) for i in todo], llm_concurrency, stage
+    )
     with tqdm(total=len(todo), desc=f"  {cache_key}") as progress:
-        for start in range(0, len(todo), batch):
-            idxs = todo[start : start + batch]
-            contents = invoke_or_capture_many(
-                model, [build_messages(i) for i in idxs], llm_concurrency, stage
-            )
-            for i, (content, error, gen) in zip(idxs, contents, strict=True):
+        try:
+            for i, (content, error, gen) in zip(todo, contents, strict=True):
                 record = {"id": questions[i]["id"], "content": content}
                 if error:
                     record["error"] = error
@@ -440,7 +438,14 @@ def run_llm_step(
                         f"{cache_key}: {consecutive_failures} consecutive model"
                         " failures — aborting; cached results are preserved"
                     )
-            progress.update(len(idxs))
+                progress.update(1)
+        except (KeyboardInterrupt, RuntimeError):
+            # Cancel the queued tail so it neither runs here nor drains at
+            # process exit; drop the cached pool for a fresh one next step.
+            if llm_concurrency > 1:
+                _llm_pool(llm_concurrency).shutdown(wait=False, cancel_futures=True)
+                _llm_pool.cache_clear()
+            raise
     return [
         r if r is not None else cache[q["id"]]
         for r, q in zip(results, questions, strict=True)
