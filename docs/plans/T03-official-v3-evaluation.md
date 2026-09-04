@@ -8,7 +8,7 @@ Measure the four frozen v3 Direct/Text2SQL runs with a standalone, reproducible 
 
 ## Contracts
 
-- Raw inference keeps `pv-8394cd22`, all five prompt inputs, frozen decoding, existing cache files, and PostgreSQL cache rows. Its seal covers only `direct_answer`, or `sql_generate` + `sql_exec` + `sql_answer`.
+- Raw inference uses `pv-26b1ac0d`, derived only from its three prompts, with frozen decoding and unchanged PostgreSQL cache rows. Its seal covers only `direct_answer`, or `sql_generate` + `sql_exec` + `sql_answer`; parser prompts belong only to evaluation.
 - Evaluation requires a valid raw seal, reads only the corresponding raw answer file, and writes only under `results/evaluation/<model>/<baseline>/`.
 - The same selected model parses answers with the frozen baseline-specific parser prompt. Parse artifacts never enter `cache_vi`.
 - One explicit T01–T28 family mapping is checked against the frozen manifest: entity/name (T01–T06, T08–T12), textual fact (T07), Location (T13–T20), direction/angle (T21–T22), count (T23–T24), distance (T25–T26), area (T27), length (T28).
@@ -29,8 +29,11 @@ Measure the four frozen v3 Direct/Text2SQL runs with a standalone, reproducible 
 - At the user's direction, interrupted the legacy Qwen Text2SQL process cleanly during `sql_answer`: `sql_generate` and `sql_exec` remain 2,800/2,800; `sql_answer` remains valid at 2,052/2,800. Before/after SHA-256 values are identical (`179d08f8…`, `db8ff557…`, `5671e23c…` respectively), so no cache conversion was needed.
 - Added the raw-only entrypoint and changed the official runner/raw seal to the three-stage contract. The old Vietnamese evaluator patch and every SQL/DB/coordinate/POI Location fallback were deleted from the inference configuration path.
 - Added the standalone evaluator, explicit T01–T28 mapping validation, deterministic text/typed/spatial best-match scoring, persistent Nominatim results, QID-sorted metrics, and a separate evaluation seal/check path.
-- Offline validation is green: Python compilation, Ruff, Bash syntax, logging contract, help/import checks (no NLTK/evaluator/geocoder import on raw path), evaluator contract checks, diff whitespace, and byte-identical interrupted raw artifacts. Live resume, raw sealing, official evaluation artifacts, raw immutability across evaluation, and byte-identical sealed evaluation rerun remain pending.
+- Offline validation is green: Python compilation, Ruff, Bash syntax, logging contract, help/import checks (no NLTK/evaluator/geocoder import on raw path), evaluator contract checks, diff whitespace, and byte-identical raw migration. Official evaluation artifacts, raw immutability across evaluation, and byte-identical sealed evaluation rerun remain pending.
+- Qwen resume subsequently completed both raw baselines at 2,800 questions and produced valid raw seals. The raw namespace was reduced from the legacy five-prompt hash `pv-8394cd22` to the three-prompt hash `pv-26b1ac0d`; an ad-hoc verified copy preserved the complete source namespace and PostgreSQL cache.
+- Ornith subsequently completed both raw baselines, leaving all four runs sealed under `pv-26b1ac0d`. At the user's explicit request, Qwen `range+loc-026` received one post-seal retry after its original three empty completions; the identical request then returned a valid, normally terminated answer. A first operator invocation omitted `OPENAI_BASE_URL`, causing ten 401 records before the systemic-failure guard stopped it; the affected raw files were restored byte-identically from preserved backups before the targeted retry. The resealed Qwen artifact differs only at that QID and now has zero explicit `sql_answer` failures.
+- The PostgreSQL cache contains 16,800 non-empty, normally terminated generations (8,400/model; two semantic model keys). `llm-cache-20260904.sql.gz` was gzip-checked, restored into an isolated temporary database at exactly 16,800 rows, and replaced on the `data-v3.0.0` GitHub Release (5,397,172 bytes; SHA-256 `4726eaad9859475d9fc0af7430cbb5c7d528238af1353e5a46386b9c224fac2c`).
 
 ## Next
 
-Resume Qwen Text2SQL with `scripts/run_official.sh --llm-concurrency 4`; it should reuse the 2,800 SQL generations/executions and 2,052 answers, fill the remaining 748 answers, and raw-seal without parsing. Then run and verify the separate evaluation. Keep T03 open until all required official outputs exist.
+Run and verify the four separate evaluations. Keep T03 open until all required official outputs exist.

@@ -73,7 +73,7 @@ python scripts/run_evaluation.py --model ornith-ai/Ornith-1.5-9B-NVFP4 --baselin
 python scripts/check_run_seal.py ornith-ai/Ornith-1.5-9B-NVFP4 direct --evaluation
 ```
 
-Raw artifacts/seal nằm trong `baselines/cache_vi/pv-8394cd22/`; parse, geocode,
+Raw artifacts/seal nằm trong `baselines/cache_vi/pv-26b1ac0d/`; parse, geocode,
 metric theo câu và evaluation seal nằm trong `results/evaluation/<model>/<baseline>/`.
 
 ### Biến Môi Trường

@@ -12,13 +12,13 @@ Configures the upstream pipeline module for Vietnamese inference:
 Step caches are namespaced by the prompt version (sha256-8 of the active
 Vietnamese prompts), so a prompt change never reuses another freeze's results.
 
-Usage (run from the repo root; same flags as pipeline.py):
-  python -m baselines.baselines_vi \
+Usage (run from the repo root):
+  python scripts/run_raw_inference.py \
     --model ornith-ai/Ornith-1.5-9B-NVFP4 \
-    --baseline direct --mode smoke
-  python -m baselines.baselines_vi \
+    --baseline direct --mode smoke --llm-concurrency 4
+  python scripts/run_raw_inference.py \
     --model ornith-ai/Ornith-1.5-9B-NVFP4 \
-    --baseline text2sql --mode full
+    --baseline text2sql --mode full --llm-concurrency 4
 """
 
 import hashlib
@@ -51,17 +51,11 @@ pipeline.DB_PARAMS = PostgresSettings().connection_kwargs()
 pipeline.PROMPT_FILES["direct_answer"] = (
     ROOT / "baseline_prompts" / "direct_answer_vi.txt"
 )
-pipeline.PROMPT_FILES["direct_json_parse"] = (
-    ROOT / "baseline_prompts" / "direct_json_parse_vi.txt"
-)
 pipeline.PROMPT_FILES["sql_generate"] = (
     ROOT / "baseline_prompts" / "text2sql_generate_vi.txt"
 )
 pipeline.PROMPT_FILES["sql_answer"] = (
     ROOT / "baseline_prompts" / "text2sql_answer_vi.txt"
-)
-pipeline.PROMPT_FILES["sql_json_parse"] = (
-    ROOT / "baseline_prompts" / "text2sql_json_parse_vi.txt"
 )
 
 
@@ -79,10 +73,8 @@ def _prompt_version() -> str:
     h = hashlib.sha256()
     for key in (
         "direct_answer",
-        "direct_json_parse",
         "sql_generate",
         "sql_answer",
-        "sql_json_parse",
     ):
         h.update(pipeline.PROMPT_FILES[key].read_bytes())
     return h.hexdigest()[:8]
@@ -127,7 +119,6 @@ def build_model_vi(model_name: str):
 
 
 pipeline.build_model = build_model_vi
-pipeline.build_parser_model = build_model_vi
 
 # ── PostgreSQL LLM cache (LangChain) ─────────────────────────────────────────
 # The cache is the skip layer for LLM steps; the JSON step files remain
@@ -237,8 +228,8 @@ def setup_llm_cache() -> None:
 # ── Text2SQL stage output validation ─────────────────────────────────────────
 # ViGSQA policy on top of pipeline's opt-in mechanism: a successful transport
 # call is not automatically a successful step. Corresponding Direct and
-# Text2SQL stages share the answer/JSON contracts; upstream/non-Vietnamese runs
-# never import this layer.
+# Text2SQL stages share the answer contract; upstream/non-Vietnamese runs never
+# import this layer.
 
 STAGE_MAX_ATTEMPTS = 3
 
@@ -270,26 +261,12 @@ def answer_text_error(content, finish_reason):
     return None
 
 
-def json_block_error(content, finish_reason):
-    """`sql_json_parse` contract: at least one fenced JSON block accepted by
-    the same parser the evaluation step uses (`extract_json_blocks`).
-
-    A complete parseable block stays accepted even if trailing generation hit
-    the token limit.
-    """
-    if isinstance(content, str) and pipeline.extract_json_blocks(content):
-        return None
-    return "invalid_json_output: no parseable JSON block"
-
-
 def _stage_validation(cache_key):
     """The stage's structural validation policy, if it is an LLM stage."""
     checks = {
         "direct_answer": answer_text_error,
-        "direct_json_parse": json_block_error,
         "sql_generate": sql_block_error,
         "sql_answer": answer_text_error,
-        "sql_json_parse": json_block_error,
     }
     check = checks.get(cache_key)
     return pipeline.StageValidation(check, STAGE_MAX_ATTEMPTS) if check else None
@@ -341,37 +318,5 @@ def _step_answer_from_records_vi(
     )
 
 
-_orig_step_parse_to_json = pipeline.step_parse_to_json
-
-
-def _step_parse_to_json_vi(
-    questions,
-    answers,
-    parser_model,
-    model_name,
-    cache_key,
-    json_prompt_key,
-    llm_concurrency=1,
-    stage=None,
-):
-    return _orig_step_parse_to_json(
-        questions,
-        answers,
-        parser_model,
-        model_name,
-        cache_key,
-        json_prompt_key,
-        llm_concurrency,
-        stage if stage is not None else _stage_validation(cache_key),
-    )
-
-
 pipeline.step_generate_answers = _step_generate_answers_vi
 pipeline.step_answer_from_records = _step_answer_from_records_vi
-pipeline.step_parse_to_json = _step_parse_to_json_vi
-
-
-# ── Run ───────────────────────────────────────────────────────────────────────
-if __name__ == "__main__":
-    setup_llm_cache()
-    pipeline.main()

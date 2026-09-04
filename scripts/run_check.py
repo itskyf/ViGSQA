@@ -44,10 +44,8 @@ REPORT_ID_LIMIT = 20
 # Must stay in sync with baselines_vi._prompt_version (same files, same order).
 PROMPT_FILES = [
     "direct_answer_vi.txt",
-    "direct_json_parse_vi.txt",
     "text2sql_generate_vi.txt",
     "text2sql_answer_vi.txt",
-    "text2sql_json_parse_vi.txt",
 ]
 
 

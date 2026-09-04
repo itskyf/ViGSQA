@@ -13,10 +13,8 @@ STEPS = {
 }
 PROMPT_FILES = (
     "direct_answer_vi.txt",
-    "direct_json_parse_vi.txt",
     "text2sql_generate_vi.txt",
     "text2sql_answer_vi.txt",
-    "text2sql_json_parse_vi.txt",
 )
 
 

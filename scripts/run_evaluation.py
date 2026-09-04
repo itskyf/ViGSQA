@@ -21,7 +21,6 @@ from shapely import from_wkt
 from baselines import pipeline
 from baselines.baselines_vi import (
     INFERENCE_PROFILE,
-    _stage_validation,
     build_model_vi,
     setup_llm_cache,
 )
@@ -33,7 +32,10 @@ EVALUATOR_VERSION = 1
 EXPECTED_PER_TID = 100
 RAW_STEPS = {"direct": "direct_answer", "text2sql": "sql_answer"}
 PARSE_FILES = {"direct": "direct_json_parse.json", "text2sql": "sql_json_parse.json"}
-PROMPT_KEYS = {"direct": "direct_json_parse", "text2sql": "sql_json_parse"}
+PROMPT_PATHS = {
+    "direct": ROOT / "baselines" / "baseline_prompts" / "direct_json_parse_vi.txt",
+    "text2sql": ROOT / "baselines" / "baseline_prompts" / "text2sql_json_parse_vi.txt",
+}
 TID_FAMILIES = {
     "T01": "entity",
     "T02": "entity",
@@ -159,6 +161,13 @@ def nested_values(data: object, keys: set[str]) -> list[object]:
     return values
 
 
+def json_block_error(content, finish_reason):
+    """Require a fenced JSON value accepted by the scoring parser."""
+    if isinstance(content, str) and pipeline.extract_json_blocks(content):
+        return None
+    return "invalid_json_output: no parseable JSON block"
+
+
 def candidates(question: dict, parsed: list[object], family: str) -> list:
     if family == "entity":
         values = nested_values(parsed, {"name"})
@@ -276,7 +285,7 @@ def parse_answers(
         raise ValueError(f"{output}: duplicate or unknown parse IDs")
     cached = {record["id"]: record for record in existing}
     frozen = set(existing_ids) == question_ids
-    prompt = pipeline.load_prompt(PROMPT_KEYS[baseline])
+    prompt = PROMPT_PATHS[baseline].read_text()
     todo = []
     for question, answer in zip(questions, answers, strict=True):
         if question["id"] in cached and (
@@ -308,7 +317,7 @@ def parse_answers(
         for (question, _), (content, error, gen) in zip(
             todo,
             pipeline.invoke_or_capture_many(
-                model, calls, concurrency, _stage_validation(PROMPT_KEYS[baseline])
+                model, calls, concurrency, pipeline.StageValidation(json_block_error, 3)
             ),
             strict=True,
         ):
@@ -498,7 +507,7 @@ def main() -> int:
     )
 
     raw_seal = raw_dir / f"{args.baseline}.seal.json"
-    prompt_path = pipeline.PROMPT_FILES[PROMPT_KEYS[args.baseline]]
+    prompt_path = PROMPT_PATHS[args.baseline]
     seal = {
         "seal_version": 1,
         "evaluator": {"id": EVALUATOR_ID, "version": EVALUATOR_VERSION},
