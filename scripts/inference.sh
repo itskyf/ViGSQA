@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# T07 G6: raw, untuned official baseline runs (T11: external vLLM endpoint).
+# Raw, untuned official baseline runs against an external vLLM endpoint.
 # Ornith Text2SQL → Ornith Direct → Qwen Text2SQL → Qwen Direct — but vLLM
 # serves one model at a time: restart it with VLLM_MODEL and re-run for the
 # other, or pass MODELS="<id>" for a single-model pass. The endpoint itself is
@@ -12,8 +12,16 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${ROOT_DIR}"
 
 LLM_CONCURRENCY="${LLM_CONCURRENCY:-1}"
+usage() {
+	echo "Usage: ${0##*/} [--llm-concurrency N] [--help]"
+}
+
 while [[ $# -gt 0 ]]; do
 	case "$1" in
+	--help)
+		usage
+		exit 0
+		;;
 	--llm-concurrency)
 		if [[ $# -lt 2 ]]; then
 			echo "[ERROR] --llm-concurrency requires an argument" >&2
@@ -28,10 +36,16 @@ while [[ $# -gt 0 ]]; do
 		;;
 	*)
 		echo "[ERROR] unknown argument: $1" >&2
+		usage >&2
 		exit 2
 		;;
 	esac
 done
+
+if ! [[ "${LLM_CONCURRENCY}" =~ ^[1-9][0-9]*$ ]]; then
+	echo "[ERROR] --llm-concurrency must be a positive integer" >&2
+	exit 2
+fi
 
 # The official v3 models. Override MODELS when the endpoint serves only one.
 read -ra MODELS <<<"${MODELS:-ornith-ai/Ornith-1.5-9B-NVFP4 AxionML/Qwen3.5-9B-NVFP4}"

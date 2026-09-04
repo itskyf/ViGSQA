@@ -10,13 +10,15 @@ Measure the four frozen v3 Direct/Text2SQL runs with a standalone, reproducible 
 
 - Raw inference uses `pv-26b1ac0d`, derived only from its three prompts, with frozen decoding and unchanged PostgreSQL cache rows. Its seal covers only `direct_answer`, or `sql_generate` + `sql_exec` + `sql_answer`; parser prompts belong only to evaluation.
 - Evaluation requires a valid raw seal, reads only the corresponding raw answer file, and writes only under `results/evaluation/<model>/<baseline>/`.
-- The same selected model parses answers with the frozen baseline-specific parser prompt. Parse artifacts never enter `cache_vi`.
+- `ornith-ai/Ornith-1.5-9B-NVFP4` parses every Ornith/Qwen × Direct/Text2SQL answer with one frozen prompt, decoding profile, and three-attempt JSON contract. The evaluated model never selects or becomes its parser. Parse artifacts never enter `cache_vi`.
 - One explicit T01–T28 family mapping is checked against the frozen manifest: entity/name (T01–T06, T08–T12), textual fact (T07), Location (T13–T20), direction/angle (T21–T22), count (T23–T24), distance (T25–T26), area (T27), length (T28).
 - Text normalization is Unicode NFKC + casefold + Unicode punctuation separation + whitespace collapse, preserving Vietnamese diacritics and numbers; token precision/recall/F1 uses no NLTK or stopwords.
 - Location scoring extracts non-empty parsed addresses, text-scores them, geocodes only those addresses with Nominatim, and compares them to authoritative gold `geo_wkt` with `min(distance_m / 500000, 1)`. No SQL, database, POI, or coordinate-extraction fallback is permitted.
 - Direction uses eight Vietnamese sectors and circular angular error / 180. Numeric families accept finite values, normalize supported metric units, require integral counts, and cap relative error at one.
 - Every applicable prediction/gold pairing is considered, including complete range answer sets; deterministic best-match indices are recorded. Attempted status is metric-specific.
-- Ordered Nominatim results, including confirmed nulls, are persisted; transient failures abort without an evaluation seal. QID-sorted metrics and a seal bind the raw seal, evaluator/parser identities, parser prompt, and all evaluation artifact hashes.
+- Ordered Nominatim results, including confirmed nulls, are persisted; transient failures abort without an evaluation seal. QID-sorted metrics and an evaluation seal v2 bind the raw seal, evaluator identity, fixed parser model/profile/prompt/retry configuration, and all evaluation artifact hashes.
+- `scripts/inference.sh` owns raw generation; idempotent `scripts/evaluate.sh` checks all four evaluation seals before bootstrap, requires the endpoint to serve Ornith, resumes only incomplete pairs, and validates each completed seal.
+- After all four seals validate, publish one deterministic `evaluation-results.tar.gz` containing only `results/evaluation/` on the existing `data-v3.0.0` release. Do not replace its 16,800-row raw-inference LLM-cache dump with live parser-cache rows.
 
 ## Validation and Evidence
 
@@ -33,7 +35,9 @@ Measure the four frozen v3 Direct/Text2SQL runs with a standalone, reproducible 
 - Qwen resume subsequently completed both raw baselines at 2,800 questions and produced valid raw seals. The raw namespace was reduced from the legacy five-prompt hash `pv-8394cd22` to the three-prompt hash `pv-26b1ac0d`; an ad-hoc verified copy preserved the complete source namespace and PostgreSQL cache.
 - Ornith subsequently completed both raw baselines, leaving all four runs sealed under `pv-26b1ac0d`. At the user's explicit request, Qwen `range+loc-026` received one post-seal retry after its original three empty completions; the identical request then returned a valid, normally terminated answer. A first operator invocation omitted `OPENAI_BASE_URL`, causing ten 401 records before the systemic-failure guard stopped it; the affected raw files were restored byte-identically from preserved backups before the targeted retry. The resealed Qwen artifact differs only at that QID and now has zero explicit `sql_answer` failures.
 - The PostgreSQL cache contains 16,800 non-empty, normally terminated generations (8,400/model; two semantic model keys). `llm-cache-20260904.sql.gz` was gzip-checked, restored into an isolated temporary database at exactly 16,800 rows, and replaced on the `data-v3.0.0` GitHub Release (5,397,172 bytes; SHA-256 `4726eaad9859475d9fc0af7430cbb5c7d528238af1353e5a46386b9c224fac2c`).
+- Fixed-parser policy prepared before official evaluation: Ornith is the only parser; the byte-identical parser prompts now resolve through one canonical file; evaluation seal validation binds the complete parser configuration. The former `run_official.sh` is now `inference.sh`, paired with seal-driven `evaluate.sh`. No raw inference command was run and no raw artifact changed.
+- The first evaluation invocation exposed silent long-running parser and Nominatim loops because the standalone evaluator bypasses `pipeline.run_llm_step`'s progress wrapper. Added direct `tqdm` progress for pending parser completions and missing geocodes; resume and artifact semantics are unchanged.
 
 ## Next
 
-Run and verify the four separate evaluations. Keep T03 open until all required official outputs exist.
+Serve Ornith and run `scripts/evaluate.sh --llm-concurrency 4`. Verify all four seals, raw byte identity, and a release-ready `results/evaluation/` archive; do not replace the published raw-only LLM-cache dump.

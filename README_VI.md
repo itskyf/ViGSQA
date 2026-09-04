@@ -65,13 +65,17 @@ python scripts/run_raw_inference.py --model ornith-ai/Ornith-1.5-9B-NVFP4 --base
 # Qwen: restart vLLM với VLLM_MODEL=AxionML/Qwen3.5-9B-NVFP4 rồi dùng id đó
 ```
 
-`scripts/run_official.sh --llm-concurrency 4` chạy và đóng dấu từng raw run.
-Sau khi raw seal hợp lệ, đánh giá độc lập bằng:
+`scripts/inference.sh --llm-concurrency 4` chạy và đóng dấu từng raw run.
+Sau khi cả bốn raw seal hợp lệ, giữ endpoint phục vụ
+`ornith-ai/Ornith-1.5-9B-NVFP4` và chạy đánh giá độc lập bằng:
 
 ```bash
-python scripts/run_evaluation.py --model ornith-ai/Ornith-1.5-9B-NVFP4 --baseline direct --llm-concurrency 4
-python scripts/check_run_seal.py ornith-ai/Ornith-1.5-9B-NVFP4 direct --evaluation
+./scripts/evaluate.sh --llm-concurrency 4
 ```
+
+Ornith là parser cố định cho cả Ornith/Qwen × Direct/Text2SQL; model đang được
+đánh giá không bao giờ tự chọn parser. Lệnh trên tiếp tục từ evaluation JSON
+nếu bị gián đoạn và thoát ngay sau khi đủ bốn evaluation seal.
 
 Raw artifacts/seal nằm trong `baselines/cache_vi/pv-26b1ac0d/`; parse, geocode,
 metric theo câu và evaluation seal nằm trong `results/evaluation/<model>/<baseline>/`.
@@ -87,7 +91,7 @@ metric theo câu và evaluation seal nằm trong `results/evaluation/<model>/<ba
 | `PGUSER` / `PGPASSWORD` | `postgres` / `postgres` | Chứng thực local |
 | `LLM_CACHE_DBNAME` | `llm_cache` | Tên DB cache LLM (tách biệt DB OSM `osm_vn`) |
 
-Cờ `--llm-concurrency N` (bắt buộc) giới hạn số lời gọi LLM đồng thời phía client; đặt theo throughput của server vLLM. `scripts/run_official.sh` chỉ dò endpoint (curl `${OPENAI_BASE_URL}/models`), không tự khởi động server — muốn đổi model đang phục vụ, restart vLLM với `VLLM_MODEL=<id>`.
+Cờ `--llm-concurrency N` giới hạn số lời gọi LLM đồng thời phía client; đặt theo throughput của server vLLM. `scripts/inference.sh` và `scripts/evaluate.sh` chỉ dò endpoint (curl `${OPENAI_BASE_URL}/models`), không tự khởi động server. Inference yêu cầu model đang chạy; evaluation luôn yêu cầu Ornith.
 
 SQL do model sinh luôn chạy trong transaction **read-only** kèm statement timeout.
 

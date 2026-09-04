@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Focused offline checks for the ViGSQA v3 evaluator contract."""
 
+import json
 import tempfile
 import unicodedata
 from pathlib import Path
@@ -16,6 +17,14 @@ from run_evaluation import (
 )
 
 from baselines import pipeline
+from baselines.baselines_vi import INFERENCE_PROFILE
+from vigsqa.sealing import (
+    EVALUATION_PARSER_MAX_ATTEMPTS,
+    EVALUATION_PARSER_MODEL,
+    EVALUATION_PARSER_PROFILE,
+    EVALUATION_PARSER_PROMPT,
+    evaluation_parser_identity,
+)
 
 
 class Location:
@@ -31,6 +40,28 @@ class Geocoder:
 
 
 def main() -> None:
+    evaluated_models = (
+        "ornith-ai/Ornith-1.5-9B-NVFP4",
+        "AxionML/Qwen3.5-9B-NVFP4",
+    )
+    parser_identities = {
+        (model, baseline): evaluation_parser_identity()
+        for model in evaluated_models
+        for baseline in ("direct", "text2sql")
+    }
+    assert (
+        len({json.dumps(value, sort_keys=True) for value in parser_identities.values()})
+        == 1
+    )
+    parser_identity = next(iter(parser_identities.values()))
+    assert parser_identity["model"] == EVALUATION_PARSER_MODEL == evaluated_models[0]
+    assert parser_identity["prompt"] == EVALUATION_PARSER_PROMPT
+    assert parser_identity["profile"] == EVALUATION_PARSER_PROFILE
+    assert EVALUATION_PARSER_PROFILE == INFERENCE_PROFILE
+    assert parser_identity["max_attempts"] == EVALUATION_PARSER_MAX_ATTEMPTS
+    evaluation_runner = (pipeline.ROOT.parent / "scripts" / "evaluate.sh").read_text()
+    assert f'PARSER_MODEL="{EVALUATION_PARSER_MODEL}"' in evaluation_runner
+
     composed = "Đường Trần Hưng Đạo, số 12!"
     decomposed = unicodedata.normalize("NFD", composed)
     assert normalize_text(composed) == normalize_text(decomposed)

@@ -17,6 +17,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from pyproj import Geod
 from shapely import from_wkt
+from tqdm import tqdm
 
 from baselines import pipeline
 from baselines.baselines_vi import (
@@ -24,18 +25,27 @@ from baselines.baselines_vi import (
     build_model_vi,
     setup_llm_cache,
 )
-from vigsqa.sealing import validate_seal
+from vigsqa.sealing import (
+    EVALUATION_PARSER_MAX_ATTEMPTS,
+    EVALUATION_PARSER_MODEL,
+    EVALUATION_PARSER_PROFILE,
+    EVALUATION_PARSER_PROMPT,
+    EVALUATION_SEAL_VERSION,
+    EVALUATOR_ID,
+    EVALUATOR_VERSION,
+    evaluation_parser_identity,
+    validate_seal,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
-EVALUATOR_ID = "vigsqa-gsqa-v3"
-EVALUATOR_VERSION = 1
 EXPECTED_PER_TID = 100
 RAW_STEPS = {"direct": "direct_answer", "text2sql": "sql_answer"}
 PARSE_FILES = {"direct": "direct_json_parse.json", "text2sql": "sql_json_parse.json"}
-PROMPT_PATHS = {
-    "direct": ROOT / "baselines" / "baseline_prompts" / "direct_json_parse_vi.txt",
-    "text2sql": ROOT / "baselines" / "baseline_prompts" / "text2sql_json_parse_vi.txt",
-}
+PARSER_PROMPT_PATH = ROOT / "baselines" / "baseline_prompts" / EVALUATION_PARSER_PROMPT
+if INFERENCE_PROFILE != EVALUATION_PARSER_PROFILE:
+    raise RuntimeError(
+        "parser decoding profile differs from the frozen evaluation seal"
+    )
 TID_FAMILIES = {
     "T01": "entity",
     "T02": "entity",
@@ -271,7 +281,6 @@ def parse_answers(
     questions: list[dict],
     answers: list[dict],
     model,
-    baseline: str,
     output: Path,
     concurrency: int,
 ) -> list[dict]:
@@ -285,7 +294,7 @@ def parse_answers(
         raise ValueError(f"{output}: duplicate or unknown parse IDs")
     cached = {record["id"]: record for record in existing}
     frozen = set(existing_ids) == question_ids
-    prompt = PROMPT_PATHS[baseline].read_text()
+    prompt = PARSER_PROMPT_PATH.read_text()
     todo = []
     for question, answer in zip(questions, answers, strict=True):
         if question["id"] in cached and (
@@ -314,35 +323,38 @@ def parse_answers(
         )
     if todo:
         calls = [messages for _, messages in todo]
-        for (question, _), (content, error, gen) in zip(
-            todo,
-            pipeline.invoke_or_capture_many(
-                model, calls, concurrency, pipeline.StageValidation(json_block_error, 3)
-            ),
-            strict=True,
-        ):
-            cached[question["id"]] = {
-                "id": question["id"],
-                "content": content,
-                **({"error": error} if error else {}),
-                **({"gen": gen} if gen else {}),
-            }
-            output.write_text(
-                json.dumps(
-                    [cached[q["id"]] for q in questions if q["id"] in cached],
-                    ensure_ascii=False,
-                    indent=2,
+        completions = pipeline.invoke_or_capture_many(
+            model,
+            calls,
+            concurrency,
+            pipeline.StageValidation(json_block_error, EVALUATION_PARSER_MAX_ATTEMPTS),
+        )
+        with tqdm(total=len(todo), desc="  parse_answers") as progress:
+            for (question, _), (content, error, gen) in zip(
+                todo, completions, strict=True
+            ):
+                cached[question["id"]] = {
+                    "id": question["id"],
+                    "content": content,
+                    **({"error": error} if error else {}),
+                    **({"gen": gen} if gen else {}),
+                }
+                output.write_text(
+                    json.dumps(
+                        [cached[q["id"]] for q in questions if q["id"] in cached],
+                        ensure_ascii=False,
+                        indent=2,
+                    )
                 )
-            )
+                progress.update(1)
     return [cached[question["id"]] for question in questions]
 
 
 def load_geocodes(path: Path, addresses: list[str], geocoder) -> list[dict]:
     records = json.loads(path.read_text()) if path.exists() else []
     by_address = {record["address"]: record for record in records}
-    for address in addresses:
-        if address in by_address:
-            continue
+    missing = [address for address in addresses if address not in by_address]
+    for address in tqdm(missing, desc="  geocode_addresses"):
         try:
             location = geocoder.geocode(address, exactly_one=True)
         except GeocoderServiceError as error:
@@ -469,7 +481,7 @@ def main() -> int:
     seal_path.unlink(missing_ok=True)
     parse_path = output_dir / PARSE_FILES[args.baseline]
     setup_llm_cache()
-    model = build_model_vi(args.model)
+    model = build_model_vi(EVALUATION_PARSER_MODEL)
     with ExitStack() as clients:
         if isinstance(model, ChatOpenAI):
             clients.enter_context(model.root_client)
@@ -477,7 +489,6 @@ def main() -> int:
             questions,
             answers,
             model,
-            args.baseline,
             parse_path,
             args.llm_concurrency,
         )
@@ -507,18 +518,13 @@ def main() -> int:
     )
 
     raw_seal = raw_dir / f"{args.baseline}.seal.json"
-    prompt_path = PROMPT_PATHS[args.baseline]
     seal = {
-        "seal_version": 1,
+        "seal_version": EVALUATION_SEAL_VERSION,
         "evaluator": {"id": EVALUATOR_ID, "version": EVALUATOR_VERSION},
         "model": args.model,
         "baseline": args.baseline,
         "raw_seal_sha256": sha256(raw_seal),
-        "parser": {
-            "model": args.model,
-            "profile": INFERENCE_PROFILE,
-            "prompt_sha256": sha256(prompt_path),
-        },
+        "parser": evaluation_parser_identity(),
         "artifacts": {
             parse_path.name: sha256(parse_path),
             geocode_path.name: sha256(geocode_path),

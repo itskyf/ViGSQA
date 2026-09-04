@@ -7,6 +7,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SEAL_VERSION = 2
+EVALUATION_SEAL_VERSION = 2
+EVALUATOR_ID = "vigsqa-gsqa-v3"
+EVALUATOR_VERSION = 2
+EVALUATION_PARSER_MODEL = "ornith-ai/Ornith-1.5-9B-NVFP4"
+EVALUATION_PARSER_PROMPT = "direct_json_parse_vi.txt"
+EVALUATION_PARSER_MAX_ATTEMPTS = 3
+EVALUATION_PARSER_PROFILE = {
+    "temperature": 1.0,
+    "top_p": 0.95,
+    "presence_penalty": 1.5,
+    "seed": 42,
+    "max_completion_tokens": 32768,
+    "extra_body": {"top_k": 20, "min_p": 0.0, "repetition_penalty": 1.0},
+}
 STEPS = {
     "direct": ("direct_answer",),
     "text2sql": ("sql_generate", "sql_exec", "sql_answer"),
@@ -125,6 +139,18 @@ def validate_seal(model: str, baseline: str) -> tuple[bool, str]:
         return False, str(error)
 
 
+def evaluation_parser_identity() -> dict:
+    """Return the frozen parser configuration recorded by evaluation seals."""
+    prompt = ROOT / "baselines" / "baseline_prompts" / EVALUATION_PARSER_PROMPT
+    return {
+        "model": EVALUATION_PARSER_MODEL,
+        "profile": EVALUATION_PARSER_PROFILE,
+        "prompt": EVALUATION_PARSER_PROMPT,
+        "prompt_sha256": _sha256(prompt),
+        "max_attempts": EVALUATION_PARSER_MAX_ATTEMPTS,
+    }
+
+
 def validate_evaluation_seal(model: str, baseline: str) -> tuple[bool, str]:
     """Validate an evaluation seal against its raw seal and output bytes."""
     try:
@@ -136,23 +162,20 @@ def validate_evaluation_seal(model: str, baseline: str) -> tuple[bool, str]:
         output_dir = ROOT / "results" / "evaluation" / model / baseline
         path = output_dir / "evaluation.seal.json"
         seal = json.loads(path.read_text())
-        if seal.get("seal_version") != 1:
+        if seal.get("seal_version") != EVALUATION_SEAL_VERSION:
             return False, f"{path}: mismatched seal_version"
         if seal.get("model") != model or seal.get("baseline") != baseline:
             return False, f"{path}: mismatched run identity"
+        if seal.get("evaluator") != {
+            "id": EVALUATOR_ID,
+            "version": EVALUATOR_VERSION,
+        }:
+            return False, f"{path}: mismatched evaluator identity"
         raw_seal = raw_dir / f"{baseline}.seal.json"
         if seal.get("raw_seal_sha256") != _sha256(raw_seal):
             return False, f"{path}: changed raw seal"
-        parser = seal.get("parser")
-        prompt_name = {
-            "direct": "direct_json_parse_vi.txt",
-            "text2sql": "text2sql_json_parse_vi.txt",
-        }[baseline]
-        prompt = ROOT / "baselines" / "baseline_prompts" / prompt_name
-        if not isinstance(parser, dict) or parser.get("model") != model:
-            return False, f"{path}: mismatched parser identity"
-        if parser.get("prompt_sha256") != _sha256(prompt):
-            return False, f"{path}: changed parser prompt"
+        if seal.get("parser") != evaluation_parser_identity():
+            return False, f"{path}: mismatched parser configuration"
         artifacts = seal.get("artifacts")
         expected = {
             "direct_json_parse.json" if baseline == "direct" else "sql_json_parse.json",

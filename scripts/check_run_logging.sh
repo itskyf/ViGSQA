@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Focused check for the run_official.sh tee logging contract: stdout and
-# stderr stay separate, both land in their provenance files, and a python
+# Focused check for the official runners' tee logging contract: stdout and
+# stderr stay separate, both land in their provenance files, and a command
 # failure still fails the pipeline (pipefail propagates the exit status).
 set -o errexit -o nounset -o pipefail
 
@@ -8,15 +8,21 @@ TMP_DIR="$(mktemp --directory)"
 trap 'rm -rf "${TMP_DIR}"' EXIT
 LOG="${TMP_DIR}/run"
 
-python -u -c "print('stdout line'); import sys; sys.stderr.write('tqdm-ish stderr\n')" \
+{
+	echo 'stdout line'
+	echo 'tqdm-ish stderr' >&2
+} \
 	2> >(tee "${LOG}.err" >&2) | tee "${LOG}.out" >/dev/null
 # The process substitution flushes asynchronously; give it a beat.
 sleep 1
-grep -q '^stdout line$' "${LOG}.out"
-grep -q 'tqdm-ish stderr' "${LOG}.err"
+grep --quiet '^stdout line$' "${LOG}.out"
+grep --quiet 'tqdm-ish stderr' "${LOG}.err"
 
 set +o errexit
-python -u -c "import sys; sys.exit('boom')" \
+(
+	echo 'boom' >&2
+	exit 1
+) \
 	2> >(tee "${LOG}2.err" >&2) | tee "${LOG}2.out" >/dev/null
 STATUS=$?
 set -o errexit

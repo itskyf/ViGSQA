@@ -1,6 +1,6 @@
 # T11 — Official Inference on an External vLLM Endpoint
 
-**Status: done (2026-09-04).** Every llama.cpp-specific script, config, prefix, URL, and doc is removed from the official inference path; `run_official.sh` and `main.ipynb` target an external OpenAI-compatible vLLM endpoint through standard OpenAI env vars with one frozen decoding profile; all existing LLM caches are purged.
+**Status: done (2026-09-04).** Every llama.cpp-specific script, config, prefix, URL, and doc is removed from the official inference path; `inference.sh` (renamed from `run_official.sh` during T03) and `main.ipynb` target an external OpenAI-compatible vLLM endpoint through standard OpenAI env vars with one frozen decoding profile; all existing LLM caches are purged.
 
 ## Goal
 
@@ -15,12 +15,12 @@ Serve both official models (`ornith-ai/Ornith-1.5-9B-NVFP4`, `AxionML/Qwen3.5-9B
 | Profile (frozen, both models) | thinking on via default chat behavior (no `chat_template_kwargs`), `temperature=1.0`, `top_p=0.95`, `top_k=20`, `min_p=0.0`, `presence_penalty=1.5`, `repetition_penalty=1.0`, `max_completion_tokens=32768`, `seed=42`; vLLM-only samplers ride in `extra_body`; never deprecated `max_tokens`; no tool-calling config |
 | Serving (repo-maintained only) | `compose.yaml` `vllm` service, one model per server, `--reasoning-parser qwen3 --language-model-only --max-model-len auto`, model selectable via `VLLM_MODEL` (default `AxionML/Qwen3.5-9B-NVFP4`); no other serving flags; no `--served-model-name` (served id = HF repo id) |
 | Reasoning | `--reasoning-parser qwen3` keeps `<think>` text out of `content`; evaluation and stage validation read `content` only; step records persist only diagnostic `gen` metadata (`finish_reason`, `completion_tokens`, `reasoning_tokens` when the API reports them) — never chain-of-thought text |
-| Runner | `run_official.sh` probes the endpoint (curl `--retry` against `${OPENAI_BASE_URL}/models` for cold loads, then a served-id `grep --fixed-strings` gate that fails fast listing missing ids); one model per invocation via `MODELS="<id>"`; the runner never starts the LLM server, only postgres + dataset restore |
+| Runner | `inference.sh` probes the endpoint (curl `--retry` against `${OPENAI_BASE_URL}/models` for cold loads, then a served-id `grep --fixed-strings` gate that fails fast listing missing ids); one model per invocation via `MODELS="<id>"`; the runner never starts the LLM server, only postgres + dataset restore |
 | Cache | T09 architecture unchanged and no profile-hash machinery added — `extra_body` and all standard kwargs already enter the cache key through `_get_llm_string()`; every pre-T11 cache was deleted instead (see Decisions) |
 
 ## Decisions
 
-- **Per-model invocation, not server rotation** (user choice): vLLM serves one model, so the official workflow is "restart vLLM with `VLLM_MODEL=<id>`, run `MODELS=\"<id>\" ./scripts/run_official.sh`" per model. `scripts/run_qwen_official.sh` is deleted (its single-model pass is the `MODELS` override). The runner still iterates all pending pairs but fails fast before any inference if the endpoint does not serve a pending model.
+- **Per-model invocation, not server rotation** (user choice): vLLM serves one model, so the official workflow is "restart vLLM with `VLLM_MODEL=<id>`, run `MODELS=\"<id>\" ./scripts/inference.sh`" per model. `scripts/run_qwen_official.sh` is deleted (its single-model pass is the `MODELS` override). The runner still iterates all pending pairs but fails fast before any inference if the endpoint does not serve a pending model.
 - **Factory always routes to the endpoint** — no `llamacpp:`-style prefix and no official-model allowlist: every `--model` passed to `baselines_vi` is treated as a served model id, and a wrong id fails loudly as an HTTP 404 from the server. Upstream `pipeline.build_model` (Ollama/Anthropic) remains untouched for the English legacy path, but `baselines_vi` no longer falls through to it.
 - **`api_key` fallback lives in the factory** (`os.environ.get("OPENAI_API_KEY") or "not-needed"`): one place covers keyless local vLLM for CLI and notebook; a real endpoint overrides via env. Verified: `ChatOpenAI` construction raises without any key, so the fallback is required, not cosmetic.
 - **Profile keys the cache for free**: verified in the pinned env that `max_completion_tokens` is emitted on the wire (not `max_tokens`) and `extra_body` is a first-class `ChatOpenAI` field present in both the request payload and `_get_llm_string()`. No inference-profile hash was added.
@@ -32,13 +32,13 @@ Serve both official models (`ornith-ai/Ornith-1.5-9B-NVFP4`, `AxionML/Qwen3.5-9B
 
 ## Validation
 
-- Static (2026-09-04): Ruff clean on all touched Python; `bash -n` + ShellCheck clean on `scripts/run_official.sh`; `podman compose config -q` OK; `scripts/check_run_logging.sh` passes (tee/pipefail contract unchanged); grep gate — remaining llama.cpp/haproxy mentions are only frozen history (`docs/results.md`, `baselines/REPORT_VN_GEOQA.md`, T02/T07/T09 records, `migrate_sql_generate_cache.py`) plus this record's own description of the removal.
+- Static (2026-09-04): Ruff clean on all touched Python; `bash -n` + ShellCheck clean on the official inference runner (now `scripts/inference.sh`); `podman compose config -q` OK; `scripts/check_run_logging.sh` passes (tee/pipefail contract unchanged); grep gate — remaining llama.cpp/haproxy mentions are only frozen history (`docs/results.md`, `baselines/REPORT_VN_GEOQA.md`, T02/T07/T09 records, `migrate_sql_generate_cache.py`) plus this record's own description of the removal.
 - Offline payload assert (2026-09-04, no server): `build_model_vi(...)._get_request_payload(...)` emits `max_completion_tokens=32768` with **no** `max_tokens`, `temperature=1.0`, `top_p=0.95`, `seed=42`, `presence_penalty=1.5`, and `extra_body={"top_k": 20, "min_p": 0.0, "repetition_penalty": 1.0}` as its own payload key (the openai SDK merges it into the wire JSON at send time); no `tools`, no `chat_template_kwargs`. `pipeline.build_model is build_model_vi` after patching; the profile also appears in `_get_llm_string()`, so it is part of the cache key.
 - Preflight behavior (2026-09-04): the curl gate's served-id check (`grep --fixed-strings '"<id>"'` over `/v1/models`) detects a missing id and a present id correctly against a stubbed response; the refused-endpoint curl retry path fails within its `--retry-max-time` (verified with a shrunk budget); `check_served_models.py` was later folded into this curl gate per review — no standalone checker script remains.
 - Seal gate: `check_run_seal.py ornith-ai/Ornith-1.5-9B-NVFP4 direct` exits 1 "incomplete" against the purged caches — both per-model pairs correctly become pending for the runner.
 - Cache purge (2026-09-04): `full_md5_llm_cache` 27,983 rows → 0; `baselines/cache_vi/` empty; `llm-cache-*.sql.gz` exports untouched.
 
-*(Pending — requires the endpoint up: model ping, the served-id gate against a live server loading a different id, `--mode smoke` direct+text2sql with `gen` metadata (`finish_reason`, `reasoning_tokens`) and CoT-free `content`. Run: `podman compose up -d vllm`, then `MODELS="AxionML/Qwen3.5-9B-NVFP4" ./scripts/run_official.sh --llm-concurrency 4` or the notebook smoke.)*
+*(Pending — requires the endpoint up: model ping, the served-id gate against a live server loading a different id, `--mode smoke` direct+text2sql with `gen` metadata (`finish_reason`, `reasoning_tokens`) and CoT-free `content`. Run: `podman compose up --detach vllm`, then `MODELS="AxionML/Qwen3.5-9B-NVFP4" ./scripts/inference.sh --llm-concurrency 4` or the notebook smoke.)*
 
 ## Next
 

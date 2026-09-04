@@ -1,6 +1,6 @@
 """G6 completion asserts, manifest, and seal for one official baseline run.
 
-Run by scripts/run_official.sh right after each baseline finishes. Asserts
+Run by scripts/inference.sh right after each baseline finishes. Asserts
 the raw caches are complete against the frozen questions, then writes a
 minimal manifest and a stable checksum-bound completion seal.
 

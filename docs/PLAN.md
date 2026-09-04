@@ -9,7 +9,7 @@ Build and evaluate a reproducible Vietnamese adaptation of GS-QA (`docs/context/
 - Dataset `v3.0.0`: 28 canonical GS-QA TIDs × 100 = 2,800 questions, seed 42, generated from the pinned Geofabrik snapshot `vietnam-260901.osm.pbf` (md5 verified against the Geofabrik sidecar in `download_osm.sh`; never `vietnam-latest`).
 - Location gold (T13–T20): frozen geometry (`geo_wkt`) **and** native OSM address components **and** one deterministic canonical address string built only from those components; candidates are restricted to address-bearing POIs by a criterion fixed by the coverage audit; geometry stays the authoritative spatial reference.
 - T7/T8 external facts (frozen viwiki/enwiki infobox values) are genuinely out-of-schema: no T7/T8 answer attribute is exposed as a reference-DB column (verifier-enforced).
-- Official baselines: Ornith/Qwen × Direct/Text2SQL over an external OpenAI-compatible vLLM endpoint (`ornith-ai/Ornith-1.5-9B-NVFP4`, `AxionML/Qwen3.5-9B-NVFP4`), frozen decoding profile (T11: temperature 1.0, top_p 0.95, top_k 20, min_p 0, presence_penalty 1.5, repetition_penalty 1.0, max_completion_tokens 32768, seed 42, thinking on), frozen prompts, bounded concurrency, raw QID-indexed JSON artifacts under raw-only namespace `cache_vi/pv-26b1ac0d/`, G6 artifact-integrity seal binding dataset + raw prompts + OSM/DB provenance. Parser prompts belong only to the separate evaluation seal.
+- Official baselines: Ornith/Qwen × Direct/Text2SQL over an external OpenAI-compatible vLLM endpoint (`ornith-ai/Ornith-1.5-9B-NVFP4`, `AxionML/Qwen3.5-9B-NVFP4`), frozen decoding profile (T11: temperature 1.0, top_p 0.95, top_k 20, min_p 0, presence_penalty 1.5, repetition_penalty 1.0, max_completion_tokens 32768, seed 42, thinking on), frozen prompts, bounded concurrency, raw QID-indexed JSON artifacts under raw-only namespace `cache_vi/pv-26b1ac0d/`, G6 artifact-integrity seal binding dataset + raw prompts + OSM/DB provenance. Evaluation uses Ornith as one fixed parser with one prompt/profile across all four runs; parser identity belongs only to the separate evaluation seal.
 - v1/v2 artifacts (releases, raw JSONs, logs, seals, QC records) are historical evidence only; old seals can never satisfy v3; the PostgreSQL semantic LLM cache was purged once at T11 (v2 rows and file caches deleted — the llama.cpp/temperature-0 era ended), after which the T09 cache-key contract again guarantees natural misses across profile changes.
 
 ## Why v1/v2 were superseded
@@ -27,7 +27,7 @@ Build and evaluate a reproducible Vietnamese adaptation of GS-QA (`docs/context/
 | --- | --- | --- | --- |
 | T01 | Establish a trustworthy Vietnamese benchmark | `done` | Satisfied **at v3**: T10 re-validated the frozen benchmark (2,800/2,800 automated verification, byte-identical regeneration, human QC approval). The v1/v2 freezes remain Git/history evidence. |
 | T02 | Make the whole experiment runnable end-to-end | `planned` | **Reopened for v3.** The v2 proof (fresh Colab VM) is tooling evidence only. v3 re-proof pending: T11 bumped the notebook's v3 pins and vLLM endpoint plumbing; the end-to-end re-run (bootstrap → dataset → baseline on v3 assets) rides with T03/T05 once the four v3 raw runs exist. |
-| T03 | Measure correctly and establish official baselines | `in_progress` | All four Direct/Text2SQL raw runs are sealed under `pv-26b1ac0d`; the verified PostgreSQL semantic-cache dump is published on `data-v3.0.0`. Raw/evaluation entrypoints and separate seals are implemented. The four official evaluation artifact sets remain. Record: `docs/plans/T03-official-v3-evaluation.md`. |
+| T03 | Measure correctly and establish official baselines | `in_progress` | All four raw runs are sealed under `pv-26b1ac0d`. `inference.sh` and idempotent `evaluate.sh` separate the pipeline layers; evaluation is pinned to one Ornith parser configuration. The four official evaluation artifact sets remain. Record: `docs/plans/T03-official-v3-evaluation.md`. |
 | T04 | Improve what the frozen baselines fail at | `planned` | Starts from T03 sealed per-question evidence; no intervention is selected in advance. Record: `docs/plans/T04-baseline-improvement.md`. |
 | T05 | Analyze Vietnamese-specific behavior and errors | `planned` | Depends on official T03 evidence (and retained T04 results); covers robustness, error taxonomy, and the Vietnamese demo. Record: `docs/plans/T05-vietnamese-error-analysis.md`. |
 | T06 | Tell the story as an ACL paper | `planned` | Depends on T03–T05 evidence; ACL report claims and tables remain artifact-traceable. Record: `docs/plans/T06-acl-paper.md`. |
@@ -35,7 +35,7 @@ Build and evaluate a reproducible Vietnamese adaptation of GS-QA (`docs/context/
 | T08 | Fast database bootstrap via prebuilt release dump | `done` | Version-agnostic capability, re-verified **at v3** inside T10: clean-DB restore from the published `data-v3.0.0` dump matched all G1′ counts (five tables + import marker). |
 | T09 | PostgreSQL LangChain LLM cache + bounded LLM concurrency | `done` | Architecture preserved in v3 and exercised by all four raw runs: 16,800 normally terminated generations across two model keys, exported and restore-verified on the `data-v3.0.0` release. Record: `docs/plans/T09-llm-cache-postgres.md`. |
 | T10 | v3.0.0 benchmark refactor | `done` | v3 frozen and published (`data-v3.0.0`: dataset + DB dump, both restores verified from the release); all gates G1′–G6′ passed including byte-identical regeneration, human QC approval, prompt freeze `pv-8394cd22`, v2-seal negative test; no official inference launched. Record: `docs/plans/T10-benchmark-v3-refactor.md`. |
-| T11 | Official inference on an external vLLM endpoint | `done` | All llama.cpp code/config/docs removed from the official path; `baselines_vi.build_model_vi` serves both NVFP4 models through standard OpenAI env vars with one frozen decoding profile; `run_official.sh` probes the endpoint per model (curl `/v1/models` gate), compose keeps an optional `vllm` service (`--reasoning-parser qwen3`); step records gained diagnostic `gen` metadata; all LLM caches purged. Record: `docs/plans/T11-vllm-official-inference.md`. |
+| T11 | Official inference on an external vLLM endpoint | `done` | All llama.cpp code/config/docs removed from the official path; `baselines_vi.build_model_vi` serves both NVFP4 models through standard OpenAI env vars with one frozen decoding profile; `inference.sh` probes the endpoint per model (curl `/v1/models` gate), compose keeps an optional `vllm` service (`--reasoning-parser qwen3`); step records gained diagnostic `gen` metadata; all LLM caches purged. Record: `docs/plans/T11-vllm-official-inference.md`. |
 
 ## Cross-Task Contracts
 
@@ -51,7 +51,7 @@ G1′ DB rebuild (five tables non-empty, representative spatial ops, address cov
 
 ## Active Next Action
 
-**Evaluate all four raw-sealed runs separately with `scripts/run_evaluation.py`.** Keep T03 open until all official evaluation artifacts/seals exist.
+**Serve Ornith and run `scripts/evaluate.sh --llm-concurrency 4`.** Keep T03 open until all four evaluation seals exist and `results/evaluation/` is verified for release upload.
 
 ## Session Prompt
 
