@@ -16,7 +16,7 @@ Toàn bộ nội dung đồ án có thể được tái lập trên Google Colab
 
 ## Tái lập đồ án trên Colab CPU
 
-Mở `main.ipynb` trong bài nộp bằng Google Colab với runtime CPU và chọn **Runtime → Run all**.
+[Mở `main.ipynb` bằng Google Colab](https://drive.google.com/file/d/1ae4NWZ9TkNKvpRsNFPpqiAacQHO8Ihr3/view?usp=sharing), chọn runtime CPU, rồi chọn **Runtime → Run all**.
 Notebook cài đặt dự án và PostgreSQL/PostGIS, tải các artifact `v3.0.0` và kiểm tra checksum.
 
 Không cần GPU, tải model, API key hay dịch vụ LLM.

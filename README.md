@@ -16,7 +16,7 @@ The complete coursework can be reproduced on Google Colab CPU by opening the sub
 
 ## Course reproduction on Colab CPU
 
-Open the submitted `main.ipynb` in Google Colab on a CPU runtime and select **Runtime → Run all**.
+[Open `main.ipynb` in Google Colab](https://drive.google.com/file/d/1ae4NWZ9TkNKvpRsNFPpqiAacQHO8Ihr3/view?usp=sharing), select a CPU runtime, and choose **Runtime → Run all**.
 The notebook installs the project and PostgreSQL/PostGIS, downloads the `v3.0.0` artifacts, and verifies their checksums.
 
 No GPU, model download, API key, or LLM service is required.
