@@ -27,6 +27,10 @@ generator/wikipedia_cache_vi.json
 baselines/*_eval.csv
 results/
 
+# Notebook-emitted figures (regenerated deterministically from the frozen
+# dataset; shipped for the report via the release archive)
+artifacts/
+
 # Overnight run logs (provenance lives in the run manifests)
 logs/
 

@@ -16,7 +16,7 @@ Write the course report with ACL style, documenting the benchmark, methods, eval
 - **Target Files**:
   - `docs/report/main.typ`: Full paper in Typst with ACL template (`@preview/tracl:0.8.1`).
   - `docs/report/references.yaml`: 22 bibliographic entries in Hayagriva YAML format.
-  - `docs/report/figures/`: SVG diagrams for Figure 1 (`fig1_baselines.svg`) and Figure 3 (`fig3_pipeline.svg`).
+  - `docs/report/figures/`: SVG diagrams for Figure 1 (`fig1_baselines.svg`) and Figure 3 (`fig3_pipeline.svg`). The notebook §2.4 spatial-reasoning map (`artifacts/figures/spatial_reasoning_example.{svg,webp}`, mixed raster/vector SVG over OSM Mapnik tiles) is available for reuse via `scripts/restore_figures.sh`.
 - **Semantic Formatting Invariant**: All ad-hoc LaTeX spacing (`\vspace`, `\resizebox`, `\tabcolsep`, etc.) removed; layout relies on semantic Typst primitives (`table`, `figure`). Wide tables (Table 1 and Table 4) span across both columns via `scope: "parent"`.
 - **Visual Comparative Analysis**: Page screenshots captured at 144 PPI for both LaTeX (9 pages) and Typst (10 pages) and analyzed with multimodal vision.
 

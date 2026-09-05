@@ -4,6 +4,8 @@ version = "0.1.0"
 requires-python = ">= 3.11"
 authors = [{ name = "Kỳ", email = "40734986+itskyf@users.noreply.github.com" }]
 dependencies = [
+  "contextily>=1.7.1,<2",
+  "geopandas[all]>=1.1.4,<2",
   "geopy>=2.5.0,<3",
   "langchain-community>=0.4.2,<0.5",
   "langchain-openai>=1.6.0,<2",
@@ -14,6 +16,7 @@ dependencies = [
   "pydantic-settings>=2.15.0,<3",
   "pyproj>=3.7.2,<4",
   "shapely>=2.1.2,<3",
+  "sqlalchemy>=2.0.52,<3",
   "tqdm>=4.70.0,<5",
 ]
 
@@ -53,7 +56,6 @@ curl = ">=8.21.0,<9"
 osm2pgsql = ">=2.2.0,<3"
 osmium-tool = ">=1.19.1,<2"
 unzip = ">=6.0,<7"
-sqlalchemy = ">=2.0,<3"
 
 [tool.pixi.feature.dev.dependencies]
 nb-cli = ">=0.0.9,<0.0.10"
