@@ -4,14 +4,24 @@
 Five questions that do not exist in the benchmark, phrased with the
 generator's template dialect and anchored on POIs whose names appear
 nowhere in the 2,800 benchmark surfaces (asserted). Grounded gold comes
-from executing gold SQL read-only. Direct and Text2SQL run through the
-model client with the PostgreSQL LangChain cache in front — restored from
-the published dump, every generation is an exact cache hit and the endpoint
-is never contacted; a cache miss fails loudly against the (deliberately
-dead) endpoint. The pipeline cache is redirected to
-`baselines/cache_vi/demo/` — never the sealed `pv-26b1ac0d` namespace —
-and Text2SQL empty answers get the frozen records→answer rescue applied
-for display.
+from executing gold SQL read-only.
+
+Model generations replay through the pipeline's resume layer — with no
+global LangChain cache configured, the JSON step records under the demo
+cache ARE the skip layer (the exact upstream semantics): a question with a
+published step record is never re-invoked, and any question without one
+attempts the endpoint and fails loudly against the deliberately dead
+`OPENAI_BASE_URL`. Step records, not the LangChain cache, are the
+cross-platform replay contract: one answer-stage prompt embeds executed
+azimuth floats whose rendering differs across distro numeric stacks
+(verified: PostgreSQL 18 + PostGIS 3.6 on Ubuntu still differs from the
+original Debian-based environment in the last digits), which would change
+the prompt bytes and therefore the LangChain cache key. Deterministic
+stages — gold SQL, execution of the generated SQL, the records→answer
+rescue, presentation — always run live.
+
+The step cache is redirected to `baselines/cache_vi/demo/` — never the
+sealed `pv-26b1ac0d` namespace.
 """
 
 import argparse
@@ -23,7 +33,7 @@ from langchain_openai import ChatOpenAI
 from records_to_answer import canonical_address, exec_rows, rescue_block
 
 from baselines import pipeline
-from baselines.baselines_vi import build_model_vi, setup_llm_cache
+from baselines.baselines_vi import build_model_vi
 
 ROOT = Path(__file__).resolve().parents[1]
 MODEL = "ornith-ai/Ornith-1.5-9B-NVFP4"
@@ -211,7 +221,6 @@ def main() -> int:
         {"id": demo["id"], "question": demo["question"], "type": "demo"}
         for demo in demos
     ]
-    setup_llm_cache()
     model = build_model_vi(MODEL)
     with ExitStack() as clients:
         if isinstance(model, ChatOpenAI):

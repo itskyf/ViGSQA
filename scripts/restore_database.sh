@@ -69,16 +69,11 @@ else
 fi
 
 echo "[INFO] Restoring reference database..."
-# The dump is produced by PostgreSQL 18 / psql 18 and restored into 14/3.4 on
-# Colab; these filters remove exactly the incompatible lines (COPY data can
-# never match: hex EWKB and tab-separated text never start with a lone
-# backslash, which COPY escaping always doubles) and the --clean artifacts
-# that would drop the schema hosting the postgis extension.
+# The dump's --clean section drops its own partial objects first; the schema
+# filters keep it from dropping the schema hosting the postgis extension that
+# init_database.sql creates before this restore runs.
 gzip --decompress --stdout "${DB_ASSET_FILE}" |
 	sed \
-		--expression '/^SET transaction_timeout = 0;$/d' \
-		--expression '/^\\restrict /d' \
-		--expression '/^\\unrestrict /d' \
 		--expression '/^DROP SCHEMA IF EXISTS public;$/d' \
 		--expression '/^CREATE SCHEMA public;$/d' |
 	psql_stream

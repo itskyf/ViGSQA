@@ -86,3 +86,7 @@ Commit `5259b7e6` ("t04: freeze records-to-answer-rescue-v1 ...") contains the r
 - area/length/textual_fact are untouched by construction: their failing SQL returns no typed aggregate (area/length golds come from external measurements; textual facts are out-of-schema for the verifier).
 - Location rescue emits the row's address string, which may differ from gold formatting even when it names the same place — text F1 gains understate the true spatial recovery (distance error improves separately).
 - The intervention arm is evaluated as a merge over sealed parse records; it is not a rerun of the pipeline, so latency/cost claims about the full system do not apply (the rescue itself is deterministic and free).
+
+## Rename + Colab reconstruction (2026-09-05)
+
+For the course-facing surface the workflow script was renamed `scripts/t04_rescue.py` → `scripts/records_to_answer.py` and outputs moved `results/t04/rescue/` → `results/rescue/` (workflow id `records-to-answer-rescue-v1` unchanged; no task IDs in script names/paths). A full cache-only rerun of `eval --split dev` and `eval --split test` (post-rename, zero LLM calls, `[split] geocoded 0 new addresses` on both) reproduced every output under `results/rescue/` **byte-identically**, so the reconstruction shipped in the notebook (`rescue-inputs.tar.gz` release asset: `sql_exec.json` + the frozen `geocodes_{dev,test}.json` + `intervention.json`, SHA-256 `56841ffa…`) deterministically regenerates the frozen numbers; the notebook asserts equality against the frozen record.

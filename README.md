@@ -24,16 +24,17 @@ Every artifact is sha256-pinned; the notebook and the individual scripts verify 
 | `evaluation-results.tar.gz` | sealed per-question results for all four official runs | `bb10de26aa851dab1e24baf93dbf8d32d21ecad1205aabf32920074efd484b16` |
 | `llm-cache-20260905.sql.gz` | the published LLM cache (27,674 cached generations) | `60d9e0f213c6bd8282dd00ceb16b3c428187f9b2791840c2e521b15c6c808830` |
 | `rescue-inputs.tar.gz` | sealed inputs of the records→answer rescue reconstruction | `56841ffaa4a0354a02fac9619254b5bf554d5a291049d075dde4ad9c42cc373f` |
+| `demo-inputs.tar.gz` | published step records of the five demo generations | `c538c9332410690b76330ea1659ce3960c17ebc20186319d6930c77ba7c5228b` |
 
 ## Course notebook (`main.ipynb`)
 
 Open `main.ipynb` in Google Colab on a **fresh CPU runtime** and Run All — no GPU, no LLM endpoint, no API keys. The notebook:
 
-1. clones this repository, installs it with `uv`, and bootstraps PostgreSQL/PostGIS (apt on Colab; the pinned `compose.yaml` service locally);
+1. clones this repository, installs it with `uv`, and bootstraps PostgreSQL/PostGIS (Colab installs PostgreSQL 18 + PostGIS 3.6 from the PGDG apt repository; locally the pinned `compose.yaml` service is used);
 2. restores the PostGIS reference database, the frozen dataset, the sealed evaluation artifacts, and the published LLM cache — each download sha256-verified;
 3. profiles the dataset, computes the official baseline tables from the sealed per-question results, and compares runs under the frozen dev/test split;
 4. reconstructs the records→answer rescue improvement live and asserts the recomputed tables equal the frozen record (zero LLM calls, zero geocoding requests — both asserted);
-5. replays the five novel Vietnamese demo questions: questions, gold SQL, PostGIS execution, rescue, and presentation are rebuilt live, while every model generation is served as an exact hit from the restored LLM cache — a **cached replay of the original live inference, not new inference**;
+5. replays the five novel Vietnamese demo questions: questions, gold SQL, PostGIS execution, rescue, and presentation are rebuilt live, while every model generation replays from its published step record (the pipeline's resume layer) — a **cached replay of the original live inference, not new inference**;
 6. presents the Vietnamese error analysis and interpretation.
 
 Cache-only contract: no notebook step contacts an LLM server. `OPENAI_BASE_URL` points at a deliberately unreachable address, so an unexpected cache miss fails loudly instead of silently falling back to live inference.

@@ -17,6 +17,7 @@ Mọi asset được ghim SHA-256; notebook và từng script tự kiểm tra m�
 | `evaluation-results.tar.gz` | Kết quả theo từng câu (sealed) của cả bốn run chính thức | `bb10de26…84b16` |
 | `llm-cache-20260905.sql.gz` | Cache LLM đã công bố (27.674 generation) | `60d9e0f2…8830` |
 | `rescue-inputs.tar.gz` | Input sealed cho việc tái dựng records→answer rescue | `56841ffa…373f` |
+| `demo-inputs.tar.gz` | Step record đã công bố của năm generation demo | `c538c93…c5228b` |
 
 ---
 
@@ -24,11 +25,11 @@ Mọi asset được ghim SHA-256; notebook và từng script tự kiểm tra m�
 
 Mở `main.ipynb` trong Google Colab trên **runtime CPU mới** và Run All — không GPU, không endpoint LLM, không API key. Notebook:
 
-1. clone repository này, cài bằng `uv`, và bootstrap PostgreSQL/PostGIS (Colab: apt; local: service `compose.yaml`);
+1. clone repository này, cài bằng `uv`, và bootstrap PostgreSQL/PostGIS (Colab cài PostgreSQL 18 + PostGIS 3.6 từ apt repository PGDG; local dùng service `compose.yaml`);
 2. restore database tham chiếu PostGIS, bộ dữ liệu đóng băng, artifact đánh giá sealed, và cache LLM đã công bố — mỗi lượt tải đều kiểm tra SHA-256;
 3. phân tích bộ dữ liệu, tính bảng baseline chính thức từ kết quả sealed theo từng câu, so sánh các run dưới split dev/test đóng băng;
 4. tái dựng live cải tiến records→answer rescue và assert bảng tính lại bằng đúng kết quả đã đóng băng (0 lời gọi LLM, 0 yêu cầu geocoding — đều được assert);
-5. replay năm câu hỏi demo tiếng Việt mới: câu hỏi, gold SQL, thực thi PostGIS, rescue và trình bày được dựng lại live, còn mọi generation của model được phục vụ như cache hit chính xác từ cache LLM đã restore — **cached replay của lần inference trực tiếp gốc, không phải inference mới**;
+5. replay năm câu hỏi demo tiếng Việt mới: câu hỏi, gold SQL, thực thi PostGIS, rescue và trình bày được dựng lại live, còn mọi generation của model replay từ step record đã công bố (resume layer của pipeline) — **cached replay của lần inference trực tiếp gốc, không phải inference mới**;
 6. trình bày phân tích lỗi tiếng Việt và diễn giải.
 
 Hợp đồng cache-only: không bước nào của notebook gọi tới server LLM. `OPENAI_BASE_URL` trỏ vào một địa chỉ cố tình không thể truy cập, nên cache miss bất ngờ sẽ fail thẳng thay vì âm thầm fallback sang inference trực tiếp.

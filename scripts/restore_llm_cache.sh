@@ -58,20 +58,7 @@ if [[ "${DB_EXISTS%%|*}" != "1" ]]; then
 fi
 
 echo "[INFO] Restoring LLM cache from $(basename "${DUMP_FILE}")..."
-if [[ -n "${COLAB_RELEASE_TAG:-}" ]]; then
-	# The dump is produced by PostgreSQL 18 / psql 18 and restored into 14/3.4
-	# on Colab; these filters remove exactly the 18-only lines (identical
-	# filters to scripts/restore_database.sh — COPY data can never match: JSON
-	# text never starts with a lone backslash, which COPY escaping always
-	# doubles) or ON_ERROR_STOP aborts the restore.
-	gzip --decompress --stdout "${DUMP_FILE}" | sed \
-		--expression '/^SET transaction_timeout = 0;$/d' \
-		--expression '/^\\restrict /d' \
-		--expression '/^\\unrestrict /d' |
-		psql_stream
-else
-	gzip --decompress --stdout "${DUMP_FILE}" | psql_stream
-fi
+gzip --decompress --stdout "${DUMP_FILE}" | psql_stream
 
 if [[ -n "${COLAB_RELEASE_TAG:-}" ]]; then
 	ROWS="$(psql --username="${PGUSER}" --dbname="${LLM_CACHE_DB}" \
