@@ -1,6 +1,6 @@
 # T01 — Trustworthy Vietnamese Benchmark
 
-**Status: done (re-frozen as v1.0.0, 2026-08-28).** Published as the `data-v1.0.0` GitHub Release asset.
+**Status: done (re-frozen as v1.0.0, 2026-08-28).** Published as the `v1.0.0` GitHub Release asset.
 
 ## Goal
 

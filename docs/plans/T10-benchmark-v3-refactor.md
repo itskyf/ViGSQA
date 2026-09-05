@@ -20,7 +20,7 @@ Freeze a corrected v3.0.0 benchmark contract and prepare the runtime so the four
 - **`capacity` removed from the reference schema** (Lua `poi_extra_tags`, `pois` view, Text2SQL prompt) and kept as a T7/T8 external attribute. Evidence: no filter label uses it (`generator/filter_labels_vi.json` covers cuisine/museum/takeaway/outdoor_seating/delivery/emergency), so removal breaks no template while making every T7/T8 attribute genuinely out-of-schema. Upstream GS-QA shares this quirk (`poi_schema.json` exposes `capacity` while `generator.py` uses "Capacity" as a multi-source attribute); v3 does not copy it.
 - **Prompts are edited only after user QC approval**, immediately before freeze: a repo with v3 prompts + v2 dataset is self-consistent to the seal machinery, and an accidental official run in that window would seal a hybrid. No official-runner invocations between prompt edit and dataset freeze.
 - **Generation goes to a staging directory, swapped at freeze** (documented flow in `docs/data_generation.md`): in-place regeneration would leave the v2 `MANIFEST.json` describing v3 files.
-- **v2 dump pins and export version bump land in one commit** (`restore_database.sh` + `export_database.sh` are two halves of the `data-v3.0.0` release tag).
+- **v2 dump pins and export version bump land in one commit** (`restore_database.sh` + `export_database.sh` are two halves of the `v3.0.0` release tag).
 
 ## Evidence log
 
@@ -72,8 +72,8 @@ Freeze a corrected v3.0.0 benchmark contract and prepare the runtime so the four
 
 - Tee live logging landed in both runners (`python -u … 2> >(tee .err >&2) | tee .out`); `scripts/check_run_logging.sh` verifies exit propagation + both files non-empty (failing python → non-zero script exit; succeeding → `.out`/`.err` both populated).
 - **Seal negative test passed**: all four `check_run_seal.py` pairs report `incomplete` (exit 1) under `pv-8394cd22` — v2 seals live under `pv-b383e117` and can never satisfy v3 identity.
-- Freeze swap executed: v2 dataset archived at `data/questions_vi_v2_archive` (release `data-v2.0.0` also restorable), staged v3 moved to `data/questions_vi`; `dataset_sha256 = d7a0c45c…17ff1`; `scripts/v3.0.0.sha256` (28 files); MANIFEST v3.0.0 written.
-- Release **`data-v3.0.0` published**: `vn-geoqa.zip` (2,388,528 B) + `osm-vn.sql.gz` (122,288,436 B, sha `ae06f7c2…ef53e6`); export/upload pin ordering enforced by the existing guard; pins committed as one commit (`90ca689d`) with `restore_dataset.sh` default → v3.0.0.
+- Freeze swap executed: v2 dataset archived at `data/questions_vi_v2_archive` (release `v2.0.0` also restorable), staged v3 moved to `data/questions_vi`; `dataset_sha256 = d7a0c45c…17ff1`; `scripts/v3.0.0.sha256` (28 files); MANIFEST v3.0.0 written.
+- Release **`v3.0.0` published**: `vn-geoqa.zip` (2,388,528 B) + `osm-vn.sql.gz` (122,288,436 B, sha `ae06f7c2…ef53e6`); export/upload pin ordering enforced by the existing guard; pins committed as one commit (`90ca689d`) with `restore_dataset.sh` default → v3.0.0.
 - **Restore verification from the published release**: `restore_dataset.sh` into a moved-aside `data/questions_vi` → "28 files, 2800 questions verified", `diff -r` byte-identical to the frozen copy. DB: tables dropped via `prepare_import.sql`, `bootstrap_postgres.sh` (dump path) → five-table counts match G1′ exactly (38,207 / 8,567 / 1,493 / 7,987 / 175,883); restored `pois` view = 24 columns (8 `addr_*`, no `capacity`), address-bearing pool = 5,321.
 - Docs refreshed: README.md / README_VI.md (v3.0.0, `vietnam-260901`, release tag, full-mode = 2,800), `docs/data_generation.md` (v3 view columns, address semantics, staging-dir flow, answer-key table re-verified against the frozen jsonl).
 - **T10 closed**: no official inference launched (no new `logs/official/` artifacts), no T03/evaluator code touched. Next action: user review → user manually launches the four v3 official baseline runs.

@@ -73,7 +73,7 @@ filter label uses it.
 The dataset lives at `data/questions_vi/` with `generator/questions_vi` as a
 symlink to it, so code and notebooks keep using the familiar path. `data/` is
 **not tracked by git** (`.gitignore`): the frozen dataset is published as a
-public GitHub Release asset (tag `data-v3.0.0`) and restored by:
+public GitHub Release asset (tag `v3.0.0`) and restored by:
 
 1. `./scripts/restore_dataset.sh` — downloads, unpacks, and sha256-verifies
    `data/questions_vi` against `scripts/v3.0.0.sha256` (idempotent; needs only

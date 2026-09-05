@@ -17,7 +17,7 @@ ViGSQA/
 │   ├── init_database.sh                # Tạo database osm_vn + PostGIS
 │   ├── download_osm.sh                 # Tải PBF snapshot OSM đã pin (vietnam-260901)
 │   ├── import_osm.sh                   # osm2pgsql flex → view pois
-│   └── restore_dataset.sh              # Tải bộ dữ liệu từ GitHub Release (data-v3.0.0)
+│   └── restore_dataset.sh              # Tải bộ dữ liệu từ GitHub Release (v3.0.0)
 ├── generator/
 │   ├── generator_vi.py                 # Sinh câu hỏi tiếng Việt từ DB
 │   ├── verify_vi.py                    # Kiểm tra chất lượng câu hỏi
@@ -99,7 +99,7 @@ SQL do model sinh luôn chạy trong transaction **read-only** kèm statement ti
 
 LangChain cache (`SQLAlchemyMd5Cache` chuẩn hoá bỏ trường transport như `base_url`/api key) luôn bật cho pipeline, nằm trong DB `llm_cache` — cùng service Postgres nhưng tách biệt hoàn toàn với DB tham chiếu `osm_vn`, nên restore/xoá cache không bao giờ ảnh hưởng dữ liệu OSM. Hai luồng restore độc lập:
 
-- **OSM**: `scripts/bootstrap_postgres.sh` (dump release `osm-vn.sql.gz` của tag `data-v3.0.0`, ghim SHA-256).
+- **OSM**: `scripts/bootstrap_postgres.sh` (dump release `osm-vn.sql.gz` của tag `v3.0.0`, ghim SHA-256).
 - **LLM cache**: `scripts/export_llm_cache.sh` → `scripts/restore_llm_cache.sh <dump>`.
 
 Hợp đồng cache-key: cùng một yêu cầu model (model/quantization/tham số sinh/prompt giữ nguyên) tại endpoint khác nhau → cache hit; đổi model hoặc tham số sinh → miss. File JSON step (`cache_vi/…`) vẫn là artifact ghi-đầy-đủ; chi tiết trong `docs/plans/T09-llm-cache-postgres.md`.

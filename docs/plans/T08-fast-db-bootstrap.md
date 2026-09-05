@@ -6,7 +6,7 @@
 
 Cut the fresh-environment database bootstrap (especially Colab, where the 327 MB snapshot download,
 osmium scan, and osm2pgsql run dominate startup) by restoring a prebuilt plain-SQL dump published on the
-GitHub Release `data-v2.0.0`, with the existing pinned-snapshot osm2pgsql import kept as the fallback.
+GitHub Release `v2.0.0`, with the existing pinned-snapshot osm2pgsql import kept as the fallback.
 Priority: **restore > build**.
 
 ## Design Decisions
@@ -87,7 +87,7 @@ pois 38,223 · regions 8,535 · parks 1,492 · lakes 7,973 · roads 175,318).
   fresh-environment path minus Colab's own postgres install.
 - **Bootstrap regression**: normal run → probe skip + gate pass; `DB_RESTORE=0` run → md5-verified
   snapshot skip, `Already imported`, gate pass (the `run_official_v2.sh` preflight shape).
-- **Publishing**: `gh release view data-v2.0.0` lists `osm-vn-v2.0.0.sql.gz` (121,322,845 B) beside
+- **Publishing**: `gh release view v2.0.0` lists `osm-vn-v2.0.0.sql.gz` (121,322,845 B) beside
   the dataset zip. Static checks: ShellCheck clean on all four scripts, `sqlfluff lint sql/` clean,
   Ruff clean on `run_check_v2.py`, and `osm_snapshot()` there now records `url` + local-file `md5`
   (schema change of the run manifest; no full-run manifests existed yet — W7 had not started).

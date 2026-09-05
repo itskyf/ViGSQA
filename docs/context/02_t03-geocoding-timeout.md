@@ -86,4 +86,4 @@ The remaining evaluation pairs resume with `./scripts/evaluate.sh
 evaluation and raw seal validates, an idempotent `evaluate.sh` rerun skips all
 pairs, and a frozen rerun of one pair reproduced its artifacts byte-identically.
 `evaluation-results.tar.gz` is published and download-verified on the
-`data-v3.0.0` release; T03 is done.
+`v3.0.0` release; T03 is done.
