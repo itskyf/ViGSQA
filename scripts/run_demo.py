@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""Fresh Vietnamese demo questions (T05): novel anchors, Ornith runs.
+"""Fresh Vietnamese demo questions: novel anchors, Ornith runs.
 
 Five questions that do not exist in the benchmark, phrased with the
 generator's template dialect and anchored on POIs whose names appear
 nowhere in the 2,800 benchmark surfaces (asserted). Grounded gold comes
 from executing gold SQL read-only. Direct and Text2SQL run through the
-external OpenAI-compatible endpoint with the pipeline cache redirected to
-`baselines/cache_vi/t05-demo/` — never the sealed `pv-26b1ac0d` namespace —
-and Text2SQL empty answers get the frozen T04 rescue applied for display.
+model client with the PostgreSQL LangChain cache in front — restored from
+the published dump, every generation is an exact cache hit and the endpoint
+is never contacted; a cache miss fails loudly against the (deliberately
+dead) endpoint. The pipeline cache is redirected to
+`baselines/cache_vi/demo/` — never the sealed `pv-26b1ac0d` namespace —
+and Text2SQL empty answers get the frozen records→answer rescue applied
+for display.
 """
 
 import argparse
@@ -16,15 +20,15 @@ from contextlib import ExitStack
 from pathlib import Path
 
 from langchain_openai import ChatOpenAI
-from t04_rescue import canonical_address, exec_rows, rescue_block
+from records_to_answer import canonical_address, exec_rows, rescue_block
 
 from baselines import pipeline
 from baselines.baselines_vi import build_model_vi, setup_llm_cache
 
 ROOT = Path(__file__).resolve().parents[1]
 MODEL = "ornith-ai/Ornith-1.5-9B-NVFP4"
-DEMO_CACHE = ROOT / "baselines" / "cache_vi" / "t05-demo"
-OUT_DIR = ROOT / "results" / "t05" / "demo"
+DEMO_CACHE = ROOT / "baselines" / "cache_vi" / "demo"
+OUT_DIR = ROOT / "results" / "demo"
 
 # (question id, family, anchor category filter, target category, template)
 SPECS = [
@@ -236,7 +240,7 @@ def main() -> int:
         )
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    lines = ["# T05 — Vietnamese demo on fresh questions (Ornith)\n"]
+    lines = ["# Vietnamese demo on fresh questions (Ornith)\n"]
     for demo, direct_row, exec_row, answer_row in zip(
         demos, direct, executed, answered, strict=True
     ):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""T04 intervention: deterministic records→answer rescue (Text2SQL, Ornith).
+"""Deterministic records→answer rescue (Text2SQL, Ornith).
 
 Pre-registered rule, frozen before any test aggregate is computed: when the
 sealed run produced no answer candidates for a question (worst-case floor —
@@ -11,7 +11,7 @@ the parser produces. All typing and filtering then happens inside the sealed
 
 Because the rescue only fires where the sealed score already sits at the
 floor, per-question scores can only improve or tie (asserted after each
-evaluation). Output artifacts live under `results/t04/rescue/` only.
+evaluation). Output artifacts live under `results/rescue/` only.
 """
 
 import argparse
@@ -35,7 +35,7 @@ MODEL = "ornith-ai/Ornith-1.5-9B-NVFP4"
 BASELINE = "text2sql"
 SEALED_DIR = ROOT / "results" / "evaluation" / MODEL / BASELINE
 CACHE_DIR = ROOT / "baselines" / "cache_vi" / "pv-26b1ac0d" / MODEL
-OUT_DIR = ROOT / "results" / "t04" / "rescue"
+OUT_DIR = ROOT / "results" / "rescue"
 NAME_COLS = ("poi_name", "park_name", "lake_name", "road_name")
 ADDR_COLS = (
     "addr_housenumber",
@@ -272,7 +272,7 @@ def cmd_eval(args: argparse.Namespace) -> int:
     known = {r["address"] for r in json.loads(geocode_path.read_text())}
     new_addresses = sum(1 for a in address_order if a not in known)
     geocoder = RateLimiter(
-        Nominatim(user_agent="ViGSQA-t04-rescue", timeout=10).geocode,
+        Nominatim(user_agent="ViGSQA-records-rescue", timeout=10).geocode,
         min_delay_seconds=1,
         max_retries=2,
         error_wait_seconds=5,

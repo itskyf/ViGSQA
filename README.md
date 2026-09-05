@@ -1,249 +1,98 @@
-# GS-QA: A Benchmark for Geospatial Question Answering
+# ViGSQA — Vietnamese Geospatial Question Answering
 
-## VN-GeoQA — Vietnamese Extension
-
-This fork adds **VN-GeoQA**, a Vietnamese-language geospatial QA benchmark built on OpenStreetMap Vietnam data.
+**VN-GeoQA** is a Vietnamese-language geospatial QA benchmark built on OpenStreetMap Vietnam data, adapted from the upstream [GS-QA](https://github.com/MajidSas/GS-QA) benchmark. Everything below reproduces from the frozen `v3.0.0` GitHub Release; reproducing the published results needs **no GPU and no LLM endpoint**.
 
 | | VN-GeoQA |
 |--|--|
 | Language | Vietnamese |
-| Version | **v3.0.0 (frozen)** — [`data/questions_vi/MANIFEST.json`](data/questions_vi/MANIFEST.json) |
-| Questions | 2,800 (100 × 28 canonical GS-QA types), stable `{type}-NNN` ids + `tid` |
+| Version | **v3.0.0 (frozen)** — MANIFEST inside the dataset asset |
+| Questions | 2,800 (100 × 28 canonical question types), stable `{type}-NNN` ids |
 | Source | Geofabrik `vietnam-260901.osm.pbf` (sha256 in MANIFEST) → PostGIS `osm_vn` |
-| Database | OSM Vietnam (PostGIS `osm_vn` via [`compose.yaml`](compose.yaml)); LLM = external OpenAI-compatible vLLM (optional compose service) |
-| Dataset | `data/questions_vi/` — **not in git** by design; restore with `scripts/restore_dataset.sh` (public GitHub Release asset, sha256-verified) or regenerate with seed 42. Symlinked at `generator/questions_vi/` |
-| QC | automated checks 2,800/2,800 + human review of a 140-record seeded sample |
-| Baselines | direct, text2sql — external OpenAI-compatible vLLM `/v1` via `langchain-openai` (frozen decoding profile, thinking on) |
-| Results | [`baselines/REPORT_VN_GEOQA.md`](baselines/REPORT_VN_GEOQA.md) *(archived, pre-freeze)* |
-
-Generation is reproducible: `python generator/generator_vi.py --seed 42 --count 100` against the imported snapshot regenerates the dataset byte-identically; seed, command, snapshot hash, and validation evidence are recorded in the MANIFEST. Range questions store the **full** answer set ordered by distance (GS-QA range semantics: multiple valid answers). Location questions (T13–T20) keep `geo_wkt` as the authoritative spatial gold alongside native OSM address components and one deterministic canonical address string; candidates are restricted to address-bearing POIs (criterion recorded in the MANIFEST).
+| Baselines | Ornith/Qwen × Direct/Text2SQL over an external OpenAI-compatible vLLM endpoint (frozen decoding profile) |
+| Evaluation | sealed per-question results and evaluation seals, published on the release |
 
 **Full Vietnamese documentation: [README_VI.md](README_VI.md)**
 
-Docs:
+## Frozen release assets (`v3.0.0`)
 
-- [docs/data_generation.md](docs/data_generation.md) — pipeline, templates, output format
-- [docs/results.md](docs/results.md) — baseline results and analysis *(archived, pre-freeze)*
+Every artifact is sha256-pinned; the notebook and the individual scripts verify each download.
 
-Quick start:
+| asset | contents | sha256 |
+|---|---|---|
+| `vn-geoqa.zip` | the 2,800-question dataset (28 JSONL files + MANIFEST) | `dfe0ae70260c52837eb2aa38272787fcb55d98ad02ca4fbf0c432084f9055740` |
+| `osm-vn.sql.gz` | PostGIS reference database dump | `ae06f7c2ae7808235682371e03017a9da6ce6b323ec962cd06f99c0bb2ef53e6` |
+| `evaluation-results.tar.gz` | sealed per-question results for all four official runs | `bb10de26aa851dab1e24baf93dbf8d32d21ecad1205aabf32920074efd484b16` |
+| `llm-cache-20260905.sql.gz` | the published LLM cache (27,674 cached generations) | `60d9e0f213c6bd8282dd00ceb16b3c428187f9b2791840c2e521b15c6c808830` |
+| `rescue-inputs.tar.gz` | sealed inputs of the records→answer rescue reconstruction | `56841ffaa4a0354a02fac9619254b5bf554d5a291049d075dde4ad9c42cc373f` |
 
-Open and run `main.ipynb` in the local notebook environment or Google Colab.
+## Course notebook (`main.ipynb`)
 
-The notebook starts the PostgreSQL/PostGIS bootstrap branch and waits for it before coursework begins. The LLM endpoint is an external, already-running OpenAI-compatible vLLM server the notebook never starts: point `OPENAI_BASE_URL` (default `http://127.0.0.1:8000/v1`) and `OPENAI_API_KEY` at it, or start the optional local service with `podman compose up -d vllm`. Dependency installation, service startup/readiness, database initialization, and the pinned OSM import remain separate idempotent steps. Post-bootstrap checks and notebook queries use psycopg3.
+Open `main.ipynb` in Google Colab on a **fresh CPU runtime** and Run All — no GPU, no LLM endpoint, no API keys. The notebook:
 
----
+1. clones this repository, installs it with `uv`, and bootstraps PostgreSQL/PostGIS (apt on Colab; the pinned `compose.yaml` service locally);
+2. restores the PostGIS reference database, the frozen dataset, the sealed evaluation artifacts, and the published LLM cache — each download sha256-verified;
+3. profiles the dataset, computes the official baseline tables from the sealed per-question results, and compares runs under the frozen dev/test split;
+4. reconstructs the records→answer rescue improvement live and asserts the recomputed tables equal the frozen record (zero LLM calls, zero geocoding requests — both asserted);
+5. replays the five novel Vietnamese demo questions: questions, gold SQL, PostGIS execution, rescue, and presentation are rebuilt live, while every model generation is served as an exact hit from the restored LLM cache — a **cached replay of the original live inference, not new inference**;
+6. presents the Vietnamese error analysis and interpretation.
 
-### Abstract
+Cache-only contract: no notebook step contacts an LLM server. `OPENAI_BASE_URL` points at a deliberately unreachable address, so an unexpected cache miss fails loudly instead of silently falling back to live inference.
 
-Recent advances in Large Language Models (LLMs) have led to dramatic improvements in question answering (QA).
-To address the challenge of evaluating QA systems, standardized benchmarks have been introduced.
-This work focuses on the problem of geospatial QA, where a large collection of geospatial data is available in the form of a spatial database or other forms.
-There is limited work on creating or evaluating geospatial QA systems. This work has various limitations including a small number of questions, reliance on a knowledge graph, limited geospatial operators, and no complex reasoning.
-We present GS-QA, an extensible geospatial QA benchmark with 2800 question-answer pairs on top of Open Street Maps (OSM) and Wikipedia data, covering various spatial objects, predicates, and answer types.
-A key feature of GS-QA is that some of the questions require combining information from multiple sources, e.g., geospatial information from OSM and other information from Wikipedia.
-GS-QA includes a comprehensive evaluation methodology that combines text-based QA measures with geospatial-specific measures.
-We implemented various LLM-based geospatial QA baselines, using combinations of LLMs, retrieval, and structured querying.
-Our results show that existing solutions have very low accuracy, which warrants more research in this direction.
+The notebook lives in Google Drive/Colab and is intentionally not committed to this repository.
 
-## Features
+## Environment
 
-- **Diverse Question Types**: Includes questions about various geometry objects (points, lines, polygons, etc.)
-- **Spatial Predicates**: Tests understanding of spatial relationships (nearest neighbor, distance, intersects, direction, etc.)
-- **Comprehensive Coverage**: Designed to evaluate different aspects of geospatial reasoning capabilities
-- **Structured Format**: Benchmark data provided in JSON format for easy integration
-- **Text2SQL**: All questions have associated SQL queries to retreive the answers given a refernce database.
-- **Extensibility**: Benchmark includes associated python scripts to generate more question types and extend the dataset.
+- **Colab (recommended for the course run):** nothing to pre-install; the notebook installs the repository and the apt packages itself.
+- **Local:** [pixi](https://pixi.sh) (`pixi install`) plus the `compose.yaml` PostgreSQL/PostGIS service (`podman compose up -d postgres`). PostGIS is required.
 
-## Requirements
+## Dataset
 
-- Python 3.8+
-- PostgreSQL with PostGIS extension enabled
-- Dependencies listed in `requirements.txt`
-- An OpenAI-compatible vLLM endpoint serving `ornith-ai/Ornith-1.5-9B-NVFP4` and `AxionML/Qwen3.5-9B-NVFP4` (one model per server; the optional local compose service runs `--reasoning-parser qwen3`, and any external vLLM reached via `OPENAI_BASE_URL` works)
-
-## Installation
-
-1. Clone the repository:
-
-   ```text
-   git clone https://github.com/MajidSas/GS-QA
-   cd GS-QA
-   ```
-
-2. Install Python dependencies:
-
-   ```text
-   pip install -r ./generator/requirements.txt
-   pip install -r ./baselines/requirements.txt
-   ```
-
-3. Set up PostgreSQL with PostGIS:
-   - Ensure PostgreSQL is installed on your system
-   - Install PostGIS extension:
-
-     ```text
-     CREATE EXTENSION postgis;
-     ```
-
-   - Create a database and configure connection parameters in the config file
-
-4. Start vLLM externally (or via the local compose service) with `--reasoning-parser qwen3` and point `OPENAI_BASE_URL`/`OPENAI_API_KEY` at it; the notebook and the official runners only probe the endpoint.
-
-OpenAI API is required to evaluate GPT4o.
-
-The scripts can be easily modified for any model, and are based on LangChain.
-
-### Benchmark Data
-
-> **Removed from this fork's working tree:** the upstream English `benchmark/` tree (28 × 100 questions, ~168 MB) is deleted at the freeze commit but remains in the inherited history (fork base `tien02/nlp-ck`), so it is recoverable with `git checkout base/main -- benchmark` or regenerable via `baselines/clean_benchmark.py`. The Vietnamese benchmark (`data/questions_vi/`) is kept out of git by design (see the table above for restore paths). The English data can be regenerated with `baselines/clean_benchmark.py` from the upstream GS-QA artifacts (see "Question Generation" below and the upstream repo). The schema documentation below still describes those upstream English files.
-
-The upstream benchmark questions were located in the `benchmark/` directory. The folder contains 28 directories, one for each question type. Inside each directory there are 100 folders, one for each question. Inside each of these folders, there are two JSON files, one for the question itself and one for the answers we obtaiend from our baselines.
-
-The `question.json` files have the following general schema:
-
-- `"question"`: contains the question text.
-- `"sql"`: the sql query used to get the answers from our reference database.
-- `"answer_type"`: proivdes the answer type for each template.
-- `"answers"`: an array of objects, with schema depending on the question type.
-  - For entity name (T1-T11, except T7), the answers are in an attribute that ends with the suffix `"_name"`, e.g. `"poi_name"`.
-  - For the first type of multihop questions (T7), it is `"multihop_answer"`, and the type is `"multihop_attribute"`.
-  - For the location (T12-T20), the attribute is `"geometry"`, which needs to be geocoded if evaluating on address and not location coordinates.
-  - For the direction (T21,T22), the attribute is `"angle"`.
-  - For other output types it is under `"count"`, `"distance"`, `"length"`, `"area"`.
-  For non-aggregate answers, the entire record is stored in addition to the answer attribute.
-- `"question_entities"`: stores the objects that were used to create the question such as the anchoring points or the region. This can be helpful for more advanced evaluation.
-- `"id"`: a unique identifier for each question in the benchmark.
-- `"type"`: a unique identifier for each template, which includes the names of predicates and output type.
-
-## Usage
-
-### Question Generation
-
-To run the question generation script, first we need to setup the database.
-
-First, download our data from: <https://drive.google.com/drive/folders/1pz895-lpGAaNJXz2mzjnB7SAgWwD0Uag?usp=share_link>
-
-We obtained this data using this tool: <https://bitbucket.org/bdlabucr/osmx/src/master/>
-With the source: <https://www.geofabrik.de/data/download.html>
-We only downloaded the data of the US. You can obtain data over a different region or a more recent copy.
-
-The data must be in geojson format, with the following folder structure:
+`data/questions_vi/` is deliberately outside version control. Restore it with `./scripts/restore_dataset.sh` (downloads `vn-geoqa.zip` from the release, sha256-verifies, idempotent) or regenerate byte-identically with the pinned seed:
 
 ```text
-- osm_extract:
--- lakes
--- parks
--- pois
--- postal_codes 
--- roads
+python generator/generator_vi.py --seed 42 --count 100
 ```
 
-Once the data is ready, and a database in PostgresQL is created, we can use the folloing scripts to create the tables and insert the data into the database:
+Read the dataset through the `generator/questions_vi` symlink; never commit anything under `data/`. Location questions store `geo_wkt` as the authoritative spatial gold alongside native OSM address components; range questions store the full distance-ordered answer set (GS-QA range semantics).
 
-- "pois_processor.py"
-- "regions_processor.py"
-- "roads_processor.py"
-- "parks_processor.py"
-- "lakes_processor.py"
+## Baselines and official evaluation
 
-In all of these scripts, you will need to update your database connection information. Modify the connection lines:
+Four official runs — Ornith (`ornith-ai/Ornith-1.5-9B-NVFP4`) and Qwen (`AxionML/Qwen3.5-9B-NVFP4`) × Direct and Text2SQL — were produced against an external OpenAI-compatible vLLM endpoint under a frozen decoding profile. Raw generations are QID-indexed under a sealed cache namespace; sealed per-question results and evaluation seals are published as `evaluation-results.tar.gz`.
+
+Inference and scoring CLIs (they only probe the endpoint; nothing starts a server):
 
 ```text
-conn = psycopg2.connect(
-      host = 'localhost',
-      dbname = 'database_name',
-      user = 'postgres',
-      password = 'postgres',
-      port = 5432
-    )
+python scripts/run_raw_inference.py --model <model> --baseline direct|text2sql --mode smoke|full
+./scripts/inference.sh      # official full runs
+./scripts/evaluate.sh       # sealed evaluation of all runs
 ```
 
-Additionally, each of these scripts has an associated json schema which is used to select the relevant attributes and define the table. E.g. `"poi_schema.json"` each attribute in this schema corresponds to one column in the POI table.
+### LLM cache
 
-After populating the database, you can run `python generator.py`, which will generate 1000 questions for all the templates. You can modify the code to generate a smaller or a larger subset as desired.
-
-To modify the text templates, such as changing the language of the questions, you can modify the texts in the files inside the folder `./generator/templates/*.txt`. There is one file for each template. You can add additional templates by first creating a file with one version of the question in each line. You can then add additional functions inside the generator file to populate this template. Here is an example code that populates one template, with comments:
-
-```python
-variable_types = [
-    ("[1]", "poi"),
-    ("[2]", "distance"),
-    ("[3]", "poi"),
-]  # determines for which cateogory of values these parameters are populated all text version of this template must contain all three parameters
-
-template_tokens = [
-    ("[1_type]", "[1] main_category"),
-    (
-        "[1]",
-        "[1] sub_category",
-        "append_an",
-    ),  # for this question [1] is preprended with `a` or `an` to make the question grammatically correct
-    ("[2]", "[2] distance"),
-    (
-        "[2_text]",
-        "[2] text",
-    ),  # we differntiate between the distance number in meters and the text which is appended by the unit in kilometers
-    ("[3]", "[3] display_name"),  # this populates it with the display_name of the poi
-    (
-        "[3_wkt]",
-        "[3] geo_wkt",
-    ),  # this one populates the geometry of the poi in the SQL template
-]  #
-
-
-template_sql = """SELECT * FROM pois
-WHERE ST_DWithin(pois.geometry, ST_GeomFromText('[3_wkt]',4326)::geography, [2])
-AND [1_type] = '[1]';
-"""
-text_templates = [
-    l.replace("[2]", "[2_text]").strip()
-    for l in open("templates/range+name.txt", "r").readlines()
-]
-answer_type = "name"
-n = N
-questions = question_generator(
-    text_templates,
-    variable_types,
-    template_tokens,
-    template_sql,
-    answer_type,
-    verifier,
-    n,
-)  # this function will generate the questions
-# if new types of entities are used the question_generator function will need to be modified to support them
-save(
-    questions, "range+name.jsonl"
-)  # saves the questiosn one in JSON format one per line
-```
-
-Finally, the notebook `./generator/question_selector.ipynb` is used to filter the questions based on our criteria and select 100 questions from each template. Further, we manually evaluated this final set of questions that are included in the benchmark.
-
-### Baselines and evaluation
-
-The folder `./baselines/` contains multiple scripts to run and evaluate the baselines. See `./baselines/run_baselines.sh` for usage. The baselines require OLLAMA to be setup and also OpenAI and Anthropic API keys to evaluate their models.
-
-The questions can be read using the following code:
-
-```python
-from glob import glob
-import json
-
-files = glob("../benchmark/**/question.json", recursive=True)
-questions = []
-for path in files:
-    with open(path, "r") as file:
-        question = json.loads(file.read())
-        questions.append(question)
-```
-
-Running the remainder of the script will generate two files one for full text evaluation and one for parsed evaluation. The file `./baselines/evaluate.py` contains the evaluation functions that we proposed.
-
-## Citation
+All LangChain generations pass through a PostgreSQL cache database (`llm_cache`, created by `scripts/bootstrap_postgres.sh`). The cache key normalizes away the endpoint address, so a restored cache serves identical prompts on any machine. Restore the published cache with:
 
 ```text
-[Paper under review will be added later]
+./scripts/restore_llm_cache.sh llm-cache-20260905.sql.gz
 ```
 
-## Contact
+## Records→answer rescue
 
-For questions or feedback, please open an issue or contact <msaee007@ucr.edu>
+`scripts/records_to_answer.py` implements the frozen `records-to-answer-rescue-v1` intervention: where the sealed Text2SQL run executed correct SQL with typed rows but then refused to answer, the typed value is emitted through the parser's fenced-JSON shape — only where the sealed run sits at the unattempted floor, so per-question scores can only improve or tie. The notebook reconstructs the published dev/test tables from the sealed artifacts and asserts they equal the frozen record (65/560 dev and 222/2,240 test questions improved, zero regressions on both splits).
+
+## Demo
+
+`scripts/run_demo.py` builds five novel Vietnamese questions (anchors asserted absent from all benchmark surfaces), grounds gold via read-only SQL, and answers through both baselines with the rescue applied to empty Text2SQL answers. On Colab the notebook runs it as a cached replay; with a live endpoint available it performs new inference.
+
+## Optional live inference
+
+New inference is **not** needed to reproduce any published result. To run it, serve one model at a time on any OpenAI-compatible vLLM server started with `--reasoning-parser qwen3` and point `OPENAI_BASE_URL`/`OPENAI_API_KEY` at it. The repository also ships an optional compose service (`VLLM_MODEL=… podman compose up -d vllm`, requires a GPU). One model per server.
+
+## Paper deviation note
+
+GS-QA converts free-text model answers into structured JSON with Qwen 3.5 chosen as the parsing model. ViGSQA intentionally fixes one parser (Ornith, under the same frozen decoding profile) for the structured-answer parsing of all four evaluated runs. This keeps the four arms comparable and the parser identity sealed, while preserving the paper's metric semantics (best-match text F1, capped relative error, geocoded location distance, 8-sector direction scoring). It is a Vietnamese evaluation adaptation, not an exact implementation reproduction of the upstream evaluation stack.
+
+## Docs
+
+- [docs/data_generation.md](docs/data_generation.md) — dataset pipeline, templates, output format
+- [README_VI.md](README_VI.md) — full Vietnamese documentation
+- [baselines/REPORT_VN_GEOQA.md](baselines/REPORT_VN_GEOQA.md), [docs/results.md](docs/results.md) — archived pre-freeze results

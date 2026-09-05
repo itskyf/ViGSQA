@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Vietnamese error taxonomy over sealed per-question evidence (T05).
+"""Vietnamese error taxonomy over sealed per-question evidence.
 
 Classifies every question of one sealed run by failure stage — using the
 paper's error-binning thresholds (text F1 ≥ 0.5, error ≤ 0.1) — and flags
@@ -14,9 +14,9 @@ import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from records_to_answer import exec_rows, load_dataset, rescue_block
 from report_split_metrics import load_split
 from run_evaluation import gold_values, text_score
-from t04_rescue import exec_rows, load_dataset, rescue_block
 
 ROOT = Path(__file__).resolve().parents[1]
 EVAL_DIR = ROOT / "results" / "evaluation"
