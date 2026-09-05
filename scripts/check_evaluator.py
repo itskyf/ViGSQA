@@ -6,6 +6,8 @@ import tempfile
 import unicodedata
 from pathlib import Path
 
+from geopy.exc import GeocoderQueryError, GeocoderUnavailable
+from geopy.extra.rate_limiter import RateLimiter
 from run_evaluation import (
     best_error,
     best_text,
@@ -37,6 +39,46 @@ class Geocoder:
         assert address == "1 Đường Mới, Hà Nội"
         assert exactly_one is True
         return Location()
+
+
+# Mirrors the production RateLimiter(max_retries=2) in run_evaluation.py.
+MAX_RETRIES = 2
+
+
+class FlakyGeocoder:
+    """Fail for the full retry budget like a transient outage, then resolve."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def __call__(self, address, exactly_one=True):
+        self.calls += 1
+        if self.calls <= MAX_RETRIES:
+            raise GeocoderUnavailable("service unavailable")
+        return Location()
+
+
+def unavailable_geocode(address, exactly_one=True):
+    raise GeocoderUnavailable("service unavailable")
+
+
+def rejected_geocode(address, exactly_one=True):
+    raise GeocoderQueryError("Non-successful status code 400")
+
+
+def uncalled_geocode(address, exactly_one=True):
+    raise AssertionError("cached records must not be re-queried")
+
+
+def fast_rate_limiter(func):
+    """Production-shaped limiter with near-zero delays for offline checks."""
+    return RateLimiter(
+        func,
+        min_delay_seconds=0,
+        max_retries=MAX_RETRIES,
+        error_wait_seconds=0.01,
+        swallow_exceptions=False,
+    )
 
 
 def main() -> None:
@@ -73,6 +115,9 @@ def main() -> None:
     assert angle == {"attempted": True, "error": 2 / 180}
     text, prediction, gold = best_text(["đáp án hai"], ["sai", "đáp án hai"])
     assert text["f1"] == 1 and (prediction, gold) == (0, 1)
+    text, prediction, gold = best_text(["Hồ Tây"], [])
+    assert text["f1"] == 0 and text["attempted"] is False
+    assert (prediction, gold) == (None, None)
 
     question = {
         "id": "range+loc-check",
@@ -91,11 +136,87 @@ def main() -> None:
         geocodes = load_geocodes(
             Path(directory) / "geocodes.json",
             ["1 Đường Mới, Hà Nội"],
-            Geocoder(),
+            Geocoder().geocode,
         )
     row = evaluate([question], [parsed], geocodes)[0]
     assert row["metrics"]["spatial"] == {"attempted": True, "error": 0.0}
     assert row["selected"]["spatial"]["gold"] == 1
+
+    # Lake-name golds (T11/T12) are entity golds too; they previously fell
+    # through the entity key set and crashed scoring with empty golds.
+    lake_row = evaluate(
+        [
+            {
+                "id": "lake-check",
+                "tid": "T11",
+                "type": "intersects:area_max+name",
+                "answers": [
+                    {"lake_name": "Hồ Tây", "area": 5.0, "geo_wkt": "POINT(105 21)"}
+                ],
+            }
+        ],
+        [{"id": "lake-check", "content": '```json\n{"name": "Hồ Tây"}\n```'}],
+        [],
+    )[0]
+    assert lake_row["metrics"]["text"] == {
+        "attempted": True,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+    }
+
+    # A rate-limited geocoder retries transient failures; once retries are
+    # exhausted the run aborts without recording not_found for the address.
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "geocodes.json"
+        geocodes = load_geocodes(
+            path, ["1 Đường Mới, Hà Nội"], fast_rate_limiter(FlakyGeocoder())
+        )
+        assert geocodes[0]["status"] == "found"
+        try:
+            load_geocodes(
+                path, ["2 Đường Cũ, Hà Nội"], fast_rate_limiter(unavailable_geocode)
+            )
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("exhausted retries must abort the evaluation")
+        assert json.loads(path.read_text()) == geocodes
+        # A rejected query (HTTP 400) is a terminal negative: persisted with a
+        # reason, distinct from a confirmed not_found, and never re-queried.
+        blob = "2 Đường Cũ, Hà Nội; 3 Đường Hết, Hà Nội"
+        assert load_geocodes(path, [blob], fast_rate_limiter(rejected_geocode)) == [
+            {
+                "address": blob,
+                "status": "rejected",
+                "reason": "Non-successful status code 400",
+            }
+        ]
+        assert load_geocodes(path, [blob], fast_rate_limiter(uncalled_geocode)) == [
+            {
+                "address": blob,
+                "status": "rejected",
+                "reason": "Non-successful status code 400",
+            }
+        ]
+        rejected_row = evaluate(
+            [
+                {
+                    "id": "rejected-check",
+                    "tid": "T13",
+                    "type": "range+loc",
+                    "answers": [{"address": "xa", "geo_wkt": "POINT(100 20)"}],
+                }
+            ],
+            [
+                {
+                    "id": "rejected-check",
+                    "content": f'```json\n{{"address": "{blob}"}}\n```',
+                }
+            ],
+            [{"address": blob, "status": "rejected", "reason": "status code 400"}],
+        )[0]
+        assert rejected_row["metrics"]["spatial"] == {"attempted": False, "error": 1.0}
 
     questions = pipeline.load_questions("full")
     validate_questions(questions)

@@ -27,7 +27,7 @@ Build and evaluate a reproducible Vietnamese adaptation of GS-QA (`docs/context/
 | --- | --- | --- | --- |
 | T01 | Establish a trustworthy Vietnamese benchmark | `done` | Satisfied **at v3**: T10 re-validated the frozen benchmark (2,800/2,800 automated verification, byte-identical regeneration, human QC approval). The v1/v2 freezes remain Git/history evidence. |
 | T02 | Make the whole experiment runnable end-to-end | `planned` | **Reopened for v3.** The v2 proof (fresh Colab VM) is tooling evidence only. v3 re-proof pending: T11 bumped the notebook's v3 pins and vLLM endpoint plumbing; the end-to-end re-run (bootstrap → dataset → baseline on v3 assets) rides with T03/T05 once the four v3 raw runs exist. |
-| T03 | Measure correctly and establish official baselines | `in_progress` | All four raw runs are sealed under `pv-26b1ac0d`. `inference.sh` and idempotent `evaluate.sh` separate the pipeline layers; evaluation is pinned to one Ornith parser configuration. The four official evaluation artifact sets remain. Record: `docs/plans/T03-official-v3-evaluation.md`. |
+| T03 | Measure correctly and establish official baselines | `done` | All four raw runs sealed under `pv-26b1ac0d`; all four evaluation seals validate (2,800 questions each, byte-identical frozen rerun proven); `evaluation-results.tar.gz` published and download-verified on `data-v3.0.0` (508,883 bytes, SHA-256 `c908ad45…`). Evaluator hardened en route: Nominatim behind a 1 req/s retrying `RateLimiter` (10 s timeout), HTTP-400/414 query rejections as terminal `rejected` records, `lake_name` entity golds. Record: `docs/plans/T03-official-v3-evaluation.md`. |
 | T04 | Improve what the frozen baselines fail at | `planned` | Starts from T03 sealed per-question evidence; no intervention is selected in advance. Record: `docs/plans/T04-baseline-improvement.md`. |
 | T05 | Analyze Vietnamese-specific behavior and errors | `planned` | Depends on official T03 evidence (and retained T04 results); covers robustness, error taxonomy, and the Vietnamese demo. Record: `docs/plans/T05-vietnamese-error-analysis.md`. |
 | T06 | Tell the story as an ACL paper | `planned` | Depends on T03–T05 evidence; ACL report claims and tables remain artifact-traceable. Record: `docs/plans/T06-acl-paper.md`. |
@@ -51,7 +51,7 @@ G1′ DB rebuild (five tables non-empty, representative spatial ops, address cov
 
 ## Active Next Action
 
-**Serve Ornith and run `scripts/evaluate.sh --llm-concurrency 4`.** Keep T03 open until all four evaluation seals exist and `results/evaluation/` is verified for release upload.
+**Start T04 (improve what the frozen baselines fail at)** from the sealed per-question evidence in `results/evaluation/`; create its task record under `docs/plans/` before implementation.
 
 ## Session Prompt
 

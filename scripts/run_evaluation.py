@@ -8,11 +8,14 @@ import math
 import re
 import unicodedata
 from collections import Counter
+from collections.abc import Callable
 from contextlib import ExitStack
 from pathlib import Path
 
-from geopy.exc import GeocoderServiceError
+from geopy.exc import GeocoderQueryError, GeocoderServiceError
+from geopy.extra.rate_limiter import RateLimiter
 from geopy.geocoders import Nominatim
+from geopy.location import Location
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from pyproj import Geod
@@ -206,7 +209,7 @@ def candidates(question: dict, parsed: list[object], family: str) -> list:
 
 def gold_values(question: dict, family: str) -> list:
     keys = {
-        "entity": ("poi_name", "park_name", "road_name"),
+        "entity": ("poi_name", "park_name", "lake_name", "road_name"),
         "textual_fact": ("multi_source_answer",),
         "location": ("address",),
         "direction": ("angle",),
@@ -221,7 +224,9 @@ def gold_values(question: dict, family: str) -> list:
 
 
 def best_text(predictions: list, golds: list) -> tuple[dict, int | None, int | None]:
-    if not predictions:
+    # No pairings are possible without golds either; an unattempted zero
+    # matches the empty-prediction case.
+    if not predictions or not golds:
         return text_score("", golds[0] if golds else ""), None, None
     scored = [
         (text_score(pred, gold), pi, gi)
@@ -350,22 +355,33 @@ def parse_answers(
     return [cached[question["id"]] for question in questions]
 
 
-def load_geocodes(path: Path, addresses: list[str], geocoder) -> list[dict]:
+def load_geocodes(
+    path: Path, addresses: list[str], geocode: Callable[..., Location | None]
+) -> list[dict]:
     records = json.loads(path.read_text()) if path.exists() else []
     by_address = {record["address"]: record for record in records}
     missing = [address for address in addresses if address not in by_address]
     for address in tqdm(missing, desc="  geocode_addresses"):
         try:
-            location = geocoder.geocode(address, exactly_one=True)
+            location = geocode(address, exactly_one=True)
+        except GeocoderQueryError as error:
+            # Nominatim rejected the query itself (e.g. oversized multi-address
+            # predictions): a deterministic model-output failure, not a service
+            # outage. Terminal and persisted so reruns never re-query it;
+            # spatial scoring skips it like any unresolvable candidate.
+            record = {"address": address, "status": "rejected", "reason": str(error)}
         except GeocoderServiceError as error:
             raise RuntimeError(
                 f"transient Nominatim failure for {address!r}: {error}"
             ) from error
-        record = {"address": address, "status": "found" if location else "not_found"}
-        if location:
-            record.update(
-                latitude=float(location.latitude), longitude=float(location.longitude)
-            )
+        else:
+            status = "found" if location else "not_found"
+            record = {"address": address, "status": status}
+            if location:
+                record.update(
+                    latitude=float(location.latitude),
+                    longitude=float(location.longitude),
+                )
         by_address[address] = record
         path.write_text(
             json.dumps(
@@ -504,9 +520,17 @@ def main() -> int:
                 if address not in address_order:
                     address_order.append(address)
     geocode_path = output_dir / "geocodes.json"
-    geocodes = load_geocodes(
-        geocode_path, address_order, Nominatim(user_agent="ViGSQA-v3-evaluator")
+    # Nominatim policy caps bulk use at 1 request/second; retry transient
+    # failures and abort without a seal once retries are exhausted — a service
+    # error must never be recorded as not_found.
+    geocode = RateLimiter(
+        Nominatim(user_agent="ViGSQA-v3-evaluator", timeout=10).geocode,
+        min_delay_seconds=1,
+        max_retries=2,
+        error_wait_seconds=5,
+        swallow_exceptions=False,
     )
+    geocodes = load_geocodes(geocode_path, address_order, geocode)
     rows = evaluate(questions, parsed_records, geocodes)
     for row in rows:
         row.update(model=args.model, baseline=args.baseline)
