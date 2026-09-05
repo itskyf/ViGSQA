@@ -75,3 +75,11 @@ apm_modules/
 
 # datasets live outside git (synced via rclone to Google Drive)
 data/
+
+# Report outputs
+docs/report/*.pdf
+
+# Figure assets ship via the release archive (scripts/restore_figures.sh)
+docs/report/figures/
+report-figures.tar.gz
+

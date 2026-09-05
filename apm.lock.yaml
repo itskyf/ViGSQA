@@ -2,6 +2,253 @@ lockfile_version: '1'
 generated_at: '2026-08-27T05:59:30.665310+00:00'
 apm_version: 0.28.0
 dependencies:
+- repo_url: apcamargo/typst-skills
+  name: typst-author
+  host: github.com
+  resolved_commit: 93978422d58d4e5c21efe4bfa9f3e6dd9940cf96
+  resolved_ref: main
+  version: unknown
+  virtual_path: typst-author
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/typst-author
+  - .agents/skills/typst-author/SKILL.md
+  - .agents/skills/typst-author/docs/changelog/0.1.0.md
+  - .agents/skills/typst-author/docs/changelog/0.10.0.md
+  - .agents/skills/typst-author/docs/changelog/0.11.0.md
+  - .agents/skills/typst-author/docs/changelog/0.11.1.md
+  - .agents/skills/typst-author/docs/changelog/0.12.0.md
+  - .agents/skills/typst-author/docs/changelog/0.13.0.md
+  - .agents/skills/typst-author/docs/changelog/0.13.1.md
+  - .agents/skills/typst-author/docs/changelog/0.14.0.md
+  - .agents/skills/typst-author/docs/changelog/0.14.1.md
+  - .agents/skills/typst-author/docs/changelog/0.14.2.md
+  - .agents/skills/typst-author/docs/changelog/0.15.0.md
+  - .agents/skills/typst-author/docs/changelog/0.2.0.md
+  - .agents/skills/typst-author/docs/changelog/0.3.0.md
+  - .agents/skills/typst-author/docs/changelog/0.4.0.md
+  - .agents/skills/typst-author/docs/changelog/0.5.0.md
+  - .agents/skills/typst-author/docs/changelog/0.6.0.md
+  - .agents/skills/typst-author/docs/changelog/0.7.0.md
+  - .agents/skills/typst-author/docs/changelog/0.8.0.md
+  - .agents/skills/typst-author/docs/changelog/0.9.0.md
+  - .agents/skills/typst-author/docs/changelog/earlier.md
+  - .agents/skills/typst-author/docs/changelog/index.md
+  - .agents/skills/typst-author/docs/changelog/utils.md
+  - .agents/skills/typst-author/docs/guides/accessibility.md
+  - .agents/skills/typst-author/docs/guides/for-latex-users.md
+  - .agents/skills/typst-author/docs/guides/index.md
+  - .agents/skills/typst-author/docs/guides/page-setup.md
+  - .agents/skills/typst-author/docs/guides/tables.md
+  - .agents/skills/typst-author/docs/index.md
+  - .agents/skills/typst-author/docs/overview.md
+  - .agents/skills/typst-author/docs/reference/export/bundle.md
+  - .agents/skills/typst-author/docs/reference/export/html.md
+  - .agents/skills/typst-author/docs/reference/export/index.md
+  - .agents/skills/typst-author/docs/reference/export/pdf.md
+  - .agents/skills/typst-author/docs/reference/export/png.md
+  - .agents/skills/typst-author/docs/reference/export/svg.md
+  - .agents/skills/typst-author/docs/reference/index.md
+  - .agents/skills/typst-author/docs/reference/language/context.md
+  - .agents/skills/typst-author/docs/reference/language/index.md
+  - .agents/skills/typst-author/docs/reference/language/scripting.md
+  - .agents/skills/typst-author/docs/reference/language/styling.md
+  - .agents/skills/typst-author/docs/reference/language/syntax.md
+  - .agents/skills/typst-author/docs/reference/library/data-loading.md
+  - .agents/skills/typst-author/docs/reference/library/emoji.md
+  - .agents/skills/typst-author/docs/reference/library/foundations.md
+  - .agents/skills/typst-author/docs/reference/library/index.md
+  - .agents/skills/typst-author/docs/reference/library/introspection.md
+  - .agents/skills/typst-author/docs/reference/library/layout.md
+  - .agents/skills/typst-author/docs/reference/library/math.md
+  - .agents/skills/typst-author/docs/reference/library/model.md
+  - .agents/skills/typst-author/docs/reference/library/sym.md
+  - .agents/skills/typst-author/docs/reference/library/text.md
+  - .agents/skills/typst-author/docs/reference/library/visualize.md
+  - .agents/skills/typst-author/docs/tutorial/1-writing.md
+  - .agents/skills/typst-author/docs/tutorial/2-formatting.md
+  - .agents/skills/typst-author/docs/tutorial/3-advanced.md
+  - .agents/skills/typst-author/docs/tutorial/4-template.md
+  - .agents/skills/typst-author/docs/tutorial/index.md
+  - .claude/skills/typst-author
+  - .claude/skills/typst-author/SKILL.md
+  - .claude/skills/typst-author/docs/changelog/0.1.0.md
+  - .claude/skills/typst-author/docs/changelog/0.10.0.md
+  - .claude/skills/typst-author/docs/changelog/0.11.0.md
+  - .claude/skills/typst-author/docs/changelog/0.11.1.md
+  - .claude/skills/typst-author/docs/changelog/0.12.0.md
+  - .claude/skills/typst-author/docs/changelog/0.13.0.md
+  - .claude/skills/typst-author/docs/changelog/0.13.1.md
+  - .claude/skills/typst-author/docs/changelog/0.14.0.md
+  - .claude/skills/typst-author/docs/changelog/0.14.1.md
+  - .claude/skills/typst-author/docs/changelog/0.14.2.md
+  - .claude/skills/typst-author/docs/changelog/0.15.0.md
+  - .claude/skills/typst-author/docs/changelog/0.2.0.md
+  - .claude/skills/typst-author/docs/changelog/0.3.0.md
+  - .claude/skills/typst-author/docs/changelog/0.4.0.md
+  - .claude/skills/typst-author/docs/changelog/0.5.0.md
+  - .claude/skills/typst-author/docs/changelog/0.6.0.md
+  - .claude/skills/typst-author/docs/changelog/0.7.0.md
+  - .claude/skills/typst-author/docs/changelog/0.8.0.md
+  - .claude/skills/typst-author/docs/changelog/0.9.0.md
+  - .claude/skills/typst-author/docs/changelog/earlier.md
+  - .claude/skills/typst-author/docs/changelog/index.md
+  - .claude/skills/typst-author/docs/changelog/utils.md
+  - .claude/skills/typst-author/docs/guides/accessibility.md
+  - .claude/skills/typst-author/docs/guides/for-latex-users.md
+  - .claude/skills/typst-author/docs/guides/index.md
+  - .claude/skills/typst-author/docs/guides/page-setup.md
+  - .claude/skills/typst-author/docs/guides/tables.md
+  - .claude/skills/typst-author/docs/index.md
+  - .claude/skills/typst-author/docs/overview.md
+  - .claude/skills/typst-author/docs/reference/export/bundle.md
+  - .claude/skills/typst-author/docs/reference/export/html.md
+  - .claude/skills/typst-author/docs/reference/export/index.md
+  - .claude/skills/typst-author/docs/reference/export/pdf.md
+  - .claude/skills/typst-author/docs/reference/export/png.md
+  - .claude/skills/typst-author/docs/reference/export/svg.md
+  - .claude/skills/typst-author/docs/reference/index.md
+  - .claude/skills/typst-author/docs/reference/language/context.md
+  - .claude/skills/typst-author/docs/reference/language/index.md
+  - .claude/skills/typst-author/docs/reference/language/scripting.md
+  - .claude/skills/typst-author/docs/reference/language/styling.md
+  - .claude/skills/typst-author/docs/reference/language/syntax.md
+  - .claude/skills/typst-author/docs/reference/library/data-loading.md
+  - .claude/skills/typst-author/docs/reference/library/emoji.md
+  - .claude/skills/typst-author/docs/reference/library/foundations.md
+  - .claude/skills/typst-author/docs/reference/library/index.md
+  - .claude/skills/typst-author/docs/reference/library/introspection.md
+  - .claude/skills/typst-author/docs/reference/library/layout.md
+  - .claude/skills/typst-author/docs/reference/library/math.md
+  - .claude/skills/typst-author/docs/reference/library/model.md
+  - .claude/skills/typst-author/docs/reference/library/sym.md
+  - .claude/skills/typst-author/docs/reference/library/text.md
+  - .claude/skills/typst-author/docs/reference/library/visualize.md
+  - .claude/skills/typst-author/docs/tutorial/1-writing.md
+  - .claude/skills/typst-author/docs/tutorial/2-formatting.md
+  - .claude/skills/typst-author/docs/tutorial/3-advanced.md
+  - .claude/skills/typst-author/docs/tutorial/4-template.md
+  - .claude/skills/typst-author/docs/tutorial/index.md
+  deployed_file_hashes:
+    .agents/skills/typst-author/SKILL.md: sha256:502cee1e506ee64a5930a152e8b140b08608935b4ead4ecc9f25d27b1f014d1d
+    .agents/skills/typst-author/docs/changelog/0.1.0.md: sha256:e25a659975075581476ab76253c50cef3fe0e30e8548772906e35161291c47a1
+    .agents/skills/typst-author/docs/changelog/0.10.0.md: sha256:278f383c19ab3399d2e3b49e9fb00c644aa036ae670b8a8c23496adfdb50cf6f
+    .agents/skills/typst-author/docs/changelog/0.11.0.md: sha256:c920cd5c7ae56a99ae405ef5a068a6955b00f0cb6fe426bab7c8c6b6bff93e7e
+    .agents/skills/typst-author/docs/changelog/0.11.1.md: sha256:7ca8d8daab4c2c0c7be509f8dc81a28f3115ce3f13e8d7f1e92cf0489982ef51
+    .agents/skills/typst-author/docs/changelog/0.12.0.md: sha256:3d6c4d62085880b5e3e775a0452ef14423f5f4bd2055bf4806e16a23a7efe60f
+    .agents/skills/typst-author/docs/changelog/0.13.0.md: sha256:b66ccd19bdb4b7d2808d9d546026aaaed036d4f2aaad18a9f29b624924a41bd7
+    .agents/skills/typst-author/docs/changelog/0.13.1.md: sha256:28987653b2f6afb5159a453fe99a219620c71fef0c008a8dfe6376b871648ba7
+    .agents/skills/typst-author/docs/changelog/0.14.0.md: sha256:3c154ff3d7c64c3e07fec88f0f752cfed2e1360f1507a2b389c6c5192bf3374a
+    .agents/skills/typst-author/docs/changelog/0.14.1.md: sha256:544d6485051ad598c81545685ac227ce2ad6c46e5033288c71eeb062b68ad5f5
+    .agents/skills/typst-author/docs/changelog/0.14.2.md: sha256:117db73045a635a310fda374144193d208e41322a47cfc9362505b7be23bef69
+    .agents/skills/typst-author/docs/changelog/0.15.0.md: sha256:b09c92e6cfc8472a8ca779aab108c9e264f68a1465881a2149a9cab95ea4d462
+    .agents/skills/typst-author/docs/changelog/0.2.0.md: sha256:3dcdb95ab7bce8c24806b718d17ae4086408cab23cf69789f9d925b6d9e32c03
+    .agents/skills/typst-author/docs/changelog/0.3.0.md: sha256:f9f48bd2bebbe1f3e8462eaf7e9722eb5e7c5dbd65b07c6a1da0d2c980e76c6d
+    .agents/skills/typst-author/docs/changelog/0.4.0.md: sha256:f29ca5edd83aea6c08349aef85444fbb777044966646dd2ce12fb9278e92c216
+    .agents/skills/typst-author/docs/changelog/0.5.0.md: sha256:eab5427be99fcf7057e898827a9413fee9aaf2ab7416ac715617cdbe8c039128
+    .agents/skills/typst-author/docs/changelog/0.6.0.md: sha256:afe0b6952ed4762c9e8a95394fb718d2e387d1c4f20e1bb51501251522301a12
+    .agents/skills/typst-author/docs/changelog/0.7.0.md: sha256:7193d4d02a0d9a7a4b55610348586694dc37d91d759529a90cefa7a15f30d223
+    .agents/skills/typst-author/docs/changelog/0.8.0.md: sha256:b75e288590ce1ba22b09fee925c84e05cd77a005895d542899651867c1aee55e
+    .agents/skills/typst-author/docs/changelog/0.9.0.md: sha256:e4f901c67409eba1b6d8f6a2e3a02e26ebb7da29ccd5283622cb6a381d07451e
+    .agents/skills/typst-author/docs/changelog/earlier.md: sha256:4a069900b2507bdb9d040d62946c861a63ad494c743d4f3a52401d07908274ef
+    .agents/skills/typst-author/docs/changelog/index.md: sha256:414664a0e408cfff9b6ab3e091b23bcd2376c0d416adcefe915ae6355bca58ac
+    .agents/skills/typst-author/docs/changelog/utils.md: sha256:01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
+    .agents/skills/typst-author/docs/guides/accessibility.md: sha256:dace4a6594f6b529c4b70638c73bddc74dda03861e4063c7236f4641ffddfec0
+    .agents/skills/typst-author/docs/guides/for-latex-users.md: sha256:464014f14a2c60c0adffa813186d3916b104a3c6d24308d44e4dc562ed447659
+    .agents/skills/typst-author/docs/guides/index.md: sha256:7063773b43af9723dcd342cc5a0e71382e79ba72a977155eb3747af2bf9f4ed8
+    .agents/skills/typst-author/docs/guides/page-setup.md: sha256:1463f39cd6cd3ef6f5d1b0c6b1c882333b47e152a1099d0a9986b16b9769a593
+    .agents/skills/typst-author/docs/guides/tables.md: sha256:dc55e2b6c449b7e1a4e1df1d5be7fa069913a74b68748a897859ded7cd7b98ff
+    .agents/skills/typst-author/docs/index.md: sha256:c21b12a2d2cffa06c8c27c4d6b81e835eda4698e2f7516a593e692f1733f059e
+    .agents/skills/typst-author/docs/overview.md: sha256:c9d24bed08ff6715bf25339e7b0ed9e02363128b1e9a2043e19acb4ad71a045c
+    .agents/skills/typst-author/docs/reference/export/bundle.md: sha256:6efda943ab0997d28a324bb0f5e6924984481eed0c562ba33a64bc52792034fc
+    .agents/skills/typst-author/docs/reference/export/html.md: sha256:a0adc00bb928f62be675a02480898bb58d24cf51418d33aefd6010c515608ee4
+    .agents/skills/typst-author/docs/reference/export/index.md: sha256:028ff5b83688cbc68c023dacb3b67fa1b32d1cf61767982f301e6f67a253fc06
+    .agents/skills/typst-author/docs/reference/export/pdf.md: sha256:17efdd551a3ce83c1bd2e26c29aa197152ad6758e63d994e6347ae405b7e211b
+    .agents/skills/typst-author/docs/reference/export/png.md: sha256:06daeebfa4619688e5b86b0ae828583f24907e56d528309e8e0c1ba11b60ce80
+    .agents/skills/typst-author/docs/reference/export/svg.md: sha256:e13192eb5a44c69ea3a78f8c2c0f3e094c91c1f231aa58b3ec86a210c97435e1
+    .agents/skills/typst-author/docs/reference/index.md: sha256:eb2d14cdb81bb7482757c26e606e59187323476de3a64ab3a05989023d62194c
+    .agents/skills/typst-author/docs/reference/language/context.md: sha256:a5f66b905a719a988cefa4e513dbd8f7b56af7243045f2494dddc8d5be7230ec
+    .agents/skills/typst-author/docs/reference/language/index.md: sha256:73f796e1b6323f6148c446c9161abb68253dca88af268f60f79203ded374f2a9
+    .agents/skills/typst-author/docs/reference/language/scripting.md: sha256:d67920ad3f82c1cc76cbb2b6064e2e2d35cd653c6c364247e51857e9b7ad4518
+    .agents/skills/typst-author/docs/reference/language/styling.md: sha256:d5c4ba75f7edfd5666c9a3a229a1085672fefa1bf757074e2d5a82f3958db304
+    .agents/skills/typst-author/docs/reference/language/syntax.md: sha256:af1f0d39bb37b021a26a92188c52a6b898013c788c4deb5e0dbe0b1336261018
+    .agents/skills/typst-author/docs/reference/library/data-loading.md: sha256:a54ac9af4bceb09e88d79c9444baf5df861037519b20f0ac9a779dbe80e7655c
+    .agents/skills/typst-author/docs/reference/library/emoji.md: sha256:b07588fb50dbea79f781a6c0196e7dab3b1d66c02ef63b9e778a05a4684893ea
+    .agents/skills/typst-author/docs/reference/library/foundations.md: sha256:c1a5bc2f5568777c4d3cc3c12eebe7142b075e47470b8b149f42f66c9eb1ed71
+    .agents/skills/typst-author/docs/reference/library/index.md: sha256:4f0d1f890ada7a28ed17b75ee065d6d0786da3a85376d3d1afc5fc176dd0b47e
+    .agents/skills/typst-author/docs/reference/library/introspection.md: sha256:68efadc5aeb0dea37dd9647787c6ab92dcb1e5cc7e3c0ac03650d58c88049cdf
+    .agents/skills/typst-author/docs/reference/library/layout.md: sha256:9a6b4d563fd5a762b32c6e6dd48c70b6172394bde02e591d994ab9d60429940f
+    .agents/skills/typst-author/docs/reference/library/math.md: sha256:891033992ae3e978ee0ceb0816f78f123d0a626029b4aa9d3110f47ac712c9e0
+    .agents/skills/typst-author/docs/reference/library/model.md: sha256:41928d915d29746c4cce0440801f543e1622268b5f1d9ffef30fcc80d3489711
+    .agents/skills/typst-author/docs/reference/library/sym.md: sha256:8e1d93e5647088f3446625456f4bf3e4470960af454413541567d224fcac4e65
+    .agents/skills/typst-author/docs/reference/library/text.md: sha256:d159aa3b69be686ded2b004661d5b2842d3ef1abcdf9463b8ccc833e330a9a3b
+    .agents/skills/typst-author/docs/reference/library/visualize.md: sha256:2386868624ffd9d6362c06d85b396822dbbacccd31b725e9a4e87676cad06a19
+    .agents/skills/typst-author/docs/tutorial/1-writing.md: sha256:54cbfddf65b8a3753561ebcddd38bdfd54c5acd2efcb4d1d14baec9308dfe7e2
+    .agents/skills/typst-author/docs/tutorial/2-formatting.md: sha256:7557a756e2f7cd4d58e90c791d5c530bcfe418c2efd0f6bbb6ebd96707172295
+    .agents/skills/typst-author/docs/tutorial/3-advanced.md: sha256:9d7f78b6c563a2d620d02256b0af4c5ae87b3b9ca23d727b7444def8342e0905
+    .agents/skills/typst-author/docs/tutorial/4-template.md: sha256:961cd6abe6906922a6fcafd4d2edbd9e5ab4bf3a7b897819cb8d89e27558af08
+    .agents/skills/typst-author/docs/tutorial/index.md: sha256:3847e6332ecd335217372704c0140accb11779037bb44bad9e1f656f02010c86
+    .claude/skills/typst-author/SKILL.md: sha256:502cee1e506ee64a5930a152e8b140b08608935b4ead4ecc9f25d27b1f014d1d
+    .claude/skills/typst-author/docs/changelog/0.1.0.md: sha256:e25a659975075581476ab76253c50cef3fe0e30e8548772906e35161291c47a1
+    .claude/skills/typst-author/docs/changelog/0.10.0.md: sha256:278f383c19ab3399d2e3b49e9fb00c644aa036ae670b8a8c23496adfdb50cf6f
+    .claude/skills/typst-author/docs/changelog/0.11.0.md: sha256:c920cd5c7ae56a99ae405ef5a068a6955b00f0cb6fe426bab7c8c6b6bff93e7e
+    .claude/skills/typst-author/docs/changelog/0.11.1.md: sha256:7ca8d8daab4c2c0c7be509f8dc81a28f3115ce3f13e8d7f1e92cf0489982ef51
+    .claude/skills/typst-author/docs/changelog/0.12.0.md: sha256:3d6c4d62085880b5e3e775a0452ef14423f5f4bd2055bf4806e16a23a7efe60f
+    .claude/skills/typst-author/docs/changelog/0.13.0.md: sha256:b66ccd19bdb4b7d2808d9d546026aaaed036d4f2aaad18a9f29b624924a41bd7
+    .claude/skills/typst-author/docs/changelog/0.13.1.md: sha256:28987653b2f6afb5159a453fe99a219620c71fef0c008a8dfe6376b871648ba7
+    .claude/skills/typst-author/docs/changelog/0.14.0.md: sha256:3c154ff3d7c64c3e07fec88f0f752cfed2e1360f1507a2b389c6c5192bf3374a
+    .claude/skills/typst-author/docs/changelog/0.14.1.md: sha256:544d6485051ad598c81545685ac227ce2ad6c46e5033288c71eeb062b68ad5f5
+    .claude/skills/typst-author/docs/changelog/0.14.2.md: sha256:117db73045a635a310fda374144193d208e41322a47cfc9362505b7be23bef69
+    .claude/skills/typst-author/docs/changelog/0.15.0.md: sha256:b09c92e6cfc8472a8ca779aab108c9e264f68a1465881a2149a9cab95ea4d462
+    .claude/skills/typst-author/docs/changelog/0.2.0.md: sha256:3dcdb95ab7bce8c24806b718d17ae4086408cab23cf69789f9d925b6d9e32c03
+    .claude/skills/typst-author/docs/changelog/0.3.0.md: sha256:f9f48bd2bebbe1f3e8462eaf7e9722eb5e7c5dbd65b07c6a1da0d2c980e76c6d
+    .claude/skills/typst-author/docs/changelog/0.4.0.md: sha256:f29ca5edd83aea6c08349aef85444fbb777044966646dd2ce12fb9278e92c216
+    .claude/skills/typst-author/docs/changelog/0.5.0.md: sha256:eab5427be99fcf7057e898827a9413fee9aaf2ab7416ac715617cdbe8c039128
+    .claude/skills/typst-author/docs/changelog/0.6.0.md: sha256:afe0b6952ed4762c9e8a95394fb718d2e387d1c4f20e1bb51501251522301a12
+    .claude/skills/typst-author/docs/changelog/0.7.0.md: sha256:7193d4d02a0d9a7a4b55610348586694dc37d91d759529a90cefa7a15f30d223
+    .claude/skills/typst-author/docs/changelog/0.8.0.md: sha256:b75e288590ce1ba22b09fee925c84e05cd77a005895d542899651867c1aee55e
+    .claude/skills/typst-author/docs/changelog/0.9.0.md: sha256:e4f901c67409eba1b6d8f6a2e3a02e26ebb7da29ccd5283622cb6a381d07451e
+    .claude/skills/typst-author/docs/changelog/earlier.md: sha256:4a069900b2507bdb9d040d62946c861a63ad494c743d4f3a52401d07908274ef
+    .claude/skills/typst-author/docs/changelog/index.md: sha256:414664a0e408cfff9b6ab3e091b23bcd2376c0d416adcefe915ae6355bca58ac
+    .claude/skills/typst-author/docs/changelog/utils.md: sha256:01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
+    .claude/skills/typst-author/docs/guides/accessibility.md: sha256:dace4a6594f6b529c4b70638c73bddc74dda03861e4063c7236f4641ffddfec0
+    .claude/skills/typst-author/docs/guides/for-latex-users.md: sha256:464014f14a2c60c0adffa813186d3916b104a3c6d24308d44e4dc562ed447659
+    .claude/skills/typst-author/docs/guides/index.md: sha256:7063773b43af9723dcd342cc5a0e71382e79ba72a977155eb3747af2bf9f4ed8
+    .claude/skills/typst-author/docs/guides/page-setup.md: sha256:1463f39cd6cd3ef6f5d1b0c6b1c882333b47e152a1099d0a9986b16b9769a593
+    .claude/skills/typst-author/docs/guides/tables.md: sha256:dc55e2b6c449b7e1a4e1df1d5be7fa069913a74b68748a897859ded7cd7b98ff
+    .claude/skills/typst-author/docs/index.md: sha256:c21b12a2d2cffa06c8c27c4d6b81e835eda4698e2f7516a593e692f1733f059e
+    .claude/skills/typst-author/docs/overview.md: sha256:c9d24bed08ff6715bf25339e7b0ed9e02363128b1e9a2043e19acb4ad71a045c
+    .claude/skills/typst-author/docs/reference/export/bundle.md: sha256:6efda943ab0997d28a324bb0f5e6924984481eed0c562ba33a64bc52792034fc
+    .claude/skills/typst-author/docs/reference/export/html.md: sha256:a0adc00bb928f62be675a02480898bb58d24cf51418d33aefd6010c515608ee4
+    .claude/skills/typst-author/docs/reference/export/index.md: sha256:028ff5b83688cbc68c023dacb3b67fa1b32d1cf61767982f301e6f67a253fc06
+    .claude/skills/typst-author/docs/reference/export/pdf.md: sha256:17efdd551a3ce83c1bd2e26c29aa197152ad6758e63d994e6347ae405b7e211b
+    .claude/skills/typst-author/docs/reference/export/png.md: sha256:06daeebfa4619688e5b86b0ae828583f24907e56d528309e8e0c1ba11b60ce80
+    .claude/skills/typst-author/docs/reference/export/svg.md: sha256:e13192eb5a44c69ea3a78f8c2c0f3e094c91c1f231aa58b3ec86a210c97435e1
+    .claude/skills/typst-author/docs/reference/index.md: sha256:eb2d14cdb81bb7482757c26e606e59187323476de3a64ab3a05989023d62194c
+    .claude/skills/typst-author/docs/reference/language/context.md: sha256:a5f66b905a719a988cefa4e513dbd8f7b56af7243045f2494dddc8d5be7230ec
+    .claude/skills/typst-author/docs/reference/language/index.md: sha256:73f796e1b6323f6148c446c9161abb68253dca88af268f60f79203ded374f2a9
+    .claude/skills/typst-author/docs/reference/language/scripting.md: sha256:d67920ad3f82c1cc76cbb2b6064e2e2d35cd653c6c364247e51857e9b7ad4518
+    .claude/skills/typst-author/docs/reference/language/styling.md: sha256:d5c4ba75f7edfd5666c9a3a229a1085672fefa1bf757074e2d5a82f3958db304
+    .claude/skills/typst-author/docs/reference/language/syntax.md: sha256:af1f0d39bb37b021a26a92188c52a6b898013c788c4deb5e0dbe0b1336261018
+    .claude/skills/typst-author/docs/reference/library/data-loading.md: sha256:a54ac9af4bceb09e88d79c9444baf5df861037519b20f0ac9a779dbe80e7655c
+    .claude/skills/typst-author/docs/reference/library/emoji.md: sha256:b07588fb50dbea79f781a6c0196e7dab3b1d66c02ef63b9e778a05a4684893ea
+    .claude/skills/typst-author/docs/reference/library/foundations.md: sha256:c1a5bc2f5568777c4d3cc3c12eebe7142b075e47470b8b149f42f66c9eb1ed71
+    .claude/skills/typst-author/docs/reference/library/index.md: sha256:4f0d1f890ada7a28ed17b75ee065d6d0786da3a85376d3d1afc5fc176dd0b47e
+    .claude/skills/typst-author/docs/reference/library/introspection.md: sha256:68efadc5aeb0dea37dd9647787c6ab92dcb1e5cc7e3c0ac03650d58c88049cdf
+    .claude/skills/typst-author/docs/reference/library/layout.md: sha256:9a6b4d563fd5a762b32c6e6dd48c70b6172394bde02e591d994ab9d60429940f
+    .claude/skills/typst-author/docs/reference/library/math.md: sha256:891033992ae3e978ee0ceb0816f78f123d0a626029b4aa9d3110f47ac712c9e0
+    .claude/skills/typst-author/docs/reference/library/model.md: sha256:41928d915d29746c4cce0440801f543e1622268b5f1d9ffef30fcc80d3489711
+    .claude/skills/typst-author/docs/reference/library/sym.md: sha256:8e1d93e5647088f3446625456f4bf3e4470960af454413541567d224fcac4e65
+    .claude/skills/typst-author/docs/reference/library/text.md: sha256:d159aa3b69be686ded2b004661d5b2842d3ef1abcdf9463b8ccc833e330a9a3b
+    .claude/skills/typst-author/docs/reference/library/visualize.md: sha256:2386868624ffd9d6362c06d85b396822dbbacccd31b725e9a4e87676cad06a19
+    .claude/skills/typst-author/docs/tutorial/1-writing.md: sha256:54cbfddf65b8a3753561ebcddd38bdfd54c5acd2efcb4d1d14baec9308dfe7e2
+    .claude/skills/typst-author/docs/tutorial/2-formatting.md: sha256:7557a756e2f7cd4d58e90c791d5c530bcfe418c2efd0f6bbb6ebd96707172295
+    .claude/skills/typst-author/docs/tutorial/3-advanced.md: sha256:9d7f78b6c563a2d620d02256b0af4c5ae87b3b9ca23d727b7444def8342e0905
+    .claude/skills/typst-author/docs/tutorial/4-template.md: sha256:961cd6abe6906922a6fcafd4d2edbd9e5ab4bf3a7b897819cb8d89e27558af08
+    .claude/skills/typst-author/docs/tutorial/index.md: sha256:3847e6332ecd335217372704c0140accb11779037bb44bad9e1f656f02010c86
+  content_hash: sha256:2390bca32dde23935d6846e5eb8addd98df89904d49d82586d13844d5b9033b2
+  is_dev: true
 - repo_url: googlecolab/google-colab-cli
   name: colab-operator
   host: github.com
@@ -182,6 +429,537 @@ deployments:
   active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
   content_hash: sha256:e4db424577f705737aaa220acf5aebc6d903dab847d8a767bb82004600b60f45
 - kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: null
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:502cee1e506ee64a5930a152e8b140b08608935b4ead4ecc9f25d27b1f014d1d
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.1.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:e25a659975075581476ab76253c50cef3fe0e30e8548772906e35161291c47a1
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.10.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:278f383c19ab3399d2e3b49e9fb00c644aa036ae670b8a8c23496adfdb50cf6f
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.11.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:c920cd5c7ae56a99ae405ef5a068a6955b00f0cb6fe426bab7c8c6b6bff93e7e
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.11.1.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:7ca8d8daab4c2c0c7be509f8dc81a28f3115ce3f13e8d7f1e92cf0489982ef51
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.12.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:3d6c4d62085880b5e3e775a0452ef14423f5f4bd2055bf4806e16a23a7efe60f
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.13.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:b66ccd19bdb4b7d2808d9d546026aaaed036d4f2aaad18a9f29b624924a41bd7
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.13.1.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:28987653b2f6afb5159a453fe99a219620c71fef0c008a8dfe6376b871648ba7
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.14.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:3c154ff3d7c64c3e07fec88f0f752cfed2e1360f1507a2b389c6c5192bf3374a
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.14.1.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:544d6485051ad598c81545685ac227ce2ad6c46e5033288c71eeb062b68ad5f5
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.14.2.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:117db73045a635a310fda374144193d208e41322a47cfc9362505b7be23bef69
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.15.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:b09c92e6cfc8472a8ca779aab108c9e264f68a1465881a2149a9cab95ea4d462
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.2.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:3dcdb95ab7bce8c24806b718d17ae4086408cab23cf69789f9d925b6d9e32c03
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.3.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:f9f48bd2bebbe1f3e8462eaf7e9722eb5e7c5dbd65b07c6a1da0d2c980e76c6d
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.4.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:f29ca5edd83aea6c08349aef85444fbb777044966646dd2ce12fb9278e92c216
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.5.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:eab5427be99fcf7057e898827a9413fee9aaf2ab7416ac715617cdbe8c039128
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.6.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:afe0b6952ed4762c9e8a95394fb718d2e387d1c4f20e1bb51501251522301a12
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.7.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:7193d4d02a0d9a7a4b55610348586694dc37d91d759529a90cefa7a15f30d223
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.8.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:b75e288590ce1ba22b09fee925c84e05cd77a005895d542899651867c1aee55e
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/0.9.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:e4f901c67409eba1b6d8f6a2e3a02e26ebb7da29ccd5283622cb6a381d07451e
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/earlier.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:4a069900b2507bdb9d040d62946c861a63ad494c743d4f3a52401d07908274ef
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/index.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:414664a0e408cfff9b6ab3e091b23bcd2376c0d416adcefe915ae6355bca58ac
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/changelog/utils.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/guides/accessibility.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:dace4a6594f6b529c4b70638c73bddc74dda03861e4063c7236f4641ffddfec0
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/guides/for-latex-users.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:464014f14a2c60c0adffa813186d3916b104a3c6d24308d44e4dc562ed447659
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/guides/index.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:7063773b43af9723dcd342cc5a0e71382e79ba72a977155eb3747af2bf9f4ed8
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/guides/page-setup.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:1463f39cd6cd3ef6f5d1b0c6b1c882333b47e152a1099d0a9986b16b9769a593
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/guides/tables.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:dc55e2b6c449b7e1a4e1df1d5be7fa069913a74b68748a897859ded7cd7b98ff
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/index.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:c21b12a2d2cffa06c8c27c4d6b81e835eda4698e2f7516a593e692f1733f059e
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/overview.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:c9d24bed08ff6715bf25339e7b0ed9e02363128b1e9a2043e19acb4ad71a045c
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/export/bundle.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:6efda943ab0997d28a324bb0f5e6924984481eed0c562ba33a64bc52792034fc
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/export/html.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:a0adc00bb928f62be675a02480898bb58d24cf51418d33aefd6010c515608ee4
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/export/index.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:028ff5b83688cbc68c023dacb3b67fa1b32d1cf61767982f301e6f67a253fc06
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/export/pdf.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:17efdd551a3ce83c1bd2e26c29aa197152ad6758e63d994e6347ae405b7e211b
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/export/png.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:06daeebfa4619688e5b86b0ae828583f24907e56d528309e8e0c1ba11b60ce80
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/export/svg.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:e13192eb5a44c69ea3a78f8c2c0f3e094c91c1f231aa58b3ec86a210c97435e1
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/index.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:eb2d14cdb81bb7482757c26e606e59187323476de3a64ab3a05989023d62194c
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/language/context.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:a5f66b905a719a988cefa4e513dbd8f7b56af7243045f2494dddc8d5be7230ec
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/language/index.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:73f796e1b6323f6148c446c9161abb68253dca88af268f60f79203ded374f2a9
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/language/scripting.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:d67920ad3f82c1cc76cbb2b6064e2e2d35cd653c6c364247e51857e9b7ad4518
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/language/styling.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:d5c4ba75f7edfd5666c9a3a229a1085672fefa1bf757074e2d5a82f3958db304
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/language/syntax.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:af1f0d39bb37b021a26a92188c52a6b898013c788c4deb5e0dbe0b1336261018
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/library/data-loading.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:a54ac9af4bceb09e88d79c9444baf5df861037519b20f0ac9a779dbe80e7655c
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/library/emoji.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:b07588fb50dbea79f781a6c0196e7dab3b1d66c02ef63b9e778a05a4684893ea
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/library/foundations.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:c1a5bc2f5568777c4d3cc3c12eebe7142b075e47470b8b149f42f66c9eb1ed71
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/library/index.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:4f0d1f890ada7a28ed17b75ee065d6d0786da3a85376d3d1afc5fc176dd0b47e
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/library/introspection.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:68efadc5aeb0dea37dd9647787c6ab92dcb1e5cc7e3c0ac03650d58c88049cdf
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/library/layout.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:9a6b4d563fd5a762b32c6e6dd48c70b6172394bde02e591d994ab9d60429940f
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/library/math.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:891033992ae3e978ee0ceb0816f78f123d0a626029b4aa9d3110f47ac712c9e0
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/library/model.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:41928d915d29746c4cce0440801f543e1622268b5f1d9ffef30fcc80d3489711
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/library/sym.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:8e1d93e5647088f3446625456f4bf3e4470960af454413541567d224fcac4e65
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/library/text.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:d159aa3b69be686ded2b004661d5b2842d3ef1abcdf9463b8ccc833e330a9a3b
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/reference/library/visualize.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:2386868624ffd9d6362c06d85b396822dbbacccd31b725e9a4e87676cad06a19
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/tutorial/1-writing.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:54cbfddf65b8a3753561ebcddd38bdfd54c5acd2efcb4d1d14baec9308dfe7e2
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/tutorial/2-formatting.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:7557a756e2f7cd4d58e90c791d5c530bcfe418c2efd0f6bbb6ebd96707172295
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/tutorial/3-advanced.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:9d7f78b6c563a2d620d02256b0af4c5ae87b3b9ca23d727b7444def8342e0905
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/tutorial/4-template.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:961cd6abe6906922a6fcafd4d2edbd9e5ab4bf3a7b897819cb8d89e27558af08
+- kind: project-relative
+  target: agents
+  value: .agents/skills/typst-author/docs/tutorial/index.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:3847e6332ecd335217372704c0140accb11779037bb44bad9e1f656f02010c86
+- kind: project-relative
   target: claude
   value: .claude/skills/colab-operator
   runtime: null
@@ -289,6 +1067,537 @@ deployments:
   - jupyter-ai-contrib/nb-cli/skills/notebook-cli
   active_owner: jupyter-ai-contrib/nb-cli/skills/notebook-cli
   content_hash: sha256:e4db424577f705737aaa220acf5aebc6d903dab847d8a767bb82004600b60f45
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: null
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/SKILL.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:502cee1e506ee64a5930a152e8b140b08608935b4ead4ecc9f25d27b1f014d1d
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.1.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:e25a659975075581476ab76253c50cef3fe0e30e8548772906e35161291c47a1
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.10.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:278f383c19ab3399d2e3b49e9fb00c644aa036ae670b8a8c23496adfdb50cf6f
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.11.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:c920cd5c7ae56a99ae405ef5a068a6955b00f0cb6fe426bab7c8c6b6bff93e7e
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.11.1.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:7ca8d8daab4c2c0c7be509f8dc81a28f3115ce3f13e8d7f1e92cf0489982ef51
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.12.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:3d6c4d62085880b5e3e775a0452ef14423f5f4bd2055bf4806e16a23a7efe60f
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.13.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:b66ccd19bdb4b7d2808d9d546026aaaed036d4f2aaad18a9f29b624924a41bd7
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.13.1.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:28987653b2f6afb5159a453fe99a219620c71fef0c008a8dfe6376b871648ba7
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.14.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:3c154ff3d7c64c3e07fec88f0f752cfed2e1360f1507a2b389c6c5192bf3374a
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.14.1.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:544d6485051ad598c81545685ac227ce2ad6c46e5033288c71eeb062b68ad5f5
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.14.2.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:117db73045a635a310fda374144193d208e41322a47cfc9362505b7be23bef69
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.15.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:b09c92e6cfc8472a8ca779aab108c9e264f68a1465881a2149a9cab95ea4d462
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.2.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:3dcdb95ab7bce8c24806b718d17ae4086408cab23cf69789f9d925b6d9e32c03
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.3.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:f9f48bd2bebbe1f3e8462eaf7e9722eb5e7c5dbd65b07c6a1da0d2c980e76c6d
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.4.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:f29ca5edd83aea6c08349aef85444fbb777044966646dd2ce12fb9278e92c216
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.5.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:eab5427be99fcf7057e898827a9413fee9aaf2ab7416ac715617cdbe8c039128
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.6.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:afe0b6952ed4762c9e8a95394fb718d2e387d1c4f20e1bb51501251522301a12
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.7.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:7193d4d02a0d9a7a4b55610348586694dc37d91d759529a90cefa7a15f30d223
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.8.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:b75e288590ce1ba22b09fee925c84e05cd77a005895d542899651867c1aee55e
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/0.9.0.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:e4f901c67409eba1b6d8f6a2e3a02e26ebb7da29ccd5283622cb6a381d07451e
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/earlier.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:4a069900b2507bdb9d040d62946c861a63ad494c743d4f3a52401d07908274ef
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/index.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:414664a0e408cfff9b6ab3e091b23bcd2376c0d416adcefe915ae6355bca58ac
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/changelog/utils.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/guides/accessibility.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:dace4a6594f6b529c4b70638c73bddc74dda03861e4063c7236f4641ffddfec0
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/guides/for-latex-users.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:464014f14a2c60c0adffa813186d3916b104a3c6d24308d44e4dc562ed447659
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/guides/index.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:7063773b43af9723dcd342cc5a0e71382e79ba72a977155eb3747af2bf9f4ed8
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/guides/page-setup.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:1463f39cd6cd3ef6f5d1b0c6b1c882333b47e152a1099d0a9986b16b9769a593
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/guides/tables.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:dc55e2b6c449b7e1a4e1df1d5be7fa069913a74b68748a897859ded7cd7b98ff
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/index.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:c21b12a2d2cffa06c8c27c4d6b81e835eda4698e2f7516a593e692f1733f059e
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/overview.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:c9d24bed08ff6715bf25339e7b0ed9e02363128b1e9a2043e19acb4ad71a045c
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/export/bundle.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:6efda943ab0997d28a324bb0f5e6924984481eed0c562ba33a64bc52792034fc
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/export/html.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:a0adc00bb928f62be675a02480898bb58d24cf51418d33aefd6010c515608ee4
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/export/index.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:028ff5b83688cbc68c023dacb3b67fa1b32d1cf61767982f301e6f67a253fc06
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/export/pdf.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:17efdd551a3ce83c1bd2e26c29aa197152ad6758e63d994e6347ae405b7e211b
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/export/png.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:06daeebfa4619688e5b86b0ae828583f24907e56d528309e8e0c1ba11b60ce80
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/export/svg.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:e13192eb5a44c69ea3a78f8c2c0f3e094c91c1f231aa58b3ec86a210c97435e1
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/index.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:eb2d14cdb81bb7482757c26e606e59187323476de3a64ab3a05989023d62194c
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/language/context.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:a5f66b905a719a988cefa4e513dbd8f7b56af7243045f2494dddc8d5be7230ec
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/language/index.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:73f796e1b6323f6148c446c9161abb68253dca88af268f60f79203ded374f2a9
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/language/scripting.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:d67920ad3f82c1cc76cbb2b6064e2e2d35cd653c6c364247e51857e9b7ad4518
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/language/styling.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:d5c4ba75f7edfd5666c9a3a229a1085672fefa1bf757074e2d5a82f3958db304
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/language/syntax.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:af1f0d39bb37b021a26a92188c52a6b898013c788c4deb5e0dbe0b1336261018
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/library/data-loading.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:a54ac9af4bceb09e88d79c9444baf5df861037519b20f0ac9a779dbe80e7655c
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/library/emoji.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:b07588fb50dbea79f781a6c0196e7dab3b1d66c02ef63b9e778a05a4684893ea
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/library/foundations.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:c1a5bc2f5568777c4d3cc3c12eebe7142b075e47470b8b149f42f66c9eb1ed71
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/library/index.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:4f0d1f890ada7a28ed17b75ee065d6d0786da3a85376d3d1afc5fc176dd0b47e
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/library/introspection.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:68efadc5aeb0dea37dd9647787c6ab92dcb1e5cc7e3c0ac03650d58c88049cdf
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/library/layout.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:9a6b4d563fd5a762b32c6e6dd48c70b6172394bde02e591d994ab9d60429940f
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/library/math.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:891033992ae3e978ee0ceb0816f78f123d0a626029b4aa9d3110f47ac712c9e0
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/library/model.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:41928d915d29746c4cce0440801f543e1622268b5f1d9ffef30fcc80d3489711
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/library/sym.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:8e1d93e5647088f3446625456f4bf3e4470960af454413541567d224fcac4e65
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/library/text.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:d159aa3b69be686ded2b004661d5b2842d3ef1abcdf9463b8ccc833e330a9a3b
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/reference/library/visualize.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:2386868624ffd9d6362c06d85b396822dbbacccd31b725e9a4e87676cad06a19
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/tutorial/1-writing.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:54cbfddf65b8a3753561ebcddd38bdfd54c5acd2efcb4d1d14baec9308dfe7e2
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/tutorial/2-formatting.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:7557a756e2f7cd4d58e90c791d5c530bcfe418c2efd0f6bbb6ebd96707172295
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/tutorial/3-advanced.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:9d7f78b6c563a2d620d02256b0af4c5ae87b3b9ca23d727b7444def8342e0905
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/tutorial/4-template.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:961cd6abe6906922a6fcafd4d2edbd9e5ab4bf3a7b897819cb8d89e27558af08
+- kind: project-relative
+  target: claude
+  value: .claude/skills/typst-author/docs/tutorial/index.md
+  runtime: null
+  scope: project
+  owners:
+  - apcamargo/typst-skills/typst-author
+  active_owner: apcamargo/typst-skills/typst-author
+  content_hash: sha256:3847e6332ecd335217372704c0140accb11779037bb44bad9e1f656f02010c86
 - kind: uri
   target: mcp
   value: colab-mcp

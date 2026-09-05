@@ -1,0 +1,307 @@
+saeedan2026gsqa:
+  type: article
+  title: "GS-QA: A Benchmark for Geospatial Question Answering"
+  author:
+    - Saeedan, Majid
+    - Rashid, Muhammad Shihab
+    - Eldawy, Ahmed
+    - Hristidis, Vagelis
+  date: 2026
+  parent:
+    type: periodical
+    title: "arXiv preprint arXiv:2605.22811"
+  url: "https://arxiv.org/abs/2605.22811"
+
+mirzaee2021spartqa:
+  type: article
+  title: "SPARTQA: A Textual Question Answering Benchmark for Spatial Reasoning"
+  author:
+    - Mirzaee, Roshanak
+    - Rajaby Faghihi, Hossein
+    - Ning, Qiang
+    - Kordjamshidi, Parisa
+  date: 2021
+  parent:
+    type: proceedings
+    title: "Proceedings of the 2021 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies"
+    publisher: "Association for Computational Linguistics"
+    page-range: 4582-4598
+  url: "https://aclanthology.org/2021.naacl-main.364"
+
+kefalidis2023geoquestions:
+  type: article
+  title: "Benchmarking Geospatial Question Answering Engines Using the Dataset GeoQuestions1089"
+  author:
+    - Kefalidis, Sergios-Anestis
+    - Punjani, Dharmen
+    - Tsalapati, Eleni
+    - Plas, Konstantinos
+    - Pollali, Mariangela
+    - Mitsios, Michail
+    - Tsokanaridou, Myrto
+    - Koubarakis, Manolis
+    - Maret, Pierre
+  date: 2023
+  parent:
+    type: proceedings
+    title: "The Semantic Web -- ISWC 2023"
+
+punjani2018geoquestions201:
+  type: article
+  title: "Template-Based Question Answering over Linked Geospatial Data"
+  author:
+    - Punjani, Dharmen
+    - Singh, Kuldeep
+    - Both, Andreas
+    - Koubarakis, Manolis
+    - Angelidis, Iosif
+    - Bereta, Konstantina
+    - Beris, Themis
+    - Bilidas, Dimitris
+    - Ioannidis, Theofilos
+    - Karalis, Nikolaos
+    - Lange, Christoph
+    - Pantazi, Despina-Athanasia
+    - Papaloukas, Christos
+    - Stamoulis, Georgios
+  date: 2018
+  parent:
+    type: proceedings
+    title: "Proceedings of the 12th Workshop on Geographic Information Retrieval"
+
+li2025mapqa:
+  type: article
+  title: "MapQA: Open-Domain Geospatial Question Answering on Map Data"
+  author:
+    - Li, Zekun
+    - "others"
+  date: 2025
+  parent:
+    type: periodical
+    title: "arXiv preprint"
+
+zelle1996geoquery:
+  type: article
+  title: "Learning to Parse Database Queries Using Inductive Logic Programming"
+  author:
+    - Zelle, John M.
+    - Mooney, Raymond J.
+  date: 1996
+  parent:
+    type: proceedings
+    title: "Proceedings of the Thirteenth National Conference on Artificial Intelligence"
+    page-range: 1050-1055
+
+yu2018spider:
+  type: article
+  title: "Spider: A Large-Scale Human-Labeled Dataset for Complex and Cross-Domain Semantic Parsing and Text-to-SQL Task"
+  author:
+    - Yu, Tao
+    - Zhang, Rui
+    - Yang, Kai
+    - Yasunaga, Michihiro
+    - Wang, Dongxu
+    - Li, Zifan
+    - Ma, James
+    - Li, Irene
+    - Yao, Qingning
+    - Roman, Shanelle
+    - Zhang, Zilin
+    - Radev, Dragomir
+  date: 2018
+  parent:
+    type: proceedings
+    title: "Proceedings of the 2018 Conference on Empirical Methods in Natural Language Processing"
+    page-range: 3911-3921
+
+li2023bird:
+  type: article
+  title: "Can LLM Already Serve as a Database Interface? A BIg Bench for Large-Scale Database Grounded Text-to-SQLs"
+  author:
+    - Li, Jinyang
+    - Hui, Binyuan
+    - Qu, Ge
+    - Yang, Jiaxi
+    - Li, Binhua
+    - Li, Bowen
+    - Wang, Bailin
+    - Qin, Bowen
+    - Cao, Ruiying
+    - Geng, Ruiying
+    - Huo, Nan
+    - Zhou, Xuanhe
+    - Ma, Chenhao
+    - Li, Guoliang
+    - Chang, Kevin C. C.
+    - Huang, Fei
+    - Cheng, Reynold
+    - Li, Yongbin
+  date: 2023
+  parent:
+    type: proceedings
+    title: "Advances in Neural Information Processing Systems"
+
+nguyen2020phobert:
+  type: article
+  title: "PhoBERT: Pre-trained Language Models for Vietnamese"
+  author:
+    - Nguyen, Dat Quoc
+    - Nguyen, Anh Tuan
+  date: 2020
+  parent:
+    type: proceedings
+    title: "Findings of the Association for Computational Linguistics: EMNLP 2020"
+    page-range: 1037-1042
+
+nguyen2020uitviquad:
+  type: article
+  title: "A Vietnamese Dataset for Evaluating Machine Reading Comprehension"
+  author:
+    - Nguyen, Kiet Van
+    - Tran, Khiem Vinh
+    - Luu, Son T.
+    - Nguyen, Anh Gia-Tuan
+    - Nguyen, Ngan Luu-Thuy
+  date: 2020
+  parent:
+    type: proceedings
+    title: "Proceedings of the 28th International Conference on Computational Linguistics"
+
+geofabrik:
+  type: misc
+  title: "Geofabrik Download Server: Vietnam OSM Extract"
+  author:
+    - "Geofabrik GmbH"
+  date: 2026
+  url: "https://download.geofabrik.de/asia/vietnam.html"
+  note: "Snapshot vietnam-260901.osm.pbf"
+
+osm:
+  type: misc
+  title: "OpenStreetMap"
+  author:
+    - "OpenStreetMap contributors"
+  date: 2026
+  url: "https://www.openstreetmap.org"
+  note: "Licensed under ODbL"
+
+postgis:
+  type: misc
+  title: "PostGIS: Spatial and Geographic Objects for PostgreSQL"
+  author:
+    - "PostGIS Project"
+  date: 2026
+  url: "https://postgis.net"
+
+nominatim:
+  type: misc
+  title: "Nominatim: Open Source Geocoding with OpenStreetMap Data"
+  author:
+    - "OpenStreetMap Foundation"
+  date: 2026
+  url: "https://nominatim.org"
+
+kwon2023vllm:
+  type: article
+  title: "Efficient Memory Management for Large Language Model Serving with PagedAttention"
+  author:
+    - Kwon, Woosuk
+    - Li, Zhuohan
+    - Zhuang, Siyuan
+    - Sheng, Ying
+    - Zheng, Lianmin
+    - Yu, Cody Hao
+    - Gonzalez, Joseph E.
+    - Zhang, Hao
+    - Stoica, Ion
+  date: 2023
+  parent:
+    type: proceedings
+    title: "Proceedings of the 29th Symposium on Operating Systems Principles"
+
+nguyen2020vitext2sql:
+  type: article
+  title: "A Pilot Study of Text-to-SQL Semantic Parsing for Vietnamese"
+  author:
+    - Nguyen, Anh Tuan
+    - Dao, Mai Hoang
+    - Nguyen, Dat Quoc
+  date: 2020
+  parent:
+    type: proceedings
+    title: "Findings of the Association for Computational Linguistics: EMNLP 2020"
+    publisher: "Association for Computational Linguistics"
+    page-range: 4079-4085
+  url: "https://aclanthology.org/2020.findings-emnlp.364"
+
+le2022vimqa:
+  type: article
+  title: "VIMQA: A Vietnamese Dataset for Advanced Reasoning and Explainable Multi-hop Question Answering"
+  author:
+    - Le, Khang
+    - Nguyen, Hien
+    - Le Thanh, Tung
+    - Nguyen, Minh
+  date: 2022
+  parent:
+    type: proceedings
+    title: "Proceedings of the Thirteenth Language Resources and Evaluation Conference"
+    publisher: "European Language Resources Association"
+    page-range: 6521-6529
+  url: "https://aclanthology.org/2022.lrec-1.700"
+
+thai2022vicov19qa:
+  type: article
+  title: "UIT-ViCoV19QA: A Dataset for COVID-19 Community-based Question Answering on Vietnamese Language"
+  author:
+    - Thai, Triet Minh
+    - Vo, Anh Tuan
+    - Tran, Hao Khanh
+    - Luu, Son T.
+    - Nguyen, Kiet Van
+  date: 2022
+  parent:
+    type: proceedings
+    title: "Proceedings of the 36th Pacific Asia Conference on Language, Information and Computation"
+
+minh2026visqa:
+  type: article
+  title: "ViSQA: A Benchmark Dataset and Baseline Models for Vietnamese Spoken Question Answering"
+  author:
+    - Le, Trong Minh
+    - Nguyen, Duc Thinh
+    - Nguyen, Khanh Tho Loc
+    - Le, Van Quan
+    - Ngo, Duc Tam
+    - Le, Hoang Son
+  date: 2026
+  doi: "10.1371/journal.pone.0340771"
+  parent:
+    type: periodical
+    title: "PLOS ONE"
+
+vnreform2025:
+  type: misc
+  title: "Resolution on the Arrangement of Provincial-Level Administrative Units"
+  author:
+    - "National Assembly of Viet Nam"
+  date: 2025
+  note: "Effective 1 July 2025; 63 provincial-level units consolidated to 34 and the district tier abolished"
+
+ornith2026:
+  type: misc
+  title: "Ornith-1.5-9B"
+  author:
+    - "Ornith AI"
+  date: 2026
+  url: "https://huggingface.co/ornith-ai/Ornith-1.5-9B"
+  note: "Hugging Face model card"
+
+qwen35:
+  type: misc
+  title: "Qwen3.5-9B"
+  author:
+    - "Qwen Team"
+  date: 2026
+  url: "https://huggingface.co/Qwen/Qwen3.5-9B"
+  note: "Hugging Face model card"
