@@ -11,10 +11,11 @@ SQL_DIR="${REPO_ROOT}/sql"
 
 # Pinned like scripts/download_osm.sh: URL and checksum are a verification
 # pair, so neither is env-overridable.
-DB_ASSET_URL="https://github.com/itskyf/ViGSQA/releases/download/v3.0.0/osm-vn.sql.gz"
-DB_ASSET_SHA256="ae06f7c2ae7808235682371e03017a9da6ce6b323ec962cd06f99c0bb2ef53e6"
-DB_ASSET_FILE="${REPO_ROOT}/osm-vn.sql.gz"
+DB_ASSET_URL="https://github.com/itskyf/ViGSQA/releases/download/v3.0.0/osm-vn.dump"
+DB_ASSET_SHA256="deb523cd943520f37b67b70b421a9f3d7a22283ee0fb33d856ffd6b9cb2844d0"
+DB_ASSET_FILE="${REPO_ROOT}/osm-vn.dump"
 PART_FILE="${DB_ASSET_FILE}.part"
+TOC_FILE="${DB_ASSET_FILE}.toc"
 
 : "${PGHOST:?PGHOST is required}" "${PGPORT:?PGPORT is required}"
 : "${PGUSER:?PGUSER is required}" "${PGPASSWORD:?PGPASSWORD is required}"
@@ -27,16 +28,6 @@ psql_query() {
 		podman compose exec --no-tty postgres psql \
 			--username="${PGUSER}" --dbname="${PGDATABASE}" \
 			--tuples-only --no-align --set=ON_ERROR_STOP=1
-	fi
-}
-
-psql_stream() {
-	if [[ -n "${COLAB_RELEASE_TAG:-}" ]]; then
-		psql --quiet --set=ON_ERROR_STOP=1
-	else
-		podman compose exec --no-tty postgres psql \
-			--username="${PGUSER}" --dbname="${PGDATABASE}" \
-			--quiet --set=ON_ERROR_STOP=1
 	fi
 }
 
@@ -69,13 +60,39 @@ else
 fi
 
 echo "[INFO] Restoring reference database..."
-# The dump's --clean section drops its own partial objects first; the schema
-# filters keep it from dropping the schema hosting the postgis extension that
-# init_database.sql creates before this restore runs.
-gzip --decompress --stdout "${DB_ASSET_FILE}" |
-	sed \
-		--expression '/^DROP SCHEMA IF EXISTS public;$/d' \
-		--expression '/^CREATE SCHEMA public;$/d' |
-	psql_stream
+# The archive is a pg_dump custom format, restored in parallel. Dropping the
+# TOC's 'SCHEMA - public' entries (the custom-format analogue of the previous
+# plain-SQL schema filters) keeps the restore from dropping/recreating the
+# schema that hosts the postgis extension init_database.sql creates before
+# this runs; every other --clean entry stays, so an interrupted restore
+# remains self-healing. --jobs: 2-vCPU Colab plus headroom — pg_restore caps
+# concurrency by dependency order, so extra jobs are harmless.
+# The local branch restores inside the container with the image's own
+# pg_restore; binary stdin keeps the podman compose service-name idiom.
+if [[ -n "${COLAB_RELEASE_TAG:-}" ]]; then
+	pg_restore --list "${DB_ASSET_FILE}" |
+		grep --invert-match --fixed-strings ' SCHEMA - public ' >"${TOC_FILE}"
+	pg_restore \
+		--dbname="${PGDATABASE}" \
+		--use-list="${TOC_FILE}" \
+		--jobs=4 \
+		--exit-on-error \
+		"${DB_ASSET_FILE}"
+else
+	podman compose exec --no-tty postgres sh -c 'cat > /tmp/osm-vn.dump' \
+		<"${DB_ASSET_FILE}"
+	podman compose exec --no-tty postgres sh -c \
+		"pg_restore --list /tmp/osm-vn.dump |
+			grep --invert-match --fixed-strings ' SCHEMA - public ' >/tmp/osm-vn.dump.toc"
+	podman compose exec --no-tty postgres pg_restore \
+		--username="${PGUSER}" \
+		--dbname="${PGDATABASE}" \
+		--use-list=/tmp/osm-vn.dump.toc \
+		--jobs=4 \
+		--exit-on-error \
+		/tmp/osm-vn.dump
+	podman compose exec --no-tty postgres rm --force \
+		/tmp/osm-vn.dump /tmp/osm-vn.dump.toc
+fi
 
 echo "[INFO] Reference database restore complete."

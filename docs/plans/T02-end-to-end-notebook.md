@@ -117,3 +117,5 @@ Two fixes surfaced by the rerun (both applied):
 - §1.3's spatial-integrity gate asserted `count(*) > 0` over a full unindexed pois×regions join — 5m52s on Colab CPU, the largest per-cell cost in the cold run. Rewritten as the equivalent existence check (`SELECT 1 … LIMIT 1`): ~1s, same assertion strength.
 
 Timing conclusion for the slow-cell review: with the §1.3 fix a cold run is ~3.5 min, dominated by the bootstrap (PGDG apt install + the 122 MB `osm-vn.sql.gz` download and restore, 1m51s) and the clone/install (24s); every cacheable artifact is already a release asset, so no new assets are warranted. Executed evidence: `main_output.ipynb` (untracked, repo root).
+
+**DB asset re-cut (2026-09-05, post re-proof):** `osm-vn.sql.gz` → `osm-vn.dump` (pg_dump custom format, `pg_restore --jobs=4` with a TOC schema filter) to cut the bootstrap's single-stream psql restore; rationale, determinism loss, and local validation in the T08 addendum. Cold-run timing with the new asset to be recorded below after the next fresh-VM run.

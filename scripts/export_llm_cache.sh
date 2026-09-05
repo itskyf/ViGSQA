@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Maintainer-only: dump the LangChain LLM cache database (T09). Consumed by
 # scripts/restore_llm_cache.sh; local convenience, not a pinned release asset —
-# unlike osm-vn.sql.gz this artifact grows with inference and is regenerable.
+# unlike osm-vn.dump this artifact grows with inference and is regenerable.
 set -o errexit -o nounset -o pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"

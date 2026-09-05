@@ -13,7 +13,7 @@ Mọi asset được ghim SHA-256; notebook và từng script tự kiểm tra m�
 | Asset | Nội dung | SHA-256 |
 |---|---|---|
 | `vn-geoqa.zip` | Bộ dữ liệu 2.800 câu hỏi (28 file JSONL + MANIFEST) | `dfe0ae70…5740` |
-| `osm-vn.sql.gz` | Dump database tham chiếu PostGIS | `ae06f7c2…f53e6` |
+| `osm-vn.dump` | Dump database tham chiếu PostGIS (định dạng custom của pg_dump, restore song song) | `deb523cd…84d0` |
 | `evaluation-results.tar.gz` | Kết quả theo từng câu (sealed) của cả bốn run chính thức | `bb10de26…84b16` |
 | `llm-cache-20260905.sql.gz` | Cache LLM đã công bố (27.674 generation) | `60d9e0f2…8830` |
 | `rescue-inputs.tar.gz` | Input sealed cho việc tái dựng records→answer rescue | `56841ffa…373f` |

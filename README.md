@@ -20,7 +20,7 @@ Every artifact is sha256-pinned; the notebook and the individual scripts verify 
 | asset | contents | sha256 |
 |---|---|---|
 | `vn-geoqa.zip` | the 2,800-question dataset (28 JSONL files + MANIFEST) | `dfe0ae70260c52837eb2aa38272787fcb55d98ad02ca4fbf0c432084f9055740` |
-| `osm-vn.sql.gz` | PostGIS reference database dump | `ae06f7c2ae7808235682371e03017a9da6ce6b323ec962cd06f99c0bb2ef53e6` |
+| `osm-vn.dump` | PostGIS reference database dump (pg_dump custom format, parallel restore) | `deb523cd943520f37b67b70b421a9f3d7a22283ee0fb33d856ffd6b9cb2844d0` |
 | `evaluation-results.tar.gz` | sealed per-question results for all four official runs | `bb10de26aa851dab1e24baf93dbf8d32d21ecad1205aabf32920074efd484b16` |
 | `llm-cache-20260905.sql.gz` | the published LLM cache (27,674 cached generations) | `60d9e0f213c6bd8282dd00ceb16b3c428187f9b2791840c2e521b15c6c808830` |
 | `rescue-inputs.tar.gz` | sealed inputs of the records→answer rescue reconstruction | `56841ffaa4a0354a02fac9619254b5bf554d5a291049d075dde4ad9c42cc373f` |

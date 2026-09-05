@@ -48,7 +48,7 @@ main.ipynb
 .osm_vn_fileinfo
 
 # Prebuilt reference-DB release dump cache (scripts/restore_database.sh)
-osm-vn.sql.gz*
+osm-vn.dump*
 # Dataset release archive (scripts/restore_dataset.sh)
 vn-geoqa.zip
 # LLM-cache dumps (scripts/export_llm_cache.sh, regenerable)

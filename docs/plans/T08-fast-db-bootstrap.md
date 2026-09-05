@@ -106,3 +106,36 @@ pois 38,223 · regions 8,535 · parks 1,492 · lakes 7,973 · roads 175,318).
   an error-free restore implies correct data).
 - If a PostGIS 3.4/3.5 target ever rejects the 3.6-authored view DDL: fallback design is a tables-only
   dump plus running `sql/refresh_views.sql` on the target. Not built unless needed.
+
+## Addendum: custom-format dump + parallel restore (2026-09-05)
+
+The plain-SQL decision above was driven by one constraint — restoring onto
+Colab's apt PostgreSQL 14 — which ended when Colab moved to PGDG PostgreSQL
+18/PostGIS 3.6 (T02 re-proof). The asset is now **`osm-vn.dump`**, a
+`pg_dump --format=custom` archive of the same flags
+(`--schema=public --exclude-extension=postgis --clean --if-exists
+--no-owner --no-privileges`), restored by parallel
+`pg_restore --jobs=4 --exit-on-error`:
+
+- The TOC filter (`grep --invert-match ' SCHEMA - public '`) is the
+  custom-format analogue of the old two sed schema filters: it drops the
+  single `SCHEMA - public` TOC entry so the restore cannot drop/recreate the
+  schema hosting the pre-created postgis extension. `--exclude-extension`
+  already keeps any `EXTENSION` entry out of the archive (verified: 37 TOC
+  entries, exactly one `SCHEMA - public` line). All other `--clean` entries
+  stay, so interrupted restores remain self-healing.
+- Local runs restore inside the compose container (binary `cat` into
+  `/tmp`, then list/filter/restore there); Colab uses the host PGDG
+  `pg_restore`. This reverses the "no dump/restore parallelism" skip above;
+  gzip compression is kept (the "no zstd" skip stands).
+- **Determinism is lost**: custom archives embed their creation timestamp, so
+  every export differs. `export_database.sh` therefore now auto-pins the
+  checksum into `restore_database.sh` (reviewed via git diff) instead of the
+  confirm-by-rerun guard, which would loop on fresh checksums. The exporter's
+  stale `data-` release-tag prefix (missed by the tag rename) is fixed in the
+  same rewrite.
+- Validation: scratch-DB restore in **3.65 s** with exact v3 counts
+  (pois 38,207 · regions 8,567 · parks 1,493 · lakes 7,987 · roads 175,883 —
+  identical to the source DB), 10 GiST indexes, pois×regions spatial join
+  works, immediate re-run logs "already populated; skipping"; the published
+  asset's re-download SHA-256 matches the pin.
