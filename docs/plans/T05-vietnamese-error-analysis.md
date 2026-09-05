@@ -1,6 +1,6 @@
 # T05 — Vietnamese Error Analysis and Demo
 
-**Status: planned.**
+**Status: in_progress (2026-09-05).** Error analysis runs on the **dev split first** (`docs/dev_test_split_v3.0.0.json`); full-benchmark taxonomy is reported only after the T04 intervention is frozen.
 
 ## Dependencies
 
