@@ -208,3 +208,32 @@ Springer / Copernicus / PLOS ONE / arXiv / Hugging Face. Key corrections:
 - Content-page boundary confirmed by dual temporary markers after the final
   edits; PNG render of all 10 pages checked structurally (dimensions, ink
   coverage, no blank/overflow pages).
+
+## 2026-09-06 — ACL Short Paper Remediation & Final Verification
+
+The paper layout, section flow, table markups, and visual defects were remediated semantically without any layout hacks (no shrunken body fonts, no negative spacing, no manual vspace, no artificial page breaks):
+
+1. **Author Block Layout**:
+   - Merged the three co-authors (`Anh Pham-Ky`, `Tien Dang-Anh`, `Thuat Nguyen-Thien`) from `University of Science, VNU-HCM` into a single shared-affiliation block (`name: (...)`).
+   - Completely resolved the tracl 5 cm fixed-height titlebox overflow; Page 1 renders cleanly with zero text collisions or abstract overlaps.
+
+2. **Main Paper Page Boundary**:
+   - Sections 1–10 (Introduction through Conclusion) naturally occupy **4.45 pages**, ending cleanly in Column 2, line 18 of Page 5.
+   - References start at line 20 of Column 2 on Page 5 and conclude on Page 6, strictly fulfilling the course requirement of 4–5 main content pages before references.
+
+3. **Tables & Figures Remediation**:
+   - **Table 1 (`tab:baselines`)**: Formatted in-column with `columns: (26mm, 15mm, 21mm, 18mm)` and `inset: (x: 2.5pt, y: 3pt)`. Zero word wrapping across headers (`Attempted`, `Correct`) and model names (`Ornith-1.5-9B`, `Qwen3.5-9B`).
+   - **Table 2 (`tab:rescue`)**: Formatted in-column with `columns: (18mm, 23mm, 10mm, 16mm, 13mm)` and `inset: (x: 2.5pt, y: 3pt)`. Zero word wrapping (`direction`, `Rescue`), signed deltas (`$+0.162$`, `$-0.078$`), and delta-only metrics.
+   - **Table 3 (`tab:samples`)**: Wide table spanning both columns on Page 7 with `columns: (3.2cm, 6.8cm, 2.0cm, 5.0cm)` and `inset: (x: 3pt, y: 3pt)`. Unabridged location gold with point coordinates and external source attribution; "distance" and "external" fit without hyphenation.
+   - **Table 4 (`tab:templates`)**: Full 28-row inventory spanning both columns on Page 9 with `columns: (0.8cm, 4.8cm, 3.6cm, 1.7cm, 1fr)`. Monospace wrapping replaced with proportional typography, completely eliminating column collisions with Spatial predicate.
+   - **Table 5 (`tab:taxonomy`)**: Failure stages partitioned across families on Page 10, rotated column headers, single-line category names, strictly below the section heading.
+   - **Figure 1 (`fig:baselines`)**: Located in Section 4.1 in Column 1 of Page 3.
+   - **Figure 2 (`fig:record`)**: Authentic released record (`knn+loc-014`) JSON schema under Appendix A.1 (`placement: none`).
+   - **Figure 3 (`fig:pipeline`)**: Generation pipeline diagram placed in Appendix A.2 Column 2 on Page 8 (`placement: none`).
+   - **Appendix Flow**: Balanced Page 8 layout with Stored Record Schema in Column 1, and Generation Pipeline, Surface Variation, and Appendix B heading + introductory paragraph in Column 2. Zero orphan headings or split sentences.
+
+4. **Tooling & Quality Verification**:
+   - `pixi run python .claude/skills/anti-ai-style/scripts/scan.py --strict docs/report/main.typ` exits 0 (0 hard tells).
+   - `pixi run typstyle --check docs/report/main.typ` exits 0.
+   - `pixi run typst compile docs/report/main.typ docs/report/main.pdf` exits 0.
+   - Multimodal visual inspection of all 10 rendered PNG pages (`page-01-of-10.png` through `page-10-of-10.png`) via `view_file` confirmed publication-grade typography throughout.
