@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Restore the LangChain LLM cache database from a scripts/export_llm_cache.sh
-# dump. Restore means replace: the dump's --clean section drops existing objects,
-# so re-running over the current database is safe and idempotent. Unlike
+# Restore the LangChain LLM cache database from the published release dump.
+# Restore means replace: the dump's --clean section drops existing objects, so
+# re-running over the current database is safe and idempotent. Unlike
 # restore_database.sh there is no skip-if-populated — the cache must be verified
 # after restore (row count asserted at the end).
 set -o errexit -o nounset -o pipefail

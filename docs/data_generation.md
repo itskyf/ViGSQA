@@ -1,221 +1,168 @@
-# Data Generation — VN-GeoQA
+# VN-GeoQA Dataset Generation
 
-## Overview
+VN-GeoQA is the Vietnamese dataset produced by ViGSQA from OpenStreetMap data stored in PostgreSQL/PostGIS.
+Version `v3.0.0` contains 2,800 questions: 100 questions for each of the 28 canonical GS-QA types.
+Each record includes a Vietnamese question, the SQL query used to compute its answer, the resulting answer data, and structured question metadata.
 
-VN-GeoQA contains 2,800 Vietnamese geospatial questions (28 canonical GS-QA types × 100) generated automatically from OpenStreetMap Vietnam data stored in a PostGIS database. Questions are paired with ground-truth SQL queries and answers verified against the live database.
+This is the single reference for restoring, generating, and verifying the dataset.
+For the complete course workflow, see the repository [README](../README.md).
 
----
+## Restore the course dataset
 
-## Pipeline
-
-```text
-OSM Vietnam (.pbf)
-       │
-       ▼
- osm2pgsql → PostGIS DB (osm_vn)
-       │
-       ▼
- generator_vi.py
-  ├── query DB for real POI names + coordinates
-  ├── fill Vietnamese templates (templates_vi/*.txt)
-  ├── execute SQL to verify answer exists
-  └── save to questions_vi/*.jsonl
-       │
-       ▼
- verify_vi.py  (spot-check 5% of questions)
-```
-
----
-
-## Step 1 — Database Setup
-
-Local (PostGIS runs in the `compose.yaml` container; tools come from pixi):
+The recommended course path uses `vn-geoqa.zip` from the [v3.0.0 release](https://github.com/itskyf/ViGSQA/releases/tag/v3.0.0):
 
 ```bash
+./scripts/restore_dataset.sh
+```
+
+The script downloads the archive when necessary, extracts it to `data/questions_vi`, and verifies every JSONL file against `scripts/v3.0.0.sha256`.
+The repository reads the restored files through the `generator/questions_vi` symlink.
+Files under `data/` are intentionally excluded from Git.
+
+The course notebook also restores `osm-vn.dump`, so it does not need to download or import the raw OSM snapshot.
+
+## Generation pipeline
+
+The implementation is organized as follows:
+
+```text
+vietnam-260901.osm.pbf
+        │
+        ▼
+osm2pgsql + scripts/osm_poi.lua
+        │
+        ▼
+PostgreSQL/PostGIS (osm_vn)
+        │
+        ▼
+generator/generator_vi.py
+        │
+        ▼
+28 JSONL files
+        │
+        ▼
+generator/verify_vi.py
+```
+
+The pinned source is the Geofabrik snapshot `vietnam-260901.osm.pbf` with SHA-256 `edf2d41d93b25474acc14a34f6c313940ecfea5671835299ddd793c60d08a3e8`.
+`scripts/download_osm.sh` downloads and verifies this exact snapshot.
+`scripts/import_osm.sh` imports it with the repository's osm2pgsql configuration and creates the reference views used by the generator.
+
+The main reference views are `pois`, `regions`, `parks`, `lakes`, and `roads`.
+Geometry is exposed in WGS84 through `geometry` and `geo_wkt` fields so generated SQL can use PostGIS geography operations consistently.
+
+## Generate the dataset
+
+Install the project, enter its environment, and configure the local database:
+
+```bash
+pixi install
+pixi shell
 export PGHOST=127.0.0.1 PGPORT=5432 PGDATABASE=osm_vn
 export PGUSER=postgres PGPASSWORD=postgres
-./scripts/install_dependencies.sh
-podman compose up -d postgres
-./scripts/init_database.sh
-./scripts/download_osm.sh    # ~312 MB Geofabrik extract
-./scripts/import_osm.sh
 ```
 
-`install_dependencies.sh` only installs or verifies dependencies. In Google
-Colab it uses apt for PostgreSQL/PostGIS and the required import tools; service
-startup and database initialization are separate steps. The course notebook
-runs the PostgreSQL/OSM workflow and waits for it before exploration or
-experiments; the LLM endpoint is an external OpenAI-compatible vLLM server the
-notebook only probes. After bootstrap, bounded
-readiness and PostGIS checks use psycopg3; `psql` is used only where Colab
-already provides it or container execution is simpler.
-
-Connection is configured by `PostgresSettings` through the standard libpq
-variables (`PGHOST`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGPORT`; defaults
-`127.0.0.1` / `osm_vn` / `postgres` / `postgres` / `5432`). The notebook
-exports these values for compose and the shell scripts; manual shell runs must
-export them as shown above.
-
-| Table/View | Content |
-|-----------|---------|
-| `planet_osm_point` | POI nodes (amenity, tourism, shop, leisure) via `scripts/osm_poi.lua` |
-| `pois` | View over `planet_osm_point`: identity + category columns, filter tags (`cuisine`, `museum`, `takeaway`, `outdoor_seating`, `delivery`, `emergency`), anchor identifiers (`wikidata`, `wikipedia`), 8 native address columns (`addr_housenumber`, `addr_street`, `addr_place`, `addr_suburb`, `addr_district`, `addr_city`, `addr_province`, `addr_postcode`), `geometry`, `geo_wkt` |
-
-The `geometry` column name is intentional: the upstream GS-QA schema and the
-text2sql prompts hard-code `pois.geometry`. `capacity` is deliberately absent:
-T7/T8 external (Wikipedia) attributes must be verifiably out-of-schema, and no
-filter label uses it.
-
----
-
-## Step 2 — Question Generation
-
-The dataset lives at `data/questions_vi/` with `generator/questions_vi` as a
-symlink to it, so code and notebooks keep using the familiar path. `data/` is
-**not tracked by git** (`.gitignore`): the frozen dataset is published as a
-public GitHub Release asset (tag `v3.0.0`) and restored by:
-
-1. `./scripts/restore_dataset.sh` — downloads, unpacks, and sha256-verifies
-   `data/questions_vi` against `scripts/v3.0.0.sha256` (idempotent; needs only
-   `curl` + `unzip`), or
-2. running the pipeline above against the **pinned snapshot** and regenerating
-   with the pinned seed. `download_osm.sh` downloads the pinned
-   `vietnam-260901.osm.pbf` snapshot:
-
-   ```bash
-   export PGHOST=127.0.0.1 PGPORT=5432 PGDATABASE=osm_vn
-   export PGUSER=postgres PGPASSWORD=postgres
-   ./scripts/download_osm.sh
-   ./scripts/init_database.sh && ./scripts/import_osm.sh
-   # from the repo root (--output is resolved from the current directory):
-   python generator/generator_vi.py --seed 42 --count 100 --output data/questions_vi
-   ```
-
-   Regeneration needs the running database and the pinned PBF; the Release
-   asset needs neither.
-
-To publish a new dataset version, **generate into a staging directory** (never
-in place — regeneration would briefly leave the old `MANIFEST.json` describing
-the new jsonl files), verify, then swap at freeze:
+To rebuild the database from the pinned PBF instead of restoring `osm-vn.dump`:
 
 ```bash
-python generator/generator_vi.py --seed 42 --count 100 --output data/<version>-stage/questions_vi
-# verify + byte-identical regen check + human QC, write MANIFEST, build the sha256 table
-mv data/questions_vi "data/questions_vi_$(old_version)_archive"
-mv data/<version>-stage/questions_vi data/questions_vi   # symlink unchanged
+DB_RESTORE=0 ./scripts/bootstrap_postgres.sh
 ```
 
-The seed pins both the Python sampling and the per-call
-`TABLESAMPLE ... REPEATABLE` seeds, so regeneration against the same imported
-database is byte-identical (see the MANIFEST in the dataset directory).
-
-### How It Works
-
-Each question type follows a fixed SQL template. The generator:
-
-1. Samples a random **anchor POI** from the database
-2. Executes the SQL template against live data to get the ground-truth answer
-3. Verifies the answer is non-empty and unambiguous
-4. Fills a randomly chosen Vietnamese text template with the anchor name
-5. Stores `{question, sql, answers, type, answer_type, question_entities}`
-
-### Template Format (`templates_vi/*.txt`)
-
-One question surface per line, with placeholders:
-
-```text
-Cho biết [1_type] gần [3] nhất là gì.
-[1_type] nào gần [3] nhất hiện tại?
-Bạn có biết [1_type] gần [3] nhất là gì không?
-```
-
-`[1]` = target POI category, `[2]` = distance/radius, `[3]` = anchor POI name.
-
----
-
-## Step 3 — Quality Verification
+Generate into a staging directory so the course dataset at `data/questions_vi` remains unchanged:
 
 ```bash
-python verify_vi.py --input questions_vi/ --all --spot-check 0.05 --seed 42
+python generator/generator_vi.py \
+  --seed 42 \
+  --count 100 \
+  --output data/rebuild/questions_vi
 ```
 
-Automated checks (DB-free, per record):
+Use `--types T01,T07` to generate only selected question types during development.
+The seed controls Python sampling and the repeatable PostgreSQL samples used by the generator.
 
-- NFC normalization, no unreplaced `[N]` placeholders, plausible length
-- Anchor POI excluded from its own answer set (SQL predicate + answer ids/geometries)
-- No `LIMIT` without `ORDER BY` (nondeterministic answer subsets)
-- Stable `{type}-NNN` id, record type matches the filename, no duplicate questions
-- `question == question_surfaces.full`; Vietnamese surface consistency; name sanity
-- Location answers carry a non-empty `address` and `geo_wkt`, the canonical
-  string recomputes from the stored components, and the gold SQL contains the
-  address-bearing predicate
-- T7/T8 external attribute keys never match live `pois` view columns
-  (`pois_view_columns()` parses `sql/refresh_views.sql` fail-closed)
+For each question, `generator/generator_vi.py` selects real entities, fills a Vietnamese template, executes the corresponding SQL, rejects unusable results, and stores the verified answer.
+T7 and T8 add external Wikipedia facts through `generator/multisource_vi.py` while keeping those answer attributes outside the Text2SQL schema.
 
-Stored answers are additionally re-executed against PostGIS at freeze time
-(see the `validation` block in `questions_vi/MANIFEST.json`).
+## Verify generated questions
 
----
+Run all automated checks on the staging output:
 
-## Dataset Statistics
+```bash
+python generator/verify_vi.py \
+  --input data/rebuild/questions_vi \
+  --all \
+  --spot-check 0.05 \
+  --seed 42
+```
 
-28 canonical GS-QA types × 100 questions. Answer-type distribution:
+The verifier checks identifiers, question types, answer types, required fields, Vietnamese normalization, unreplaced template tokens, duplicate questions, SQL ordering, anchor exclusion, numeric answer validity, location addresses, and the T7/T8 out-of-schema rule.
+The optional spot check prints a deterministic TSV sample for human review.
 
-| Answer type | N | Notes |
-|------------|:-:|-------|
-| name | 1,200 | `poi_name` (single or full distance-ordered set) |
-| loc | 800 | T13–T20: canonical address + native components + `geo_wkt` |
-| angle | 200 | degrees clockwise from north |
-| count | 200 | exact integer |
-| distance | 200 | metres |
-| area | 100 | square metres |
-| length | 100 | metres |
-| **Total** | **2,800** | |
+The `v3.0.0` release was produced with all 2,800 records passing these checks and a byte-identical seed-42 regeneration.
 
-The full `tid → type` mapping is recorded in `data/questions_vi/MANIFEST.json`.
+## Dataset contract
 
-**Location semantics (v3):** location candidates are restricted to
-address-bearing POIs — `(addr_street IS NOT NULL OR addr_place IS NOT NULL)
-AND (addr_suburb IS NOT NULL OR addr_district IS NOT NULL OR addr_city IS NOT
-NULL OR addr_province IS NOT NULL)` — and the predicate is stated verbatim in
-the Text2SQL prompt, so gold SQL is reproducible by the model with no hidden
-filter. `geo_wkt` remains the authoritative spatial reference; the canonical
-address string is derived only from the frozen components (no reverse
-geocoding, no synthesis).
+| Property | Value |
+|---|---|
+| Version | `v3.0.0` |
+| Questions | 2,800 |
+| GS-QA types | 28 (`T01`–`T28`) |
+| Questions per type | 100 |
+| Seed | 42 |
+| Output | One JSONL file per question type |
 
----
+Answer types are distributed as follows:
 
-## Output Format
+| Answer type | Questions | Stored value |
+|---|---:|---|
+| `name` | 1,200 | Entity name or distance-ordered name list |
+| `loc` | 800 | Canonical address, native OSM address fields, and `geo_wkt` |
+| `angle` | 200 | Degrees clockwise from north |
+| `count` | 200 | Integer count |
+| `distance` | 200 | Metres |
+| `area` | 100 | Square metres |
+| `length` | 100 | Metres |
 
-Each `questions_vi/<type>.jsonl` — 100 lines, one JSON object per line:
+Location answers use `geo_wkt` as the spatial reference and derive their address text only from the stored native OSM address fields.
+Range questions store the complete result set in distance order rather than an arbitrary subset.
+T7 and T8 retain their external facts in the question records rather than exposing them as columns in the reference database.
+
+## Record format
+
+Each line of a JSONL file is one object with this shape:
 
 ```json
 {
-  "id": "knn+name-001",
-  "question": "Bể bơi gần [anchor] nhất là gì?",
-  "question_surfaces": {"full": "<question>", "stripped": "<diacritics-stripped>"},
-  "type": "knn+name",
-  "sql": "SELECT id, geo_wkt, poi_name FROM pois WHERE ... AND id <> <anchor> ORDER BY geometry <-> ... LIMIT 1",
-  "answers": [
-    {"id": 123, "poi_name": "[result name]", "geo_wkt": "POINT(106.xx 21.xx)"}
-  ],
-  "answer_type": "name",
-  "question_entities": {"[1]": {"main_category": "...", "sub_category": "..."}, "[2]": {"poi_name": "[anchor]", "geo_wkt": "..."}}
+  "id": "intersects+count-001",
+  "tid": "T24",
+  "type": "intersects+count",
+  "question": "Đếm số cửa hàng điện tử nằm trong Thành phố Hồ Chí Minh.",
+  "question_surfaces": {
+    "full": "Đếm số cửa hàng điện tử nằm trong Thành phố Hồ Chí Minh.",
+    "stripped": "Dem so cua hang dien tu nam trong Thanh pho Ho Chi Minh."
+  },
+  "sql": "SELECT COUNT(*) AS count FROM pois WHERE ...;",
+  "answers": [{"count": 51}],
+  "answer_type": "count",
+  "question_entities": {
+    "[1]": {"table": "pois", "column": "shop", "value": "electronics"},
+    "[2]": {"region_name": "Thành phố Hồ Chí Minh", "id": 1973756}
+  }
 }
 ```
 
-List-type questions store the **full result set** ordered by distance to the
-anchor, with the anchor itself excluded.
+The dataset manifest records the complete `tid`-to-type mapping, source information, file counts, and validation summary.
 
-Field variations by type:
+## Relevant implementation
 
-| Answer type | Key in `answers[]` | Format |
-|-------------|-------------------|--------|
-| name | `poi_name` | string |
-| location | `address` (+ `addr_*` components, `geo_wkt`) | canonical address string; e.g. `{"id": 123, "poi_name": "...", "geo_wkt": "POINT(...)", "address": "5B Nguyễn Thiện Thuật, Phường Hoàn Kiếm, Hà Nội, Thành phố Hà Nội", "addr_housenumber": "5B", ...}` |
-| distance | `distance` | number (metres) |
-| count | `count` | integer |
-| angle | `angle` | degrees |
-| area | `area` | square metres |
-| length | `length` | metres |
-| multihop (T7) | `multi_source_answer` (+ `multi_source_attribute`, `multi_source_long_answer`) | external (Wikipedia) fact |
+| Path | Purpose |
+|---|---|
+| `generator/generator_vi.py` | Generate all 28 Vietnamese question types |
+| `generator/verify_vi.py` | Validate generated JSONL records |
+| `generator/templates_vi/` | Store Vietnamese question templates |
+| `generator/multisource_vi.py` | Generate T7/T8 external-fact questions |
+| `scripts/download_osm.sh` | Download and verify the pinned OSM snapshot |
+| `scripts/import_osm.sh` | Import OSM data into PostGIS |
+| `scripts/osm_poi.lua` | Configure the osm2pgsql POI import |
+| `sql/refresh_views.sql` | Define the reference database views |
+| `scripts/restore_dataset.sh` | Restore the `v3.0.0` course dataset |

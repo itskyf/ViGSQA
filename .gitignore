@@ -51,7 +51,7 @@ main.ipynb
 osm-vn.dump*
 # Dataset release archive (scripts/restore_dataset.sh)
 vn-geoqa.zip
-# LLM-cache dumps (scripts/export_llm_cache.sh, regenerable)
+# Downloaded LLM-cache release dumps
 llm-cache-*.sql.gz*
 
 # Model weights
