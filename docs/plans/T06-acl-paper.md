@@ -1,6 +1,6 @@
 # T06 — ACL Paper
 
-**Status: in_progress.**
+**Status: done.**
 
 ## Dependencies
 
@@ -15,7 +15,7 @@ Write the course report with ACL style, documenting the benchmark, methods, eval
 - **Source Document**: Ported from `references/vigsqa/main.tex` and `references/vigsqa/custom.bib` ("VN-GeoQA: A Reproducible Vietnamese Geospatial Question Answering Benchmark" by Anh Pham-Ky & Tien Dang-Anh, HCMUS), corresponding to the LaTeX PDF `/mnt/c/Users/itsky/Downloads/_HCMUS__NLP_CK_latex.pdf`.
 - **Target Files**:
   - `docs/report/main.typ`: Full paper in Typst with ACL template (`@preview/tracl:0.8.1`).
-  - `docs/report/references.yaml`: 22 bibliographic entries in Hayagriva YAML format.
+  - `docs/report/references.bib`: 19 fully audited BibTeX entries (replaced the provisional Hayagriva `references.yaml`, which pergamon cannot parse; see the 2026-09-06 rewrite entry).
   - `docs/report/figures/`: SVG diagrams for Figure 1 (`fig1_baselines.svg`) and Figure 3 (`fig3_pipeline.svg`). The notebook §2.4 spatial-reasoning map (`artifacts/figures/spatial_reasoning_example.{svg,webp}`, mixed raster/vector SVG over OSM Mapnik tiles) is available for reuse via `scripts/restore_figures.sh`.
 - **Semantic Formatting Invariant**: All ad-hoc LaTeX spacing (`\vspace`, `\resizebox`, `\tabcolsep`, etc.) removed; layout relies on semantic Typst primitives (`table`, `figure`). Wide tables (Table 1 and Table 4) span across both columns via `scope: "parent"`.
 - **Visual Comparative Analysis**: Page screenshots captured at 144 PPI for both LaTeX (9 pages) and Typst (10 pages) and analyzed with multimodal vision.
@@ -98,3 +98,113 @@ exactly. Executed outputs are saved in the working notebook.
   analytical sentences (only the wrong-answer stage yields a prediction;
   the rescuable stage is §5's rescue target). Colab re-synced and verified
   (title, §6 markdown, Limitations).
+
+## 2026-09-06 — Full ACL rewrite of `main.typ` (page-budgeted, evidence-synchronized)
+
+The paper was rewritten end-to-end against the brief's eight work areas.
+Final layout: **5 main-content pages**, References start on page 6, appendices
+follow (10 PDF pages total). Measured with temporary `#context metadata`
+markers at the conclusion/bibliography boundary (removed before release).
+
+### Structure and page budget
+
+- Section order: Abstract, Introduction, Related Work, Dataset (Construction,
+  Location Gold, quality-control paragraph), Baselines (Direct, Text2SQL,
+  scope; Zero-LLM Rescue subsection), Experimental Setup (Metrics with formal
+  definitions, dev/test-split paragraph), Results and Discussion, Error
+  Analysis, Limitations, Ethical Considerations, Conclusion. All mandatory
+  sections present.
+- **Master results table** (`tab:fourruns`): the former four-run table and the
+  rescue table were merged into one table with a `+R` intervention column
+  (attempted/correct full-benchmark rows + per-family test means; the four
+  zero-delta rescue rows were dropped as uninformative). Rendered **in-column
+  at 8 pt** (ACL `\footnotesize` practice) instead of a `scope: "parent"`
+  band, per the user's consider-first guidance on two-column elements: the
+  7-column numeric table fits a 7.7 cm column at 8 pt, removes the page-top
+  float (and its slack), and the wide `scope: "parent"` remains only where
+  genuinely needed (appendix samples/templates tables).
+- Appendix (excluded from the page budget): sample records table + stored
+  JSON record + surface phrasings; 28-template inventory with pipeline and
+  baselines figures; taxonomy stage-by-family table.
+- Compression went 6.95 -> 5.00 content pages through 13 passes of prose
+  density rewriting; no metric formula, evidence number, or required section
+  was deleted. Fonts/spacing follow tracl defaults (only the 8 pt table text
+  via a figure-local `#set text`).
+
+### Metric definitions (from `scripts/run_evaluation.py`)
+
+Normalization (NFKC, casefold, punctuation-to-space, diacritics preserved),
+token-multiset P/R/F1, capped relative error with the exact zero-guard cases,
+circular direction error, 500 km-capped geodesic error, best-pair reduction
+(max-F1/min-error, ties toward earlier candidates), attempted semantics and
+worst-case scoring of unattempted questions, and the explicit separation of
+official metrics from the analysis-only thresholds (F1 >= 0.5 / E <= 0.1) and
+the taxonomy-level `refused` label.
+
+### Bibliography: `references.yaml` replaced by `references.bib`
+
+Pergamon's `add-bib-resource` parses BibTeX only, so the audited bibliography
+now lives in `docs/report/references.bib` (19 entries); the Hayagriva
+`references.yaml` was removed to keep a single source. Every entry was
+verified by three parallel web agents against ACL Anthology / ACM DL /
+Springer / Copernicus / PLOS ONE / arXiv / Hugging Face. Key corrections:
+
+- `li2025mapqa`: archival SIGSPATIAL '25 version replaces the preprint —
+  title "Benchmarking Geospatial Question Answering with MapQA", 6 authors,
+  pp. 1042–1045, DOI 10.1145/3748636.3764174. In-text "concurrent" dropped
+  (it is prior work from our 2026 vantage).
+- `nguyen2020uitviquad`, `thai2022vicov19qa`: published versions have
+  4-author lists (the old lists matched arXiv preprints); pages/publishers/
+  DOIs added.
+- `le2022vimqa`: author names de-garbled (Nguyen-Khang Le, Dieu-Hien
+  Nguyen, Tung Le, Minh Nguyen).
+- `punjani2018geoquestions201`: GIR '18, ACM, pp. 1–10, DOI, 14 authors
+  (one was dropped before).
+- `xu2020geoanqu` added (GeoAnQu's true origin; the Beydokhti et al. 2021
+  attribution circulating in GS-QA's reference list is unreliable).
+- `qwen35`: author corrected to AxionML (community NVFP4 quantization of
+  Qwen/Qwen3.5-9B, not the Qwen team).
+- `nominatim`: author corrected to "Nominatim developers" (OSMF only operates
+  the public instance).
+- `vnreform2025`: Resolution No. 202/2025/QH15, passed 12 June 2025; district
+  abolition attributed to the 16 June 2025 instruments, not Resolution 202.
+- Unused entries dropped (`zelle1996geoquery`, `li2023bird`, `postgis`,
+  `geofabrik`); GS-QA §2 facts quoted in our Related Work were all CONFIRMED
+  against arXiv 2605.22811 by the audit agent.
+
+### Claim -> source verification (main quantitative claims)
+
+- 2,214/2,800 = 79.1% Ornith/Direct unattempted, 77 correct; Qwen/Direct
+  2,039 unattempted, 79 correct — `results/evaluation/*/per_question.jsonl`.
+- Refusals 904/1,100 entity, 572/800 location —
+  `results/analysis/taxonomy_Ornith-1.5-9B-NVFP4_direct_all.csv`.
+- Full-benchmark attempted/correct 20.9/2.8, 54.2/32.4, 27.2/2.8, 51.5/29.3%
+  and all per-family test means in `tab:fourruns` — notebook §4.2 (Colab,
+  latest run) cross-checked against sealed per-question artifacts.
+- Rescue: 222/2,240 test (entity 165, location 35, direction 3, distance 19
+  — verified `results/rescue/rescued_test.jsonl`), zero regressions, entity
+  F1 +0.162, distance rel-err −0.078; count/area/length/textual_fact
+  unchanged because no question in them produced a rescue candidate.
+- Taxonomy flags 9 / 219 (46% of 471 attempted locations) / 14 with
+  comparables 139 (Qwen/T2S) and 175 (Ornith/Direct); entity SQL errors
+  100 vs 209, no-rows 280, subquery-as-expression 107 of 295, area/length
+  unusable 34/43 — taxonomy CSVs + `baselines/cache_vi/.../sql_exec.json`.
+- Family sizes corrected to 1,100 entity + 100 textual-fact (was miscounted
+  as 1,200); test n in the table caption sums to 2,240.
+- Dataset numbers (38,207 POIs, 5,321 address-bearing pool, 13,857/72/7
+  coverage, 4,500–4,800 district/city/province, gold-set median 2–6 max 542,
+  128 phrasings, 26 sub-categories) — T10 record and generator sources.
+- Dev/test stability scoped: location distance 0.670 dev / 0.643 test, but
+  direction text F1 0.712 dev / 0.552 test (sampling-sized divergence).
+
+### Validation
+
+- `typst compile` clean (only tracl's benign inconsolata fallback warning);
+  `typstyle --check` clean after `typstyle -i` on session-owned code.
+- Citation/label audit: every `#cite` key resolves in `references.bib`, no
+  unused bib entries, no dangling `@` refs.
+- `scan.py --strict` on `main.typ`: 0 hard tells (advisory long-sentence
+  notes remain by design in data-dense sentences).
+- Content-page boundary confirmed by dual temporary markers after the final
+  edits; PNG render of all 10 pages checked structurally (dimensions, ink
+  coverage, no blank/overflow pages).

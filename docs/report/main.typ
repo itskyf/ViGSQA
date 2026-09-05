@@ -1,4 +1,5 @@
 #import "@preview/tracl:0.8.1": *
+#import "@preview/pergamon:0.7.1": add-bib-resource, cite
 
 #show: doc => acl(
   doc,
@@ -21,75 +22,161 @@
 )
 
 #abstract[
-  Vietnamese geospatial question answering has no public benchmark. We introduce *VN-GeoQA*, a Vietnamese adaptation of the GS-QA benchmark: 2,800 questions over 28 templates, generated from a pinned OpenStreetMap Vietnam snapshot against a PostGIS database, with gold answers computed by SQL at generation time. Location gold is taken from native OSM `addr_*` components composed into a hierarchical Vietnamese address rather than a geocoded string. We evaluate two 9B open models crossed with Direct and Text2SQL prompting under one frozen decoding profile. Text2SQL is decisively the right architecture: Direct refuses roughly 82% of questions, answering only 77 of 2,800 correctly, while Text2SQL engages every family. On a frozen 560/2,240 dev/test split we pre-register a zero-LLM intervention that recovers 222 test questions with zero regressions, raising entity text F1 by 0.162 and cutting distance relative error by 0.078.#footnote[Code and dataset are available at #link("https://github.com/itskyf/ViGSQA").]
+  VN-GeoQA is a Vietnamese geospatial QA benchmark: 2,800 questions over 28 templates, generated from a pinned OpenStreetMap Vietnam snapshot against PostGIS, with SQL-computed gold answers and location gold composed from native OSM `addr_*` components into a hierarchical Vietnamese address. We evaluate two 9B open models crossed with Direct and Text2SQL prompting under one frozen decoding profile. Direct leaves 2,214 of 2,800 questions unattempted for Ornith (79.1%) and 2,039 for Qwen, while Text2SQL scores best on every family in the held-out test split for both models, where a pre-registered zero-LLM intervention recovers 222 questions with zero regressions, raising entity text F1 by 0.162 and reducing distance relative error by 0.078. Address geocoding accounts for most measurable language-specific failure (46% of attempted location answers geocode to no address) and diacritic loss for almost none (at most 9).#footnote[Code and dataset are available at #link("https://github.com/itskyf/ViGSQA").]
 ]
 
 = Introduction <sec:intro>
 
-Consider an everyday question about a map: _"Quán cà phê nào gần Nhà thờ Đức Bà nhất?"_, or in English, which café is nearest to Notre-Dame Cathedral? Answering it requires identifying the landmark, retrieving its coordinates, understanding that "nearest" is a spatial comparison rather than a popularity judgment, and returning a specific café that actually exists. A language model asked this question directly tends to name a well-known café somewhere in the city, which is often not the closest one.
-
-This is the task we benchmark. Large language models are evaluated on strong general-domain QA benchmarks, but geospatial QA remains thinly covered and Vietnamese geospatial resources are effectively absent. The gap is not only one of volume. Vietnamese addresses invert Western ordering (_số nhà_, _đường_, _phường/xã_, _quận/huyện_, _tỉnh/thành phố_), and Vietnamese tone marks are semantically contrastive, so address handling derived from English resources does not transfer.
-
-We port the construction methodology of GS-QA @saeedan2026gsqa to Vietnam. GS-QA supplies the design contract: 28 templates, deterministic SQL-computed gold, and an evaluation suite that combines text matching with spatial-aware measures. SPARTQA @mirzaee2021spartqa supplies the methodological warrant that rule-based automatic generation, paired with a human-verified sample, is a legitimate path to a language resource.
+Asked directly which café is nearest to Notre-Dame Cathedral (_"Quán cà phê nào gần Nhà thờ Đức Bà nhất?"_), a language model tends to name a well-known café somewhere in the city, rarely the closest one. We benchmark this task: geospatial QA is thinly covered among LLM benchmarks, and we found no Vietnamese geospatial resource among the datasets surveyed in @sec:related. The language also differs structurally from English, inverting Western address ordering (_số nhà_ house number, _đường_ street, _phường/xã_ ward, _quận/huyện_ district, _tỉnh/thành phố_ province) with semantically contrastive tone marks, so address handling derived from English resources does not transfer. We port GS-QA's #cite("saeedan2026gsqa") construction methodology to Vietnam, inheriting its 28 templates, deterministic SQL-computed gold and spatial-aware evaluation, under SPARTQA's #cite("mirzaee2021spartqa") warrant that rule-based generation validated on a human-checked sample is a legitimate path to a language resource.
 
 Our contributions are:
-- *VN-GeoQA*, 2,800 questions that regenerate byte-identically from a fixed seed, a pinned snapshot and a pinned generator, published with the evaluation artifacts and cache.
-- Vietnamese adaptations: native `addr_*` location gold, 128 surface phrasings across 28 templates, a 26-entry Vietnamese category lexicon, parallel diacritic-stripped surfaces, and NFKC-based scoring that equates composed and decomposed diacritics.
-- Four baseline runs, each _sealed_: every output is stored with a hash binding it to the exact model, prompts and dataset that produced it.
-- A frozen 560/2,240 dev/test split and a pre-registered zero-LLM intervention whose dev gains transfer to test with matching sign and magnitude.
-- A measured Vietnamese error taxonomy showing that geocoding coverage, not diacritic handling, is the language-specific bottleneck.
+- *VN-GeoQA*: 2,800 questions regenerating byte-identically from a fixed seed, pinned snapshot and pinned generator, released with the evaluation artifacts and cache.
+- Vietnamese adaptations: native `addr_*` location gold, 128 surface phrasings over 28 templates, 26 target categories, diacritic-stripped surfaces, NFKC scoring equating composed and decomposed diacritics.
+- Four sealed Ornith/Qwen $times$ Direct/Text2SQL runs with per-family test metrics, plus a pre-registered zero-LLM intervention on a frozen 560/2,240 split whose dev gains transfer to test.
+- An error taxonomy with Vietnamese-phenomenon flags: geocoding coverage accounts for most measurable language-specific failure, diacritic loss for almost none.
 
 = Related Work <sec:related>
 
-== GS-QA <sec:gsqa>
+Prior geospatial QA resources are small: GeoQuestions201 has 201 questions #cite("punjani2018geoquestions201"), GeoQuestions1089 has 1,089 #cite("kefalidis2023geoquestions"), GeoAnQu 429 #cite("xu2020geoanqu"), and MapQA 3,154 over OpenStreetMap for two U.S. regions #cite("li2025mapqa"). GS-QA, the benchmark we port, replaces crowdsourced collection and knowledge-graph queries with generated SQL gold and adds questions needing a second source.
 
-GS-QA addresses four limitations of prior geospatial QA benchmarks: small size, crowdsourced construction, a knowledge-graph query paradigm that constrains expressible spatial operations, and the absence of questions needing a second source. Prior resources are small: GeoQuestions201 has 201 questions, GeoQuestions1089 has 1,089, GeoAnQu has 429, and the concurrent MapQA has 3,154 over OpenStreetMap for two U.S. regions.
+*Construction.* A _template_ is a question pattern with blanks, paired with the database query that fills those blanks and computes the answer at the same time, so gold is correct by construction and recomputable whenever the map changes. GS-QA builds a PostGIS database from a February 2024 US OpenStreetMap extract, crosses five spatial relationships with eight answer types to its 28 natural combinations, and keeps 100 questions per template, 10% reviewed by hand.
+*Baselines and findings.* GS-QA crosses three LLMs with three strategies (bare prompting, Text2SQL, retrieval-augmented generation). Sonnet with Text2SQL reaches 0.23 average F1 against 0.07 bare, two-source questions fail almost completely, and compass questions sit near chance.
 
-*Construction.* A _template_ is a question pattern with blanks, such as "What is the nearest {category} to {landmark}?", paired with a database query that fills those blanks and computes the correct answer at the same time. Because the answer comes from the database rather than from a person or a model, it is correct by construction and can be recomputed whenever the map changes. GS-QA builds a PostGIS database from a February 2024 US OpenStreetMap extract (267,612 points of interest, plus parks, lakes, roads and administrative regions) and crosses five spatial relationships (nearest neighbour, within a radius, in a compass direction, in the direction of a second landmark, and overlapping a region) with eight answer types, keeping the 28 combinations that produce natural questions. One thousand questions are generated per template and down-sampled to 100 for diversity, giving 2,800; 10% are reviewed by hand. Two templates deliberately require a fact the database does not store, forcing a system to combine the map with Wikipedia; we call these _two-source_ questions throughout.
+Vietnamese question answering is active, but we found no geospatial benchmark for the language. UIT-ViQuAD #cite("nguyen2020uitviquad") established reading comprehension over Vietnamese Wikipedia, later extended to community health questions #cite("thai2022vicov19qa") and spoken input #cite("minh2026visqa"). VIMQA #cite("le2022vimqa") is closest in spirit to our two-source questions, but its location answers are place names retrieved from text, not positions computed from geometry. ViText2SQL #cite("nguyen2020vitext2sql"), roughly 10,000 question–query pairs from translating Spider #cite("yu2018spider") into Vietnamese, is the closest structural relative to our Text2SQL baseline: its monolingual PhoBERT #cite("nguyen2020phobert") beats multilingual XLM-R, but its Spider databases carry no spatial operator.
 
-*Baselines and findings.* Three LLMs (GPT-4o, Claude Sonnet 4.6, Ministral-3) are crossed with three strategies (bare prompting, Text2SQL, and retrieval-augmented generation) for nine configurations plus a random baseline. Answers are scored by token F1 on free text and then, after parsing into a fixed schema, by type-specific measures. The best configuration is Sonnet with Text2SQL at 0.23 average F1 against 0.07 for bare Sonnet. Text2SQL beats both alternatives throughout; two-source questions fail almost completely; compass-direction questions sit at chance for most systems; and configurations given more context _attempt_ fewer questions, which the authors read as appropriate abstention.
-
-== SPARTQA <sec:spartqa>
-
-SPARTQA targets textual spatial reasoning, where bAbI Task 17 was previously the only dedicated dataset and is too simple: three objects, four directions, at most two reasoning steps. It releases 1.1k QA pairs written by annotators over visual scenes, where experts score 92%, and some 93.7k generated by grammars and reasoning rules applied to a stored scene graph rather than raw text. Further pretraining BERT on the automatic data lifts accuracy on the human set from 30.17 to 47.25, while a stories-only ablation reaching 32.90 shows the gain comes from the annotations rather than from more text; it transfers to bAbI and boolQ, though human performance at 92.31 stays far above every model. The relevant lesson for us is methodological: rule-based generation validated on a human-checked sample is an accepted way to build a language resource.
-
-== Vietnamese Language Resources <sec:vnresources>
-
-Vietnamese question answering is active, but no geospatial benchmark exists for the language. UIT-ViQuAD @nguyen2020uitviquad established reading comprehension over Vietnamese Wikipedia, and VIMQA @le2022vimqa is closest in spirit to our two-source questions, with over 10,000 multi-hop questions and sentence-level supporting facts; 15% of its answers are locations, but they are place names retrieved from text, not positions computed from geometry, and nothing in it requires a distance or a direction. Later work extends the format to community health questions @thai2022vicov19qa and spoken input @minh2026visqa. None is grounded in a map.
-
-ViText2SQL @nguyen2020vitext2sql is the closest structural relative to our Text2SQL baseline: roughly 10,000 question–query pairs produced by translating Spider into Vietnamese. Its findings bear on our setting: word segmentation improves parsing, schema linking needs corpus statistics rather than string overlap, and the monolingual PhoBERT beats multilingual XLM-R. Its databases, however, are Spider's synthetic academic schemas, so no query involves a spatial operator. Separately, normalizing Vietnamese addresses is a recognized practical problem tackled mostly by engineering tools rather than benchmarks, and it became harder on 1 July 2025, when Vietnam consolidated 63 provincial-level units into 34 and abolished the district (_quận/huyện_) tier outright @vnreform2025. Crowd-sourced map data updates unevenly after such a change, so any nearby snapshot mixes pre- and post-reform naming; we preserve OpenStreetMap's orthography verbatim (@sec:locgold).
-
-== Positioning
-
-VN-GeoQA inherits GS-QA's contract of 28 templates, SQL-computed gold and spatial-aware metrics, together with SPARTQA's paradigm of rule-based generation validated on a human-checked sample. We differ from GS-QA in language, region, address semantics, and baseline scope: we evaluate two of its three baseline families and omit RAG. We differ from SPARTQA in operating over real OSM geometry rather than synthetic scenes, and in not running its language-model pretraining branch. Against the Vietnamese resources above, our distinguishing property is that answers are computed from geometry rather than retrieved from text.
+Against all of the above, the distinguishing property of VN-GeoQA is that answers are computed from geometry rather than retrieved from text, over real OSM data rather than synthetic scenes.
 
 = The VN-GeoQA Dataset <sec:dataset>
 
-== How a Question Is Made
+== Construction <sec:construction>
 
-Every question is written by a program and its answer computed by a database rather than typed by a person. Walking through one question end to end is the quickest way to see why the rest of the design follows.
+Every question is written by a program and its answer computed by a database rather than typed by a person. We take one dated OpenStreetMap extract of Vietnam #cite("osm") rather than the rolling one, check its checksum, and load it into PostGIS, which answers questions about distance, direction and containment that a plain file cannot. The map lands in five tables, 38,207 points of interest plus regions, parks, lakes and roads, each point carrying its name, a category, narrowing tags, its coordinates and up to eight address fields (@sec:locgold), the schema staying small because a Text2SQL model must be shown it in the prompt.
 
-We start from a map. OpenStreetMap publishes a downloadable extract of Vietnam; we take one dated copy rather than the rolling one and check its checksum, so a rebuild six months from now reads the same data. It is loaded into a spatial database, which can answer questions about distance, direction and containment that a plain file cannot.
+Generation draws a landmark, fills the blank, and runs the template's query. The returned row _is_ the gold answer, computed by the same database the baselines later query. A candidate whose answer set is empty or ambiguous, or that includes the landmark itself, is discarded and a new landmark drawn. This is what makes the process repeatable: the same seed against the same map produces the same 2,800 questions byte for byte, verified by generating twice and comparing (@fig:pipeline, @sec:appendix-templates). Two templates ask for something the map does not know, such as the year a building opened, meaningful only if the fact is genuinely absent: at release time we check that none of the attributes they use appears anywhere in the database, failing closed. The outside facts come from a frozen copy of Wikipedia, so generation never touches the network.
 
-Next we pick a template, say _which café is nearest to {landmark}_. The program draws a real landmark from the map at random but reproducibly, perhaps Notre-Dame Cathedral in Ho Chi Minh City, fills the blank, and runs the query belonging to that template. The database returns one row, and _that row is the gold answer_. Nobody decides what is correct; the map does.
+The benchmark contains seven kinds of question: the nearest place of a category to a landmark, every place within a radius, each restricted by compass direction, by the line towards a second landmark, or by a non-spatial filter such as "seafood", aggregates over a province or city, and two-source questions. Since the "total area" of one nearest café makes no sense, the 28 templates are the natural combinations of kind and answer type rather than the full product (@tab:templates, @sec:appendix-templates). Of the 2,800 questions, 1,100 expect a place name, 800 an address, 200 each a compass direction, a count and a distance, 100 each total area, length and a two-source fact, samples appear in @tab:samples (@sec:appendix-samples).
 
-The candidate then has to pass a few checks: the answer set must not be empty, or the question is unanswerable; it must not be ambiguous, or two answers would be equally right; and the landmark must not appear in its own answer list. A failing candidate is discarded and a new landmark drawn. Nothing is patched up, which is what makes the process repeatable: the same seed against the same map produces the same 2,800 questions byte for byte, verified by generating them twice and comparing. @fig:pipeline in the appendix diagrams the loop. Only then is the question phrased in Vietnamese and checked once more by a verifier.
+Each template is written in several Vietnamese phrasings rather than one, so models are not rewarded for memorising a single sentence shape: 128 phrasings across 28 templates. Every question is also stored with diacritics stripped, so _quán cà phê_ becomes _quan ca phe_, mirroring how Vietnamese is often typed. Target categories keep OSM tag granularity across 26 sub-categories, refined for the filter templates through a Vietnamese label lexicon (for example _restaurant_ expands to _nhà hàng món Việt_), all 26 non-empty in the address-bearing pool of @sec:locgold.
 
-== What the Database Holds
+== Location Gold <sec:locgold>
 
-The map is loaded into five tables: 38,207 points of interest, plus regions, parks, lakes and roads. Points anchor the "nearest" and "within a radius" questions, the polygon tables support containment and area, and roads support length. Keeping the schema small matters twice over, since a Text2SQL model must be shown it in the prompt. Each point of interest carries its name, a broad category such as restaurant or museum, tags that narrow that category so "a restaurant" becomes "a seafood restaurant", its coordinates, and up to eight address fields, which @sec:locgold explains. A few places link to their Wikipedia entry, though no fact from it is stored.
+GS-QA scores location answers on address text F1 and a Nominatim-geocoded distance, with a flat, U.S.-style gold string. Vietnamese addresses are hierarchical and administratively ordered, so a flat string discards the structure under test, and Nominatim's uneven Vietnamese coverage would bake the geocoder's errors into gold. We therefore take gold directly from OSM `addr_*` tags, compose the canonical string deterministically, and confine the geocoder to the prediction side.
 
-*Keeping two-source questions honest.* Two of the templates ask for something the map does not know, such as the year a building opened. These are only meaningful if the fact is genuinely absent; otherwise a system could answer by reading one more column instead of consulting an outside source. We therefore check at release time that none of the eight attributes those questions use appears anywhere in the database, and the check fails closed. The outside facts come from a frozen copy of Wikipedia, so generation never touches the network.
+A POI qualifies as address-bearing if it has a street or place name _and_ at least one broader locator, which yields 5,321 POIs. Coverage is uneven: 13,857 POIs carry a street name but only 72 a `place` and 7 a `suburb`, and district, city and province each cover roughly 4,500 to 4,800, differently, so the criterion accepts any of them. Gold comprises `geo_wkt` (driving the distance measure), the eight verbatim `addr_*` components with orthography frozen as OSM records it (including _Bắc Ninh_ beside _Bac Ninh_), and one deterministic canonical string. Nearest gold is the closest address-bearing candidate, radius gold the full distance-ordered set, median 2–6, maximum 542.
 
-== What the Questions Ask <sec:whatweask>
+*Quality control.* Six gates guard the release, from a database rebuild and a smoke run to `diff -r`-clean regeneration, human review of five records per template, static runner checks and a release restore reproducing the original table counts. Every record is additionally checked for Unicode normalization, unreplaced placeholders, landmark exclusion, duplicates, well-formed gold SQL and canonical-string recomputability. Where GS-QA reviews 10% of its questions by hand, we verify 100% automatically and 5% by hand.
 
-The benchmark contains seven kinds of question: the nearest place of a category to a landmark; every place within a radius; either restricted to a compass direction, to the line towards a second landmark, or by a non-spatial filter such as "seafood"; aggregates over a province or city; and two-source questions. Not every kind combines with every answer type, since the "total area" of one nearest café makes no sense, so the 28 templates are the natural combinations rather than the full product (@tab:samples). The answer type matters more than it might appear: naming _which_ café is nearest and saying _where_ it is are different tasks, and a system can get the first right while failing the second, so they are scored separately.
+= Baselines <sec:method>
 
-Each template is written in several Vietnamese phrasings rather than one, so models are not rewarded for memorising a single sentence shape: 128 phrasings across 28 templates. Every question is also stored with diacritics stripped, so _quán cà phê_ becomes _quan ca phe_, mirroring how Vietnamese is often typed and supporting a robustness study without regenerating the dataset.
+We evaluate two 9B open models, Ornith-1.5-9B #cite("ornith2026") and Qwen3.5-9B #cite("qwen35"), both NVFP4 4-bit quantized so each fits on a single GPU, served through vLLM #cite("kwon2023vllm").
 
-The sub-category lexicon preserves OSM tag granularity in Vietnamese: _restaurant_ expands to _nhà hàng món Việt_, _quán mì và phở_, _nhà hàng hải sản_, and further variants, with analogous entries for cafés, museums, and hospitals. All 26 sub-categories are non-empty in the address-bearing pool.
+*Direct.* The question goes to the model and the answer comes back, with no database and no retrieval (top of @fig:baselines). This measures what the model has memorized about Vietnamese places.
 
-== Sample Records <sec:samples>
+*Text2SQL.* Three stages (@fig:baselines, beneath). The model receives the schema and the question and writes SQL. PostgreSQL executes it against the same database that produced the gold answer, and the model narrates the returned rows in Vietnamese. A wrong answer is thus a reasoning or query-construction failure rather than a data mismatch, the stored stages localizing failures to generation, execution or narration (@sec:discussion).
+
+*Scope, decoding, provenance.* We evaluate two of GS-QA's three baseline families, omitting dense-retrieval RAG for compute reasons, so the Text2SQL-versus-Direct gap is not directly comparable to GS-QA's best configuration. One decoding profile is frozen across all four runs (temperature 1.0, top-$p$ 0.95, top-$k$ 20, presence penalty 1.5, seed 42, reasoning enabled), so run differences come from the model and the baseline rather than from sampling. Every run is sealed by a checksum binding model, baseline, dataset, prompts and raw outputs. Malformed JSON is retried, a well-formed but wrong answer never is.
+
+== A Zero-LLM Rescue Intervention <sec:rescue>
+
+Inspecting Text2SQL failures revealed a recoverable class: the SQL runs, returns usable typed rows, and the model still emits no answer, so the score sits at the unattempted floor although the correct value is present in the executed rows. We therefore pre-register a zero-inference intervention on Ornith with Text2SQL. It fires only when the sealed run has no candidate answer, so answered questions are never touched and a per-question score can only improve or tie, asserted after every evaluation. The executed rows are re-emitted through the parser's own output shape: the first non-empty name column for entities, the address column or the canonical string rebuilt from `addr_*` for locations, the corresponding typed column otherwise. Two-source questions are never rescued, since the database cannot hold their answer. Making no model call, no retrieval and no prompt change, the intervention isolates how much measured failure is formatting rather than reasoning.
+
+= Experimental Setup <sec:setup>
+
+Two models crossed with two baselines give four sealed runs and 11,200 predictions. All free-text answers are parsed into a fixed JSON schema by one fixed parser, Ornith-1.5-9B under a frozen prompt and decoding profile, for all four runs, so the comparison uses the same parsing setup everywhere (for Qwen runs the parser differs from the generator). Address predictions are geocoded with Nominatim under its bulk-use policy (1 request per second). The accompanying notebook restores the sealed artifacts, reruns test evaluation, the rescue and the error analysis, and replays a five-question Vietnamese demo from published steps, so the full workflow executes without an inference server.
+
+== Metrics <sec:metrics>
+
+Text is normalized by Unicode NFKC, case folding and punctuation-to-space replacement, diacritics preserved, and tokens are the whitespace-separated words of the result. For the token multiset overlap $|p inter g|$ of prediction tokens $p$ and gold tokens $g$, counted with multiplicity, precision, recall and F1 are
+$
+  P = frac(|p inter g|, |p|), quad R = frac(|p inter g|, |g|), quad F_1 = frac(2 P R, P + R),
+$
+all higher-better on $[0, 1]$. Numeric answers (count, distance, area, length) are valid only as finite numbers after unit normalization (km to m, ha to m^2, counts integral), scored by the relative error capped at 1:
+$
+  E_"rel"(hat(y), y) = cases(min(frac(|hat(y) - y|, |y|), 1) " if" y != 0, 1 " otherwise") quad "with" E_"rel" = 0 " when" hat(y) = y.
+$
+Direction answers carry an azimuth in degrees, scored by the circular error normalized to $[0,1]$ and by token F1 over the eight Vietnamese sector labels (e.g. _bắc_ north, _đông nam_ southeast) the azimuths map to. Location answers are scored by address text F1 and by geodesic distance, the WGS84 distance $d$ from the Nominatim #cite("nominatim")-geocoded prediction to the gold geometry centroid:
+$
+  E_"circ"(hat(a), a) = frac(|((hat(a) - a + 180) mod 360) - 180|, 180), quad E_"geo" = min(frac(d, "500 km"), 1).
+$
+
+When several prediction or gold candidates are present (radius gold is a full distance-ordered set), the score reduces to the best applicable pair, maximizing $F_1$ for text metrics and minimizing the error otherwise, ties toward earlier candidates. A question is _attempted_ when the parsed output yields at least one valid candidate for its family, and unattempted questions remain in every mean at the worst case, $F_1 = 0$ or $E = 1$. All errors are lower-better on $[0, 1]$.
+
+The metrics above are the official scores. Two further notions stay separate from them: for overview counts and the error taxonomy we call a question _correct_ under analysis-only thresholds, $F_1 >= 0.5$ or $E <= 0.1$ on the family's primary metric, which never enter the reported means, and the taxonomy labels a Direct question _refused_ when parsing succeeded but no candidate was emitted.
+
+*Dev/test split.* We freeze the split before touching test data: within each template, questions are ranked by the hash of a fixed salt and their identifier, the first 20 of 100 going to dev, giving 560 dev and 2,240 test questions with no training split. The sealed artifacts are read-only, the intervention scored by importing the evaluator verbatim. Baseline aggregates track closely across the halves, location distance error 0.670 on dev against 0.643 on test, while direction text F1 diverges most, 0.712 against 0.552, so we read split differences of that size as sampling variation.
+
+
+#figure(
+  [#set text(size: 8pt)
+    table(
+    columns: (1fr, auto, auto, auto, auto, auto, auto),
+    stroke: none,
+    align: (left, center, center, center, center, center, center),
+    table.hline(),
+    table.header(
+    [*Family*],
+    [*Metric*],
+    [O/D],
+    [Q/D],
+    [O/T2S],
+    [Q/T2S],
+    [+R],
+    ),
+    table.hline(stroke: 0.5pt),
+    [full (2,800)], [att. $arrow.t$], [20.9%], [27.2%], [*54.2%*], [51.5%], [],
+    [], [corr. $arrow.t$], [2.8%], [2.8%], [*32.4%*], [29.3%], [],
+    table.hline(stroke: 0.25pt),
+    [entity], [F1 $arrow.t$], [0.031], [0.055], [*0.278*], [0.269], [0.440],
+    [location], [F1 $arrow.t$], [0.054], [0.058], [*0.387*], [0.290], [0.436],
+    [], [dist $arrow.b$], [0.936], [0.974], [*0.643*], [0.680], [0.589],
+    [direction], [F1 $arrow.t$], [0.078], [0.045], [*0.552*], [0.400], [0.571],
+    [], [ang. $arrow.b$], [0.918], [0.942], [*0.433*], [0.577], [0.414],
+    [distance], [rel $arrow.b$], [0.972], [0.950], [*0.645*], [0.665], [0.568],
+    [count], [rel $arrow.b$], [0.954], [0.959], [*0.570*], [0.554], [0.570],
+    [area], [rel $arrow.b$], [0.968], [0.963], [*0.711*], [0.793], [0.711],
+    [length], [rel $arrow.b$], [0.955], [0.891], [*0.675*], [0.742], [0.675],
+    [textual_fact], [F1 $arrow.t$], [0.000], [0.000], [0.000], [0.000], [0.000],
+    table.hline(),
+    )],
+  caption: [Sealed runs (O = Ornith-1.5-9B, Q = Qwen3.5-9B, D = Direct, T2S = Text2SQL) and the zero-LLM intervention (+R, Ornith with Text2SQL, @sec:rescue). First two rows: full-benchmark rates over 2,800 questions, _attempted_ = at least one valid parsed candidate, _correct_ = analysis-only thresholds of @sec:metrics, +R empty (test-scoped). Other rows: per-family means over the 2,240 test questions (entity 880, location 640, direction 160, distance 160, count 160, area 80, length 80, textual_fact 80), unattempted at worst case. $arrow.t$ higher-better, $arrow.b$ lower-better. Bold = best of the four runs, excluding +R.],
+) <tab:fourruns>
+
+*Direct versus Text2SQL.* Under the evaluated configurations, database access separates the runs (@tab:fourruns). Ornith with Direct leaves 2,214 of 2,800 questions unattempted (79.1%), refusals concentrating on entity questions, 904 of 1,100, and locations, 572 of 800. Qwen with Direct refuses less (2,039) yet passes the thresholds on only 79, so its extra attempts are mostly wrong. Text2SQL engages every family for both models and improves every per-family test metric over Direct, consistent with GS-QA's English finding, sharper in one respect: without database access, a 9B model asked about Vietnamese places mostly declines to guess.
+
+*The rescue.* The intervention recovers 222 of 2,240 test questions with zero regressions, lifting entity F1 by 0.162 and cutting distance relative error by 0.078 without a model call (the +R column of @tab:fourruns). Every family that improved on dev improved on test with matching sign and magnitude: much of the apparent failure was a model retrieving the right rows and failing to say so. Count, area, length and two-source questions produce no rescue candidates.
+
+Two-source (textual_fact) F1 is 0.000 for every run, the benchmark working as designed: neither baseline can consult Wikipedia and the verifier guarantees the answer's absence from the schema. Ornith/Text2SQL compass error, 0.433, sits just below the 0.5 of random guessing.
+
+= Error Analysis <sec:discussion>
+
+Every question of the Ornith/Text2SQL run is classified by failure stage and flagged for Vietnamese phenomena (@tab:taxonomy, @sec:appendix-taxonomy).
+
+*The expected Vietnamese failure mode does not occur.* We anticipated diacritic corruption in place names as a leading error class. It is not: across a full run at most 9 predictions match gold only after stripping diacritics from both, because NFKC normalization already equates composed and decomposed forms. Compass vocabulary is likewise sound, with only 14 answers naming a sector inconsistent with the azimuth they state, so the weakness is in the azimuth, not the Vietnamese terms.
+
+*Geocoding is the recurring language-specific friction.* Of the 471 location questions where Ornith with Text2SQL produced candidates, 219 contain a predicted address Nominatim cannot resolve, 46%, against 139 for Qwen with Text2SQL and 175 for Ornith with Direct, reflecting how Vietnamese component order and postcode format diverge from what the geocoder expects. These questions still score through address text F1, but their spatial error is then governed by whatever the geocoder returns instead, which is why location distance error stays high even where the model named the right place. SQL generation dominates the remaining failure: for entity questions 100 statements errored and 280 ran to no rows, the largest single error class a subquery used as an expression while returning multiple rows, 107 of 295 erroneous statements. Qwen generates worse SQL, 209 entity errors against 100, while area and length fail at availability, with 34 and 43 cases of rows carrying no aggregate the family needs.
+
+= Limitations <sec:limitations>
+
+Our scope is narrow by design: two of GS-QA's three baseline families, two 9B models, one decoding profile, and runs differing from GS-QA's English ones in models, region and snapshot, so we make no claims at the level of model families and do not claim Vietnamese is harder. The intervention recovers only the refusal floor: attempted-but-wrong answers and failed queries are untouched, and area, length and two-source questions cannot be rescued. Location rescue may emit an address formatted differently from gold while naming the same place, so the reported F1 gains understate spatial recovery, and the location metric inherits Nominatim's coverage.
+
+The benchmark inherits its source: OpenStreetMap coverage of Vietnam is denser in Hà Nội and Ho Chi Minh City than in rural provinces, with mapper noise present. We record these rather than patch them, since correcting crowd-sourced data would break reproducibility. The snapshot postdates the July 2025 administrative reform #cite("vnreform2025"), so address tags reflect a re-tagging still in progress.
+
+= Ethical Considerations <sec:ethics>
+
+VN-GeoQA is built from OpenStreetMap data under the OpenDbL licence and from Wikipedia infobox values under CC-BY-SA, and the release names both sources, links the exact snapshot and excludes residential buildings. Nominatim is used only on the prediction side within its bulk-access policy, and the dataset contains public map data and no personal information. A system optimized against fixed templates may overfit question shapes rather than improve spatial reasoning, mitigated but not eliminated by the 128 surface phrasings, and model outputs, including failures, are preserved verbatim rather than curated.
+
+= Conclusion <sec:conclusion>
+
+VN-GeoQA brings the GS-QA construction contract to Vietnamese address structure with byte-identical regeneration. Text2SQL attempts more than twice as many questions as Direct, scores best on every family, and the zero-LLM intervention recovers 222 test questions without regressions. Diacritics contribute almost nothing to residual error, address geocoding remains the measurable language-specific obstacle.
+
+#add-bib-resource(read("references.bib"))
+#print-acl-bibliography()
+
+#show: it => appendix(it, clearpage: false)
+
+= Sample Records <sec:appendix-samples>
+
+@tab:samples shows six example records spanning six templates and six answer types. Two details are worth drawing out. First, the anchor landmark is stored by OSM identifier alongside its name, so a question can be traced back to the exact map feature that generated it and regenerated if that feature changes. Second, the gold answer for an address question is the set of tags the database returned rather than a string the generator wrote, with the readable form derived from them, which is what allows the canonical string to be recomputed and checked at verification time.
 
 #figure(
   table(
@@ -127,161 +214,15 @@ The sub-category lexicon preserves OSM tag granularity in Vietnamese: _restauran
     [`knn+name`\ `+two_source`],
     [Chùa gần Kinh thành Huế nhất được xây dựng năm nào?\ #text(size: 0.85em, style: "italic")[Year the pagoda nearest Huế Citadel was built?]],
     [external],
-    [1601 #text(size: 0.85em, style: "italic")[(Wikipedia; not in the schema)]],
+    [1601 #text(size: 0.85em, style: "italic")[(Wikipedia, not in the schema)]],
     table.hline(),
   ),
-  caption: [Sample records spanning six templates and six answer types. Glosses are for the reader; the dataset is Vietnamese only. Location gold carries both a composed address and a geometry, scored by separate measures. The last row is a two-source question. Every question is also stored with diacritics removed (_Quan ca phe gan Nha tho Duc Ba..._).],
+  caption: [Sample records spanning six templates and six answer types. Glosses are for the reader, the dataset itself Vietnamese only. Location gold carries both a composed address and a geometry, scored by separate measures. The last row is a two-source question. Every question is also stored with diacritics removed (_Quan ca phe gan Nha tho Duc Ba..._).],
   placement: auto,
   scope: "parent",
 ) <tab:samples>
 
-@tab:samples gives six example records, and @sec:appendix-prompts shows a complete stored record. Two details are worth drawing out. First, the anchor landmark is stored by OSM identifier alongside its name, so a question can be traced back to the exact map feature that generated it and regenerated if that feature changes. Second, the gold answer for an address question is not a string the generator wrote but the set of tags the database returned, with the readable form derived from them, which is what allows the canonical string to be recomputed and checked at verification time.
-
-== Location Gold <sec:locgold>
-
-GS-QA scores location answers on address text F1 and on a Nominatim-geocoded distance, but its gold address is a flat, U.S.-style string. Two properties of Vietnamese make that unsuitable. Addresses here are hierarchical and administratively ordered, so a flat string discards the structure the task is testing; and Nominatim's Vietnamese coverage is uneven, so a geocoded gold would bake the geocoder's errors into the benchmark. We therefore take gold directly from OSM `addr_*` tags, compose the canonical string deterministically, and confine the geocoder to the _prediction_ side.
-
-A POI qualifies as address-bearing if it has a street or place name _and_ at least one broader locator, which yields 5,321 POIs. Coverage is very uneven: a street name is present on 13,857 POIs but `place` on 72 and `suburb` on 7, while district, city and province each cover roughly 4,500 to 4,800 and not the same ones, which is why the criterion accepts any of them. The alternatives are worse: street alone admits names that repeat across cities, requiring a house number drops the pool to 4,020, and a city name is not a point. The pool spans all three regions, led by Hà Nội (1,464), Bắc Ninh (643) and Ho Chi Minh City (roughly 552 across three OSM spellings).
-
-Gold comprises `geo_wkt`, which drives the distance measure; the eight verbatim `addr_*` components with orthography frozen as OSM records it, including mixed forms such as _Bắc Ninh_ beside _Bac Ninh_; and one deterministic canonical string. Nearest gold is the closest address-bearing candidate; radius gold is the full distance-ordered set, median 2–6 and maximum 542.
-
-== Distribution and Quality Control
-
-Of the 2,800 questions, 1,200 expect the name of a place, 800 an address, and 200 each a compass direction, a count, and a distance, with 100 each for total area and total length.
-
-Generation proceeds by sampling a landmark from a fixed seed, executing the template's query, validating the answer set, filling a Vietnamese phrasing, and writing the record, followed by a verifier pass.
-
-Six gates guard the release: a database rebuild, a smoke run, full generation of all 2,800 questions, regenerating `diff -r`-clean, human review of five records per template, static checks on the runners, and a restore from the published release reproducing the original table counts. Every record is additionally checked for Unicode normalization, unreplaced placeholders, exclusion of the landmark from its own answer set, duplicates, well-formed gold SQL, and, on address questions, a geometry and an address whose canonical string recomputes from the stored components. Where GS-QA reviews 10% of its questions by hand, we verify 100% automatically and 5% by hand.
-
-= Baselines <sec:method>
-
-We evaluate two 9B-parameter open models, Ornith-1.5-9B @ornith2026 and Qwen3.5-9B @qwen35, both in the NVFP4 4-bit quantized format so that each fits on a single GPU, and both served through a vLLM inference server.
-
-#figure(
-  image("figures/fig1_baselines.svg", width: 90%),
-  caption: [The two baselines. Direct tests what a model knows about Vietnamese geography; Text2SQL tests whether it can express a spatial question as a query. Each Text2SQL stage is stored separately, so a failure can be attributed to query generation, execution, or narration rather than to the pipeline as a whole.],
-  placement: auto,
-) <fig:baselines>
-
-*Direct.* The question goes to the model and the answer comes back, with no database and no retrieval, shown at the top of @fig:baselines. This measures what the model has memorized about Vietnamese places, which is the condition an ordinary user meets when asking a chat assistant for directions.
-
-*Text2SQL.* Three stages, shown beneath it. The model receives the schema and the question and writes SQL; PostgreSQL executes it against the same database that produced the gold answer; the model narrates the returned rows in Vietnamese. Using the identical database means a wrong answer is a reasoning or query-construction failure rather than a data mismatch. The three stages are stored separately, so failures localize to generation, execution or narration (@sec:discussion).
-
-*Scope.* GS-QA evaluates three baseline families. We evaluate two, omitting dense-retrieval RAG for compute reasons. Our Text2SQL-versus-Direct gap is consequently a comparison over two options rather than three, and is not directly comparable to GS-QA's best-configuration result.
-
-*Decoding.* One frozen profile across all four runs (temperature 1.0, top-$p$ 0.95, top-$k$ 20, presence penalty 1.5, seed 42, reasoning enabled), so differences between runs come from the model and the baseline rather than from sampling.
-
-*Provenance.* Every run is sealed: a single checksum binds the model, the baseline, the dataset, the prompts and the raw outputs, so any result traces back to the exact inputs that produced it. Retries are structural only, meaning malformed JSON is retried and a well-formed but wrong answer never is.
-
-== A Zero-LLM Rescue Intervention <sec:rescue>
-
-Inspecting Text2SQL failures revealed a recoverable class: the SQL runs, returns usable typed rows, and the model still emits no answer, so the score sits at the unattempted floor although the correct value is present in the executed rows.
-
-We therefore pre-register a zero-inference intervention on Ornith with Text2SQL. It fires only when a sealed run has no candidate answer at all, so answered questions are never touched and a per-question score can only improve or tie, which we assert after every evaluation. The executed rows are then re-emitted through the parser's own output shape: the first non-empty name column for entities, the address column or the canonical string rebuilt from `addr_*` for locations, and the corresponding typed column otherwise. Two-source questions are never rescued, since the database cannot hold their answer.
-
-The intervention is deliberately dull: no model call, no retrieval, no prompt. Its effect isolates how much measured failure is a formatting gap rather than a reasoning gap.
-
-= Experimental Setup <sec:setup>
-
-Two models crossed with two baselines give four sealed runs and 11,200 predictions. Following GS-QA we apply Unicode NFKC normalization, case folding and punctuation separation while preserving diacritics, then compute token precision, recall and F1. These measure the overlap between the words a system produced and those in the gold answer, so a nearly-right place name scores partial credit rather than zero.
-
-*Dev/test split.* To evaluate the intervention honestly we freeze a split before touching test data. Within each template, questions are ranked by the hash of a fixed salt and their identifier, and the first 20 of 100 go to dev, giving 560 dev and 2,240 test questions with no training split. The rule is deterministic and re-derivable, the sealed artifacts are read-only, and the intervention arm is scored by importing the evaluator verbatim. Baseline aggregates track each other closely across the halves: location distance error is 0.670 on dev against 0.643 on test.
-
-*Parsing and geocoding.* A single model, Ornith-1.5-9B, parses every answer from both evaluated models and both baselines into a fixed schema under one frozen prompt, so no model parses its own output. Address answers are then scored on text F1 and, after geocoding with Nominatim, on distance from the gold geometry capped at 500 km, so 0.01 is five kilometres. Compass answers map to eight Vietnamese sectors scored by circular error over 180; numeric answers require finite values with units normalized and counts integral, with relative error capped at 1; radius questions are scored by best match over the full gold set. A question counts as _attempted_ when the parsed output carries the required field, matching GS-QA.
-
-= Results <sec:results>
-
-#figure(
-  table(
-    columns: (auto, auto, auto, auto, auto),
-    stroke: none,
-    align: (left, left, center, center, center),
-    table.hline(),
-    table.header([*Family*], [*Metric*], [*Base*], [*Rescue*], [$Delta$]),
-    table.hline(stroke: 0.5pt),
-    [entity], [F1 $arrow.t$], [0.278], [*0.440*], [$+$0.162],
-    [location], [F1 $arrow.t$], [0.387], [0.436], [$+$0.049],
-    [location], [dist $arrow.b$], [0.643], [0.589], [$-$0.055],
-    [direction], [F1 $arrow.t$], [0.552], [0.571], [$+$0.019],
-    [direction], [ang. $arrow.b$], [0.433], [0.414], [$-$0.019],
-    [distance], [rel. $arrow.b$], [0.645], [*0.568*], [$-$0.078],
-    [count], [rel. $arrow.b$], [0.570], [0.570], [$plus.minus$0.000],
-    [area], [rel. $arrow.b$], [0.711], [0.711], [$plus.minus$0.000],
-    [length], [rel. $arrow.b$], [0.675], [0.675], [$plus.minus$0.000],
-    [two-source], [F1 $arrow.t$], [0.000], [0.000], [$plus.minus$0.000],
-    table.hline(),
-  ),
-  caption: [Ornith with Text2SQL on the 2,240 test questions, before and after the zero-LLM intervention of @sec:rescue. Unattempted questions are included at the worst-case value. Area, length and two-source are unrescuable by construction: the database holds no typed aggregate for the first two and no answer at all for the third.],
-  placement: auto,
-) <tab:rescue>
-
-*Text2SQL is the only viable architecture.* The gap is not one of degree. Direct refuses roughly 82% of Vietnamese geospatial questions, answering only 77 of 2,800 correctly, Refusals concentrate on entity questions, 904 of 1,100, and on locations, 572 of 800. Text2SQL engages every family. This replicates GS-QA's central English finding, where the best Text2SQL configuration reached 0.23 average F1 against 0.07 for bare prompting, and holds more sharply here: without database access a 9B model asked about Vietnamese places mostly declines to guess.
-
-*A formatting gap, not only a reasoning gap.* The intervention recovers 222 of 2,240 test questions with zero regressions, lifting entity F1 by 0.162 and cutting distance relative error by 0.078 without a single model call. Every family that improved on dev improved on test with matching sign and magnitude, so the gain is no dev-split artifact: much of the apparent failure was a model retrieving the right rows and failing to say so.
-
-*Two other results.* Two-source F1 is 0.000, the benchmark working as designed, since neither baseline can consult Wikipedia and the verifier guarantees the answer is absent from the schema. Compass error of 0.433 sits just below the 0.5 of random guessing.
-
-= Error Analysis <sec:discussion>
-
-#figure(
-  [
-    #set text(size: 8pt)
-    #table(
-      columns: (auto, auto, auto, auto, auto, auto, auto),
-      stroke: none,
-      align: (left, right, right, right, right, right, right),
-      table.hline(),
-      table.header(
-        [*Family*],
-        rotate(-60deg, reflow: true)[*correct*],
-        rotate(-60deg, reflow: true)[*wrong*],
-        rotate(-60deg, reflow: true)[*rescuable*],
-        rotate(-60deg, reflow: true)[*no rows*],
-        rotate(-60deg, reflow: true)[*SQL err*],
-        rotate(-60deg, reflow: true)[*unusable*],
-      ),
-      table.hline(stroke: 0.5pt),
-      [entity], [313], [198], [208], [280], [100], [1],
-      [location], [275], [196], [48], [168], [46], [65],
-      [direction], [108], [22], [4], [44], [18], [4],
-      [count], [85], [92], [1], [0], [22], [0],
-      [distance], [66], [52], [24], [44], [12], [2],
-      [area], [29], [11], [0], [0], [26], [34],
-      [length], [30], [5], [0], [0], [22], [43],
-      [two-source], [1], [35], [0], [7], [28], [29],
-      table.hline(),
-    )],
-  caption: [Failure stage by family for Ornith with Text2SQL over all 2,800 questions. _Wrong_ means the model produced candidates and missed; _rescuable_ means usable rows existed but no answer was emitted; _unusable_ means rows existed with no typed value for the family. Two parse failures across the run are omitted.],
-  placement: auto,
-) <tab:taxonomy>
-
-Every question is classified by the stage at which it failed, then flagged for Vietnamese phenomena. For Text2SQL the empty-candidate cases split by what the executed SQL did: errored, returned nothing, returned usable rows, or returned rows with no typed value for that family. @tab:taxonomy gives the counts.
-
-*The expected Vietnamese failure mode does not occur.* We anticipated diacritic corruption in place names as a leading error class. It is not. Across a full run at most 9 predictions match gold only after stripping diacritics from both, because NFKC normalization already equates composed and decomposed forms. The character-level problem that motivates much Vietnamese NLP engineering is here solved by a line of Unicode handling. Compass vocabulary is likewise sound: only 14 answers name a sector inconsistent with the azimuth they state, so the weakness is in the azimuth, not the Vietnamese terms.
-
-*Geocoding is the real language-specific friction.* Of the 471 location questions where Ornith with Text2SQL produced candidates, 219 contain a predicted address Nominatim cannot resolve, 46%. The comparable counts are 139 for Qwen with Text2SQL and 175 for Ornith with Direct. Vietnamese component order and postcode format diverge from what the geocoder expects. These questions still score through address text F1, but their spatial error is then governed by whatever the geocoder returns instead, which is why location distance error stays high even where the model named the right place.
-
-*Where the rest sits.* SQL generation dominates: for entity questions 100 statements errored and 280 ran to no rows, the largest class being a subquery used as an expression while returning multiple rows, 107 of roughly 250 execution errors across the benchmark. Qwen generates markedly worse SQL, 209 entity errors against 100, while area and length fail at availability, with 34 and 43 cases where rows carried no aggregate the family needs.
-
-= Limitations <sec:limitations>
-
-Our scope is narrow by design: two of GS-QA's three baseline families, omitting retrieval-augmented generation, and two 9B models under a single decoding profile, so we make no claims at the level of model families. Our runs and GS-QA's English ones differ in models, region and snapshot, so we do not claim Vietnamese is harder. Per-family aggregates for three of four runs are pending, so cross-model comparisons rest on taxonomy counts.
-
-The intervention recovers only the refusal floor: attempted-but-wrong answers and failed queries are untouched, and area, length and two-source questions cannot be rescued. Location rescue may emit an address formatted differently from gold while naming the same place, so the reported F1 gains understate spatial recovery, and the location metric inherits Nominatim's coverage of Vietnamese addresses.
-
-The benchmark inherits its source. OpenStreetMap coverage of Vietnam is denser in Hà Nội and Ho Chi Minh City than in rural provinces, and tag reuse and mapper noise are present; we record these rather than patch them, since correcting crowd-sourced data would break reproducibility. The snapshot postdates Vietnam's July 2025 administrative reform @vnreform2025, so address tags reflect a re-tagging still in progress. OpenStreetMap data is ODbL and Wikipedia content CC-BY-SA, both requiring attribution, which the release provides; the generator excludes `building=residential`.
-
-= Conclusion <sec:conclusion>
-
-VN-GeoQA is the first reproducible Vietnamese geospatial QA benchmark: 2,800 SQL-grounded questions with native hierarchical address gold. Text2SQL is decisively right, since Direct refuses roughly 82% of questions, and a pre-registered zero-LLM intervention recovers 222 test questions without regressions. Diacritics prove solved by Unicode normalization; geocoding does not.
-
-#bibliography("references.yaml")
-
-#show: it => appendix(it, clearpage: false)
-
-= The 28 Templates <sec:appendix-prompts>
-
-Each template is a spatial predicate crossed with an answer type, and each is realized by several Vietnamese surface phrasings. @tab:templates gives the full inventory. Placeholders are `[1]` for the target category, `[2]` for the radius or the anchor, and `[3]` for a second anchor where the predicate needs one.
+== A stored record <sec:appendix-record>
 
 #figure(
   [
@@ -324,18 +265,14 @@ Each template is a spatial predicate crossed with an answer type, and each is re
     }
     ```
   ],
-  caption: [One record from the released dataset, abridged. The gold address is composed from the eight native `addr_*` tags in a fixed order; `geo_wkt` is what the distance measure is computed against. Null components are kept rather than dropped, so the canonical string is always recomputable from what is stored.],
+  caption: [One record from the released dataset, abridged. The gold address is composed from the eight native `addr_*` tags in a fixed order, and `geo_wkt` is what the distance measure is computed against. Null components are kept rather than dropped, so the canonical string is always recomputable from what is stored.],
   kind: image,
   placement: auto,
 ) <fig:record>
 
-== A stored record
+== Surface variation <sec:appendix-surfaces>
 
-@fig:record shows one complete record as released.
-
-== Surface variation
-
-Every template ships with several interchangeable phrasings, one of which is chosen at random per question. The complete set for `knn+name` (T01) is:
+Every template ships with several interchangeable phrasings, one of which is chosen at random per question. The complete set for `knn+name` (T01) is, with the gloss "which [1] is nearest to [2]?":
 
 ```
 [1] nào gần [2] nhất?
@@ -349,13 +286,21 @@ Tôi đang tìm [1] gần [2] nhất.
 
 The phrasings differ in politeness and in whether the question is an interrogative or a request, both common in Vietnamese search queries. Across all 28 templates there are 128 such phrasings.
 
-The prompt texts, the dataset manifest, and the reproduction recipe are included in the public release.
+= The 28 Templates <sec:appendix-templates>
+
+Each template is a spatial predicate crossed with an answer type, and each is realized by several Vietnamese surface phrasings. @tab:templates gives the full inventory. Placeholders are `[1]` for the target category, `[2]` for the radius or the anchor, and `[3]` for a second anchor where the predicate needs one.
 
 #figure(
   image("figures/fig3_pipeline.svg", width: 95%),
   caption: [Generation pipeline. Shaded stages reject rather than repair: a question that fails validation is discarded and the anchor resampled, so no partially-valid record reaches the release. Every stage is deterministic given the seed and the snapshot.],
   placement: auto,
 ) <fig:pipeline>
+
+#figure(
+  image("figures/fig1_baselines.svg", width: 88%),
+  caption: [The two baselines. Direct tests what a model knows about Vietnamese geography, and Text2SQL tests whether it can express a spatial question as a query. Each Text2SQL stage is stored separately, so a failure can be attributed to query generation, execution, or narration rather than to the pipeline as a whole.],
+  placement: auto,
+) <fig:baselines>
 
 #figure(
   [
@@ -487,12 +432,12 @@ The prompt texts, the dataset manifest, and the reproduction recipe are included
       [`range+count`],
       [within radius],
       [count],
-      [Có bao nhiêu `[1]` trong bán kính `[2]` từ `[3]`?],
+      [`Có bao nhiêu `[1]` trong bán kính `[2]` từ `[3]`?],
       [T24],
       [`intersects+count`],
       [region overlap],
       [count],
-      [Có bao nhiêu `[1]` ở `[2]`?],
+      [`Có bao nhiêu `[1]` ở `[2]`?],
       [T25],
       [`knn+distance`],
       [nearest neighbour],
@@ -516,7 +461,43 @@ The prompt texts, the dataset manifest, and the reproduction recipe are included
       table.hline(),
     )
   ],
-  caption: [The 28 templates, grouped by answer type: entity name (T01--T12), address (T13--T20), and the numeric and directional types (T21--T28). One surface pattern is shown per template; the released files contain 128 in total.],
+  caption: [The 28 templates, grouped by answer type: entity name (T01--T12), address (T13--T20), and the numeric and directional types (T21--T28). One surface pattern is shown per template, the released files contain 128 in total.],
   placement: auto,
   scope: "parent",
 ) <tab:templates>
+
+The prompt texts, the dataset manifest, and the reproduction recipe are included in the public release.
+
+= Error Taxonomy Details <sec:appendix-taxonomy>
+
+#figure(
+  [
+    #set text(size: 8pt)
+    #table(
+      columns: (auto, auto, auto, auto, auto, auto, auto),
+      stroke: none,
+      align: (left, right, right, right, right, right, right),
+      table.hline(),
+      table.header(
+        [*Family*],
+        rotate(-60deg, reflow: true)[*correct*],
+        rotate(-60deg, reflow: true)[*wrong*],
+        rotate(-60deg, reflow: true)[*rescuable*],
+        rotate(-60deg, reflow: true)[*no rows*],
+        rotate(-60deg, reflow: true)[*SQL err*],
+        rotate(-60deg, reflow: true)[*unusable*],
+      ),
+      table.hline(stroke: 0.5pt),
+      [entity], [313], [198], [208], [280], [100], [1],
+      [location], [275], [196], [48], [168], [46], [65],
+      [direction], [108], [22], [4], [44], [18], [4],
+      [count], [85], [92], [1], [0], [22], [0],
+      [distance], [66], [52], [24], [44], [12], [2],
+      [area], [29], [11], [0], [0], [26], [34],
+      [length], [30], [5], [0], [0], [22], [43],
+      [textual_fact], [1], [35], [0], [7], [28], [29],
+      table.hline(),
+    )],
+  caption: [Failure stage by family for Ornith with Text2SQL over all 2,800 questions. _Wrong_ means the model produced candidates and missed, _rescuable_ means usable rows existed but no answer was emitted, and _unusable_ means rows existed with no typed value for the family. Two parse failures across the run are omitted.],
+  placement: auto,
+) <tab:taxonomy>
