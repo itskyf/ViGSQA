@@ -1,6 +1,6 @@
 # T04 — Improve Frozen Baseline Failures
 
-**Status: in_progress (2026-09-05).** Evaluation protocol: the benchmark is split 20/TID dev + 80/TID test (`docs/dev_test_split_v3.0.0.json`, T04-owned). Method selection inspects **dev evidence only**; the intervention is frozen (committed) before any test aggregate is computed. Sealed T03 artifacts are read-only inputs; all intervention outputs live outside `results/evaluation/` and `cache_vi/pv-26b1ac0d/`.
+**Status: done (2026-09-05).** Evaluation protocol: the benchmark is split 20/TID dev + 80/TID test (`docs/dev_test_split_v3.0.0.json`, T04-owned). Method selection inspects **dev evidence only**; the intervention is frozen (committed) before any test aggregate is computed. Sealed T03 artifacts are read-only inputs; all intervention outputs live outside `results/evaluation/` and `cache_vi/pv-26b1ac0d/`.
 
 ## Dev/test protocol
 
@@ -57,6 +57,32 @@ Dev rescuable: **65/560 (11.6%)** — far above the pre-agreed ≥5% empty-candi
 
 65 rescued; per-question regression assert passed (0 regressions, as guaranteed by the fallback-only trigger). 328 new addresses geocoded (rescued location questions contribute one address per returned row; ~22/question).
 
-## Next
+## Freeze
 
-Freeze (commit the rescue script, split artifact, and this record state), then run `eval --split test` and record overall/per-family deltas and limitations.
+Commit `5259b7e6` ("t04: freeze records-to-answer-rescue-v1 ...") contains the rescue script, the split artifact, and the record up to the dev table above. The test evaluation ran after that commit; no per-question test evidence was inspected before it.
+
+## Test evaluation (after freeze)
+
+222/2,240 questions rescued (9.9%); per-question regression assert passed (0 regressions).
+
+| family | metric | baseline | rescue | delta |
+|---|---|---|---|---|
+| area | relative_error | 0.711 | 0.711 | +0.000 ≈ |
+| count | relative_error | 0.570 | 0.570 | +0.000 ≈ |
+| direction | text_f1 | 0.552 | 0.571 | +0.019 ↑ |
+| direction | angle_error | 0.433 | 0.414 | −0.019 ↑ |
+| distance | relative_error | 0.645 | 0.568 | −0.078 ↑ |
+| entity | text_f1 | 0.278 | 0.440 | +0.162 ↑ |
+| length | relative_error | 0.675 | 0.675 | +0.000 ≈ |
+| location | text_f1 | 0.387 | 0.436 | +0.049 ↑ |
+| location | distance_error | 0.643 | 0.589 | −0.055 ↑ |
+| textual_fact | text_f1 | 0.000 | 0.000 | +0.000 ≈ |
+
+630 new addresses geocoded for rescued location questions. Every family that improved on dev improved on test, with deltas of the same sign and similar magnitude (entity +0.162 test vs +0.160 dev; distance −0.078 vs −0.050) — the improvement is not a dev-split artifact.
+
+## Limitations
+
+- The rescue only recovers the refusal floor; it cannot fix wrong-but-attempted answers (the larger remaining class — see the T05 taxonomy) or sql-error/no-rows failures (their SQL yields nothing to rescue).
+- area/length/textual_fact are untouched by construction: their failing SQL returns no typed aggregate (area/length golds come from external measurements; textual facts are out-of-schema for the verifier).
+- Location rescue emits the row's address string, which may differ from gold formatting even when it names the same place — text F1 gains understate the true spatial recovery (distance error improves separately).
+- The intervention arm is evaluated as a merge over sealed parse records; it is not a rerun of the pipeline, so latency/cost claims about the full system do not apply (the rescue itself is deterministic and free).
