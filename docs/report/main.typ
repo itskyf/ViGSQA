@@ -7,11 +7,15 @@
   authors: make-authors(
     (
       name: "Anh Pham-Ky",
-      affiliation: [University of Science, VNU-HCM\ #email("25C0000000@student.hcmus.edu.vn")],
+      affiliation: [University of Science, VNU-HCM\ #email("25C1503361@student.hcmus.edu.vn")],
     ),
     (
       name: "Tien Dang-Anh",
       affiliation: [University of Science, VNU-HCM\ #email("25C1102267@student.hcmus.edu.vn")],
+    ),
+    (
+      name: "Thuat Nguyen-Thien",
+      affiliation: [University of Science, VNU-HCM\ #email("25C1502531@student.hcmus.edu.vn")],
     ),
   ),
 )

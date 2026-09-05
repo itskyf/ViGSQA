@@ -16,6 +16,7 @@ devDependencies:
     - googlecolab/google-colab-cli/skills/colab-operator#main
     - jupyter-ai-contrib/nb-cli/skills/notebook-cli#main
     - apcamargo/typst-skills/typst-author#main
+    - anthropics/skills/skills/skill-creator#main
   mcp:
     - name: colab-mcp
       registry: false
