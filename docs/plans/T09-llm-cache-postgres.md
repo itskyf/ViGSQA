@@ -1,6 +1,6 @@
 # T09 — LLM Cache (PostgreSQL/LangChain) + Bounded Concurrency
 
-**Status: in_progress (started 2026-08-30). Implementation and validation complete; close after user review.**
+**Status: done.** Implementation, validation, and the v3 release-asset refresh (2026-09-05, see the end of this record) are complete.
 
 ## Goal
 
@@ -82,3 +82,7 @@ Changing model / quantization / generation parameters / prompt → miss. Changin
 ## Next
 
 Resume T07 in a follow-up session: `scripts/run_official.sh --llm-concurrency 4`. Expected: `sql_generate` replays the 1,513 migrated ids as PG hits with zero model calls, re-invokes the 51 pruned ids plus the remaining 1,287, then the other three baselines continue → G6 per run → notebook Run All per T07.
+
+## v3 asset refresh (2026-09-05)
+
+After T04/T05 completed (the only new inference since the v3 official runs: the evaluation parse steps and the T05/notebook demo, all Ornith), the cache dump was re-exported and published as `llm-cache-20260905.sql.gz` on the `v3.0.0` release — 8,085,830 bytes, SHA-256 `60d9e0f2…830`, **27,674 rows**: 16,800 official generations (unchanged core), 10,859 Ornith evaluation parse-step generations (the T03 parser runs, including a pre-pin prompt variant), and 15 T05 demo generations. Restore into a scratch DB verified 27,674 rows; a fresh release download re-hashed byte-identical. It replaces `llm-cache-20260904.sql.gz` (16,800 rows), which was deleted from the release. The old row set is a strict subset of the new dump, so nothing restorable was lost. Status header alignment: closed as `done` per `docs/PLAN.md`.

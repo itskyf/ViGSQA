@@ -64,6 +64,8 @@ Five questions that appear nowhere in the benchmark (anchor names asserted absen
 
 Cards with full gold SQL, generated SQL, and answers: `results/t05/demo/demo.md` + `demo_results.json` (gitignored, regenerable via `env OPENAI_BASE_URL=… pixi run python scripts/t05_demo.py`). The demo's two misses reproduce the taxonomy's two largest non-rescuable classes on genuinely novel anchors (wrong-but-attempted selection; unfiltered generated SQL), which is the intended qualitative evidence.
 
+**Cache-asset refresh (2026-09-05):** after all T04/T05 work the LLM-cache dump was re-exported and published as `llm-cache-20260905.sql.gz` on the `v3.0.0` release (8,085,830 bytes, SHA-256 `60d9e0f2…`, 27,674 rows = 16,800 official generations + 10,859 Ornith evaluation parse-step generations + 15 demo generations; restore-verified into a scratch DB at 27,674 rows, download re-hashed byte-identical). It replaces `llm-cache-20260904.sql.gz` (16,800 rows, official generations only).
+
 ## Findings recorded for the report
 
 1. Text2SQL's largest addressable failure class was the refusal floor — recovered deterministically by T04 (test: entity +0.162 F1).
