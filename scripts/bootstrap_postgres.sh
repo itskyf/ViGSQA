@@ -49,7 +49,7 @@ fi
 LLM_CACHE_DB="${LLM_CACHE_DBNAME:-llm_cache}"
 if [[ -n "${COLAB_RELEASE_TAG:-}" ]]; then
 	DB_EXISTS="$(psql --tuples-only --no-align \
-		--set=db_name="${LLM_CACHE_DB}" \
+		--set=db_name="${LLM_CACHE_DB}" --set=db_user="${PGUSER}" \
 		--file="${SQL_DIR}/check_database.sql")"
 else
 	# Local psql runs inside the container, so the SQL arrives via stdin.
