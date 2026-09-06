@@ -1,0 +1,4 @@
+Tổng chiều dài các [1] đi qua [2] là bao nhiêu?
+Các [1] trong [2] dài tổng cộng bao nhiêu?
+Tính tổng chiều dài của các [1] tại [2].
+Tất cả [1] ở [2] có chiều dài tổng cộng là bao nhiêu?

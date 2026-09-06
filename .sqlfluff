@@ -1,0 +1,8 @@
+[sqlfluff]
+dialect = postgres
+
+# `geometry` is a PostGIS type keyword (RF04) but must stay the `pois` view
+# column name: the upstream GS-QA schema and the text2sql prompts hard-code
+# `pois.geometry`, and renaming it would break reproduction.
+[sqlfluff:rules:references.keywords]
+ignore_words = geometry

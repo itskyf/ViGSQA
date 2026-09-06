@@ -1,0 +1,23 @@
+# Runtime dependencies of the VN-GeoQA baselines (baselines.py, baselines_vi.py,
+# evaluate.py). Trimmed to what is actually imported — the RAG/shuffled English
+# baselines and their heavy extras (torch, faiss, chroma, sentence-transformers)
+# are not part of the Vietnamese pipeline.
+
+# LLM client — OpenAI-compatible /v1 endpoint (vLLM) via langchain-openai
+langchain-core>=1.2.19
+langchain-openai>=1.0.0
+
+# Database
+psycopg[binary]>=3.2.3
+psycopg2-binary>=2.9.9
+
+# Geospatial
+shapely>=2.0.1
+pyproj>=3.6.1
+geopy>=2.4.1
+
+# Data / NLP utilities
+pandas>=2.2.3
+nltk>=3.9
+num2words>=0.5.13
+tqdm>=4.66.1

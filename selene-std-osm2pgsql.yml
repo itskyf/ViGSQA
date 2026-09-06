@@ -1,0 +1,5 @@
+base: lua51
+
+globals:
+  osm2pgsql:
+    any: true

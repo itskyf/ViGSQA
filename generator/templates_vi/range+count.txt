@@ -1,0 +1,5 @@
+Có bao nhiêu [1] trong bán kính [2] quanh [3]?
+Trong phạm vi [2] từ [3] có bao nhiêu [1]?
+Đếm giúp tôi số [1] cách [3] không quá [2].
+Số lượng [1] trong vòng [2] tính từ [3] là bao nhiêu?
+Tổng cộng có mấy [1] nằm trong bán kính [2] từ [3]?

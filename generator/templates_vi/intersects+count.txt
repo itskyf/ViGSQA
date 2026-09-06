@@ -1,0 +1,5 @@
+Có bao nhiêu [1] ở [2]?
+Trong [2] có bao nhiêu [1]?
+Đếm số [1] nằm trong [2].
+Số lượng [1] tại [2] là bao nhiêu?
+Tổng cộng có mấy [1] ở [2]?

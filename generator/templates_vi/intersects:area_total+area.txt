@@ -1,0 +1,4 @@
+Tổng diện tích các [1] ở [2] là bao nhiêu?
+Các [1] trong [2] có tổng diện tích bao nhiêu?
+Tính tổng diện tích của các [1] tại [2].
+Tất cả [1] ở [2] rộng tổng cộng bao nhiêu?

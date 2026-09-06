@@ -1,0 +1,4 @@
+Các [1] trong bán kính [2] quanh [3] nằm ở hướng bao nhiêu độ?
+Góc phương vị của từng [1] trong phạm vi [2] từ [3] là bao nhiêu?
+Cho tôi biết góc phương vị của các [1] cách [3] không quá [2].
+Các [1] trong vòng [2] tính từ [3] nằm về hướng mấy độ?

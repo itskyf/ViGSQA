@@ -1,0 +1,155 @@
+Convert the provided user question to a SQL query for PostgreSQL + PostGIS.
+The question is in Vietnamese. The database holds OpenStreetMap data for Vietnam.
+
+--- Tables ---
+
+pois — points of interest
+  id, geometry, geo_wkt, poi_name,
+  addr_housenumber, addr_street, addr_place, addr_suburb, addr_district,
+  addr_city, addr_province, addr_postcode,
+  amenity, tourism, shop, leisure,
+  cuisine, museum, takeaway, outdoor_seating, delivery, emergency,
+  wikidata, wikipedia
+regions — administrative boundaries (province admin_level 4, district 6, commune 8)
+  id, region_name, admin_level, geometry, geo_wkt
+parks — leisure polygons
+  id, park_name, leisure (park, garden, nature_reserve, recreation_ground, playground),
+  geometry, geo_wkt
+lakes — water polygons and waterway lines
+  id, lake_name, water (lake, reservoir, pond, river), waterway (river, canal, stream),
+  geometry, geo_wkt
+roads — named roads (linestrings)
+  id, road_name, highway (motorway, trunk, primary, secondary, tertiary, residential),
+  geometry, geo_wkt
+
+geometry is PostGIS geography (SRID 4326, metres). geo_wkt is text — never use it
+inside spatial functions.
+
+--- Vietnamese words -> column and tag ---
+benh vien -> amenity='hospital'; phong kham -> 'clinic'; nha thuoc -> 'pharmacy'
+truong hoc -> amenity='school'; truong dai hoc -> 'university'; ngan hang -> 'bank'
+nha hang -> amenity='restaurant'; quan ca phe -> 'cafe'; don cong an -> 'police'
+buu dien -> 'post_office'; cho -> 'marketplace'; quan an nhanh -> 'fast_food'
+co so tho tu -> 'place_of_worship'; khach san -> tourism='hotel'; bao tang -> 'museum'
+diem tham quan -> 'attraction'; phong trung bay -> 'gallery'; sieu thi -> shop='supermarket'
+cua hang tien loi -> 'convenience'; tiem banh -> 'bakery'; cua hang dien tu -> 'electronics'
+cong vien -> leisure='park'; trung tam the thao -> 'sports_centre'; be boi -> 'swimming_pool'
+san van dong -> 'stadium'
+Filtered categories: nha hang mon Viet -> amenity='restaurant' AND cuisine ILIKE '%vietnamese%'
+hai san -> cuisine ILIKE '%seafood%'; mien Pho -> cuisine ILIKE '%noodle%'; Nhat -> '%japanese%'
+Han -> '%korean%'; pizza -> '%pizza%'; burger -> '%burger%'; An Do -> '%indian%'; ga ran -> '%chicken%'
+mang ve -> takeaway ILIKE '%yes%'; ngoi ngoai troi -> outdoor_seating ILIKE '%yes%'; giao hang -> delivery ILIKE '%yes%'
+quan tra sua -> amenity='cafe' AND cuisine ILIKE '%bubble_tea%'; ca phe -> cuisine ILIKE '%coffee_shop%'
+bao tang lich su -> tourism='museum' AND museum='history'; thien nhien -> museum='nature'
+benh vien co khoa cap cuu -> amenity='hospital' AND emergency ILIKE '%yes%'
+ho nuoc / ho -> lakes water IN ('lake','pond'); ho chua nuoc -> water='reservoir'
+song -> lakes waterway='river'; kenh -> waterway='canal'
+duong cao toc -> roads highway='motorway'; duong truc -> 'trunk'; duong lon -> 'primary'
+duong chinh -> 'secondary'; duong huyen -> 'tertiary'; duong dan cu -> 'residential'
+tinh / thanh pho / huyen / quan / phuong / xa -> regions.region_name ILIKE '%<ten>%'
+
+--- Spatial building blocks ---
+Reference POI by name (never hardcode coordinates):
+  (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ten>%' LIMIT 1) AS ref
+Second named place (for "towards" questions):
+  (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ten>%' LIMIT 1) AS tgt
+Region by name:
+  (SELECT geometry FROM regions WHERE region_name ILIKE '%<ten>%' LIMIT 1)
+Range:    ST_DWithin(p.geometry, ref.geometry, <metres>)
+KNN:      ORDER BY p.geometry <-> ref.geometry LIMIT 1
+Distance: ST_Distance(p.geometry, ref.geometry)              -- metres
+Azimuth:  degrees(ST_Azimuth(ref.geometry, p.geometry))      -- 0..360, 0 = north (bac)
+Area:     ST_Area(t.geometry)                                -- m2 (parks, lakes)
+Length:   ST_Length(t.geometry)                              -- m (roads, lakes)
+Intersect a region: ST_Intersects(t.geometry, (SELECT geometry FROM regions WHERE ...))
+
+--- Direction sectors: azimuth from the anchor to the candidate POI ---
+bac (N):    azimuth < 22.5 OR azimuth > 337.5
+dong bac:   BETWEEN 22.5 AND 67.5      dong (E): BETWEEN 67.5 AND 112.5
+dong nam:   BETWEEN 112.5 AND 157.5    nam (S):  BETWEEN 157.5 AND 202.5
+tay nam:    BETWEEN 202.5 AND 247.5    tay (W):  BETWEEN 247.5 AND 292.5
+tay bac:    BETWEEN 292.5 AND 337.5
+
+--- Representative patterns ---
+
+Nearest <category> to a named POI (also the base for distance/angle/location answers):
+  SELECT p.poi_name
+  FROM pois p, (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ten>%') ref
+  WHERE p.amenity ILIKE '%hospital%' AND p.poi_name IS NOT NULL
+    AND p.id <> (SELECT id FROM pois WHERE poi_name ILIKE '%<ten>%' LIMIT 1)
+  ORDER BY p.geometry <-> ref.geometry LIMIT 1
+
+POIs within a radius ("trong ban kinh / trong vong N km"):
+  SELECT p.poi_name
+  FROM pois p, (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ten>%') ref
+  WHERE ST_DWithin(p.geometry, ref.geometry, 2000) AND p.amenity ILIKE '%school%'
+
+Nearest POI in a compass direction (example: east):
+  SELECT p.poi_name
+  FROM pois p, (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ten>%') ref
+  WHERE degrees(ST_Azimuth(ref.geometry, p.geometry)) BETWEEN 67.5 AND 112.5
+    AND p.amenity ILIKE '%supermarket%'
+  ORDER BY p.geometry <-> ref.geometry LIMIT 1
+
+Nearest POI towards a second named place (corridor of +/-22.5 degrees,
+wrap-safe across 0/360 — 382.5 = 360 + 22.5, so MOD yields the minimal
+angular difference; ::numeric is required for MOD):
+  SELECT p.poi_name
+  FROM pois p,
+       (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ten1>%') ref,
+       (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ten2>%') tgt
+  WHERE MOD((degrees(ST_Azimuth(ref.geometry, p.geometry))
+             - degrees(ST_Azimuth(ref.geometry, tgt.geometry)) + 382.5)::numeric,
+            360.0) <= 45
+    AND p.amenity ILIKE '%pharmacy%'
+  ORDER BY p.geometry <-> ref.geometry LIMIT 1
+
+Count within a radius:
+  SELECT COUNT(*) AS count
+  FROM pois p, (SELECT geometry FROM pois WHERE poi_name ILIKE '%<ten>%') ref
+  WHERE ST_DWithin(p.geometry, ref.geometry, 5000) AND p.shop ILIKE '%bakery%'
+
+Distance / azimuth to the nearest POI (same WHERE as the KNN pattern):
+  SELECT p.poi_name, ST_Distance(p.geometry, ref.geometry) AS distance ...
+  SELECT p.poi_name, degrees(ST_Azimuth(ref.geometry, p.geometry)) AS angle ...
+
+Location answers (the address of the found POI, from the addr_* columns;
+the answer stage composes the address text from the returned records).
+Only POIs with address data are valid location answers — add this
+predicate to the WHERE clause:
+  (addr_street IS NOT NULL OR addr_place IS NOT NULL)
+  AND (addr_suburb IS NOT NULL OR addr_district IS NOT NULL
+       OR addr_city IS NOT NULL OR addr_province IS NOT NULL)
+  SELECT p.poi_name, p.addr_housenumber, p.addr_street, p.addr_place,
+         p.addr_suburb, p.addr_district, p.addr_city, p.addr_province,
+         p.addr_postcode ...
+
+Largest park/lake inside a region:
+  SELECT park_name FROM parks
+  WHERE ST_Intersects(geometry, (SELECT geometry FROM regions WHERE region_name ILIKE '%<tinh>%'))
+  ORDER BY ST_Area(geometry) DESC LIMIT 1
+
+Longest road crossing a region:
+  SELECT road_name FROM roads
+  WHERE ST_Intersects(geometry, (SELECT geometry FROM regions WHERE region_name ILIKE '%<tinh>%'))
+  ORDER BY ST_Length(geometry) DESC LIMIT 1
+
+Count / total area / total length inside a region:
+  SELECT COUNT(*) AS count FROM pois
+  WHERE amenity ILIKE '%cafe%'
+    AND ST_Intersects(geometry, (SELECT geometry FROM regions WHERE region_name ILIKE '%<tinh>%'));
+  SELECT SUM(ST_Area(geometry)) AS area FROM parks
+  WHERE leisure ILIKE 'garden'
+    AND ST_Intersects(geometry, (SELECT geometry FROM regions WHERE region_name ILIKE '%<tinh>%'));
+  SELECT SUM(ST_Length(geometry)) AS length FROM roads
+  WHERE highway ILIKE 'motorway'
+    AND ST_Intersects(geometry, (SELECT geometry FROM regions WHERE region_name ILIKE '%<tinh>%'));
+
+--- Rules ---
+- Alias the main table p and every name subquery (ref, tgt).
+- Use geometry for all spatial functions; never geo_wkt.
+- Exclude the anchor POI from answer rows (see the id <> pattern above).
+- Use ILIKE '%...%' for all string matching.
+- Return numbers as plain digits (distances in metres, areas in m2, lengths in m).
+- Never select geometry or geo_wkt columns in the output.
+- Output SQL only, wrapped in ```sql ... ``` fences.

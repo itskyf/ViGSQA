@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: docker.io/postgis/postgis:18-3.6
+    environment:
+      POSTGRES_DB: ${PGDATABASE}
+      POSTGRES_USER: ${PGUSER}
+      POSTGRES_PASSWORD: ${PGPASSWORD}
+    ports:
+      - 127.0.0.1:${PGPORT}:5432
+    volumes:
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: [ "CMD", "pg_isready", "--host=127.0.0.1", "--timeout=2", "--quiet" ]
+      start_period: 30s
+      start_interval: 2s
+    restart: always
+  # Official LLM backend. The runs expect this (or any OpenAI-compatible vLLM)
+  # endpoint at OPENAI_BASE_URL, default http://127.0.0.1:8000/v1 — start it
+  # separately from the runners, which only probe it.
+  # VLLM_MODEL selects which repo id to serve, e.g.:
+  #   VLLM_MODEL=ornith-ai/Ornith-1.5-9B-NVFP4 \
+  #     podman compose up -d --force-recreate vllm
+  # --reasoning-parser qwen3 keeps <think> content out of `content`; no
+  # --served-model-name, so the served id equals the HF repo id.
+  vllm:
+    image: docker.io/vllm/vllm-openai:v0.28.0
+    command: [ "${VLLM_MODEL:-AxionML/Qwen3.5-9B-NVFP4}", "--language-model-only", "--reasoning-parser", "qwen3", "--max-model-len", "auto" ]
+    devices:
+      - nvidia.com/gpu=all
+    environment:
+      HF_TOKEN: ${HF_TOKEN}
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface:Z
+    ipc: host
+    ports:
+      - 127.0.0.1:8000:8000
+    healthcheck:
+      test: [ "CMD", "curl", "--request", "GET", "--fail", "--silent", "--show-error", "--output", "/dev/null", "--max-time", "2", "http://localhost:8000/health" ]
+      start_period: 15m
+      start_interval: 5s
+    restart: always
+volumes:
+  postgres:

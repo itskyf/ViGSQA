@@ -1,0 +1,30 @@
+What [1] can I find within [2] when heading from [3] toward [4]?
+Which [1] are available within [2] along the route from [3] to [4]?
+What [1] exist within a [2] range as I move toward [4] from [3]?
+Which [1] can I find inside [2] on the way to [4] from [3]?
+What [1] are present within [2] while traveling from [3] toward [4]?
+Which [1] lie within [2] along the path to [4] from [3]?
+What [1] can I find within [2] as I go from [3] to [4]?
+Which [1] are available within a [2] radius on the route toward [4]?
+What [1] are located within [2] in the direction of travel from [3] to [4]?
+Which [1] can I find within [2] while progressing toward [4] from [3]?
+What [1] exist within a [2] distance along the way to [4] from [3]?
+Which [1] are situated within [2] on the journey from [3] toward [4]?
+What [1] can I find inside [2] as I approach [4] from [3]?
+Which [1] are available within [2] along the corridor from [3] to [4]?
+What [1] are present within [2] when moving toward [4] starting at [3]?
+Which [1] can I find within a [2] radius while heading toward [4]?
+What [1] are located within [2] on the path leading from [3] to [4]?
+Which [1] fall within [2] as I travel in the direction of [4] from [3]?
+What [1] can I find within [2] ahead of [3] toward [4]?
+Which [1] are available within [2] on the way from [3] to [4]?
+What [1] exist inside a [2] boundary along the route to [4]?
+Which [1] can I find within [2] while moving from [3] toward [4]?
+What [1] are positioned within [2] along the travel path to [4]?
+Which [1] are present within a [2] limit as I go toward [4] from [3]?
+What [1] can I find within [2] in the forward direction toward [4]?
+Which [1] are located within [2] on the route connecting [3] and [4]?
+What [1] exist within [2] as I proceed toward [4] from [3]?
+Which [1] can I find inside [2] along the way toward [4]?
+What [1] are available within [2] during travel from [3] to [4]?
+Which [1] fall within [2] when heading from [3] toward [4]?

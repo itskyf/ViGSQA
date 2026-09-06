@@ -1,0 +1,4 @@
+[1] gần [2] nhất nằm ở đâu?
+Vị trí của [1] gần [2] nhất là gì?
+[1] nào gần [2] nhất và nó nằm ở đâu?
+Cho tôi biết vị trí [1] gần [2] nhất.

@@ -1,0 +1,5 @@
+[1] nào lớn nhất ở [2]?
+[1] có diện tích lớn nhất trong [2] là gì?
+Ở [2], [1] nào rộng nhất?
+Cho tôi biết [1] rộng nhất tại [2].
+Đâu là [1] có diện tích lớn nhất của [2]?

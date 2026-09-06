@@ -1,0 +1,5 @@
+[1] nào dài nhất đi qua [2]?
+[1] dài nhất trong [2] là gì?
+Ở [2], [1] nào có chiều dài lớn nhất?
+Cho tôi biết [1] dài nhất cắt qua [2].
+Đâu là [1] có chiều dài lớn nhất tại [2]?
