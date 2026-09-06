@@ -1,11 +1,3 @@
-.agents/
-.claude/
-.codebuddy/
-.codex/
-.gemini/
-.mcp.json
-apm_modules/
-
 # Python
 __pycache__/
 *.pyc
@@ -67,26 +59,10 @@ llm-cache-*.sql.gz*
 # OS
 .DS_Store
 Thumbs.db
+
 # pixi environments
 .pixi/*
 !.pixi/config.toml
 
-
-# APM dependencies
-apm_modules/
-
-# Markdown lint cache
-.rumdl_cache/
-
-# datasets live outside git (synced via rclone to Google Drive)
+# datasets live outside git (mirrored to Google Drive; restore via release assets)
 data/
-
-# Report outputs
-docs/report/*.pdf
-docs/report/rendered/
-references/
-
-# Figure assets ship via the release archive (scripts/restore_figures.sh)
-docs/report/figures/
-report-figures.tar.gz
-
