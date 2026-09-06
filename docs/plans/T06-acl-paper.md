@@ -237,3 +237,39 @@ The paper layout, section flow, table markups, and visual defects were remediate
    - `pixi run typstyle --check docs/report/main.typ` exits 0.
    - `pixi run typst compile docs/report/main.typ docs/report/main.pdf` exits 0.
    - Multimodal visual inspection of all 10 rendered PNG pages (`page-01-of-10.png` through `page-10-of-10.png`) via `view_file` confirmed publication-grade typography throughout.
+
+## 2026-09-06 — Scientific Attribution, Canonical Terminology, ACL Semantics, and Course Completeness
+
+ Re-opened T06 to execute the comprehensive remediation pass:
+
+- Explicitly distinguished GS-QA inherited foundations (28 templates, Direct/Text2SQL baselines, spatial metrics) from ViGSQA adaptations (Vietnam snapshot, native address gold, NVFP4 models, fixed Ornith parser, NFKC normalization) and new group contributions (VN-GeoQA benchmark, Records-to-Answer Rescue, Vietnamese error analysis, fresh demo).
+- Re-scoped Related Work to distinguish VN-GeoQA from prior Vietnamese QA resources and separate its delta from GS-QA.
+- Relocated baseline diagram from main text to Appendix B with explicit GS-QA citation to dedicate main visual space to authentic project evidence.
+- Canonicalized terminology across prose: Direct, Text2SQL, Records-to-Answer Rescue (`records-to-answer-rescue-v1`), and model display labels Ornith and Qwen for exact IDs `ornith-ai/Ornith-1.5-9B-NVFP4` and `AxionML/Qwen3.5-9B-NVFP4`.
+- Added concrete normalization example (`“Quán Cà-phê!” → “quán cà phê”`) matching `normalize_text`.
+- Formatted title and abstract as metadata-safe plain text (removed forced break and inline footnote, plain F1).
+- Corrected `sector_right_angle_wrong` description (evaluation resolution mismatch) and separated two-source design limitation from empirical score.
+- Scoped geocoding claims to tracked flags.
+- Integrated GeoPandas/contextily T16 spatial-reasoning map into Appendix A with visible OSM attribution.
+- Documented the 5-question fresh Vietnamese demo in main text and added an appendix summary table.
+
+### Spatial Reasoning Figure Refinement & Table Adjustments (2026-09-06)
+
+- **Notebook Cell & Figure Regeneration**:
+  - Remote Google Colab cell `dc623076-6279-4533-8fee-976120b39e88` updated via `colab-mcp:update_cell` to eliminate `ax.set_title(...)` from the rendered figure and instead log the question via `logger.info("Spatial reasoning question: %s", record["question"])`.
+  - Local `ViGSQA.ipynb` updated byte-consistently.
+  - Figure regenerated at `artifacts/figures/spatial_reasoning_example.svg` and `.webp`, copied to `docs/report/figures/spatial_reasoning_example.svg`, and hashed in `scripts/figures.sha256` (`sha256sum --check` verified).
+- **Report Integrations (`docs/report/main.typ`)**:
+  - **Figure 1**: Set to span two columns (`scope: "parent"`, `placement: bottom`, `width: 62%`) on Page 7, ensuring map annotations and legend are clearly legible. The logged Vietnamese question (*“Những công viên cách Trường Mầm Non Sen Hồng không quá 3 km theo hướng Thuốc Tây Minh Hạnh nằm ở đâu?”*) is embedded directly into the figure caption.
+  - **Table 3 (`tab:samples`)**: Column header shortened from `Dataset answer_type` to `Type`, with table font size set to `8.5pt` and caption references updated accordingly.
+  - **Table 6 (`tab:demo`)**: Removed redundant `ID` column (`demo-001` through `demo-005`), yielding a clean 4-column layout (`Family`, `Question (Vietnamese)`, `Qualitative outcome`, `Analysis note`).
+- **Page Layout & Invariants**:
+  - Main text (Sections 1–10) strictly fulfills the 4–5 main-content-page course requirement, ending mid-column 2 on Page 5.
+  - References start on Page 5 Column 2 and finish on Page 6.
+  - Total document length remains exactly 10 pages.
+- **Verification Tooling**:
+  - `pixi run typstyle --check docs/report/main.typ` exits 0.
+  - `pixi run python .claude/skills/anti-ai-style/scripts/scan.py --strict docs/report/main.typ` exits 0 (0 hard tells).
+  - `pixi run typst compile docs/report/main.typ docs/report/main.pdf` exits 0.
+  - Visual inspection of all 10 rendered PNG pages (`docs/report/rendered/page-*.png`) confirmed clean presentation.
+- **Status**: Completed.

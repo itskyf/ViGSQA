@@ -41,6 +41,7 @@ logs/
 .ipynb_checkpoints/
 # Authoritative notebook copy lives in Google Drive/Colab; never track it
 main.ipynb
+ViGSQA.ipynb
 
 # Python environments
 .venv/
@@ -82,6 +83,8 @@ data/
 
 # Report outputs
 docs/report/*.pdf
+docs/report/rendered/
+references/
 
 # Figure assets ship via the release archive (scripts/restore_figures.sh)
 docs/report/figures/

@@ -3,14 +3,14 @@
 [Tiếng Việt](README.vi.md)
 
 ViGSQA is a Vietnamese adaptation of [GS-QA](https://arxiv.org/abs/2605.22811), a benchmark for question answering over geospatial data.
-The project contributes VN-GeoQA, a dataset of 2,800 Vietnamese questions across all 28 GS-QA question types, together with evaluated baselines, an answer-recovery method, error analysis, and a Vietnamese demo.
+The project contributes VN-GeoQA, a dataset of 2,800 Vietnamese questions across all 28 GS-QA question types, together with evaluated baselines, Records-to-Answer Rescue, error analysis, and a Vietnamese demo.
 The complete coursework can be reproduced on Google Colab CPU by opening the submitted `main.ipynb` and selecting **Run all**.
 
 ## Contributions
 
 1. **Vietnamese dataset:** VN-GeoQA adapts the 28 GS-QA templates to Vietnamese and pairs each question with verified SQL and answers from an OpenStreetMap Vietnam database.
 2. **Baseline evaluation:** four combinations of Ornith/Qwen and Direct/Text2SQL are compared on a fixed dev/test split using GS-QA's text and geospatial metrics.
-3. **Records-to-answer improvement:** when Text2SQL returns useful database rows but fails to express an answer, the proposed rescue step converts those typed rows into an answer without another LLM call.
+3. **Records-to-Answer Rescue:** when Text2SQL returns useful database rows but fails to express an answer, the proposed rescue step converts those typed rows into an answer without another LLM call.
 4. **Error analysis:** failures are analyzed by pipeline stage and by Vietnamese-specific effects such as address geocoding and diacritics.
 5. **Vietnamese demo:** five new questions demonstrate database grounding, both baselines, and the rescue step.
 
@@ -21,14 +21,14 @@ The notebook installs the project and PostgreSQL/PostGIS, downloads the `v3.0.0`
 
 No GPU, model download, API key, or LLM service is required.
 The official LLM outputs were generated beforehand and are restored from the release artifacts and cache.
-The notebook itself executes the SQL/PostGIS workflow, dataset exploration, test evaluation, baseline comparison, records-to-answer reconstruction, error analysis, and demo processing.
+The notebook itself executes the SQL/PostGIS workflow, dataset exploration, test evaluation, baseline comparison, Records-to-Answer Rescue reconstruction, error analysis, and demo processing.
 
 The notebook covers the course requirements in this order:
 
 1. environment setup and artifact restoration;
 2. dataset validation and exploratory analysis;
 3. official baseline results and test-set comparison;
-4. records-to-answer improvement on the dev/test split;
+4. Records-to-Answer Rescue on the dev/test split;
 5. Vietnamese error analysis;
 6. demo on new Vietnamese questions.
 
@@ -122,7 +122,7 @@ ViGSQA uses Ornith as a single parser for all four runs so that the comparison u
 | `scripts/restore_llm_cache.sh` | Restore the LLM-output cache |
 | `scripts/run_raw_inference.py` / `scripts/inference.sh` | Run Direct and Text2SQL inference |
 | `scripts/run_evaluation.py` / `scripts/evaluate.sh` | Parse and evaluate model answers |
-| `scripts/records_to_answer.py` | Reconstruct the records-to-answer improvement |
+| `scripts/records_to_answer.py` | Reconstruct Records-to-Answer Rescue |
 | `scripts/error_taxonomy.py` | Generate the error analysis |
 | `scripts/run_demo.py` | Process the Vietnamese demo |
 | `docs/data_generation.md` | Describe dataset generation and validation |

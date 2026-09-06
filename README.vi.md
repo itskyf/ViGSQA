@@ -3,14 +3,14 @@
 [English](README.md)
 
 ViGSQA là bản chuyển thể tiếng Việt của [GS-QA](https://arxiv.org/abs/2605.22811), một benchmark hỏi đáp trên dữ liệu không gian địa lý.
-Dự án xây dựng VN-GeoQA, bộ dữ liệu gồm 2.800 câu hỏi tiếng Việt thuộc đầy đủ 28 loại câu hỏi của GS-QA, cùng với các baseline đã đánh giá, một phương pháp phục hồi câu trả lời, phân tích lỗi và demo tiếng Việt.
+Dự án xây dựng VN-GeoQA, bộ dữ liệu gồm 2.800 câu hỏi tiếng Việt thuộc đầy đủ 28 loại câu hỏi của GS-QA, cùng với các baseline đã đánh giá, Records-to-Answer Rescue, phân tích lỗi và demo tiếng Việt.
 Toàn bộ nội dung đồ án có thể được tái lập trên Google Colab CPU bằng cách mở `main.ipynb` trong bài nộp và chọn **Run all**.
 
 ## Đóng góp
 
 1. **Bộ dữ liệu tiếng Việt:** VN-GeoQA chuyển thể 28 template của GS-QA sang tiếng Việt và ghép mỗi câu hỏi với SQL cùng đáp án đã được kiểm chứng trên cơ sở dữ liệu OpenStreetMap Việt Nam.
 2. **Đánh giá baseline:** bốn tổ hợp Ornith/Qwen và Direct/Text2SQL được so sánh trên split dev/test cố định bằng các metric văn bản và không gian địa lý của GS-QA.
-3. **Cải tiến records-to-answer:** khi Text2SQL trả về các hàng dữ liệu hữu ích nhưng không diễn đạt được câu trả lời, bước rescue chuyển các hàng có kiểu đó thành đáp án mà không cần thêm lời gọi LLM.
+3. **Records-to-Answer Rescue:** khi Text2SQL trả về các hàng dữ liệu hữu ích nhưng không diễn đạt được câu trả lời, bước rescue chuyển các hàng có kiểu đó thành đáp án mà không cần thêm lời gọi LLM.
 4. **Phân tích lỗi:** lỗi được phân tích theo giai đoạn của pipeline và theo các yếu tố đặc thù tiếng Việt như geocode địa chỉ và dấu thanh.
 5. **Demo tiếng Việt:** năm câu hỏi mới minh họa việc truy vấn cơ sở dữ liệu, hai baseline và bước rescue.
 
@@ -21,14 +21,14 @@ Notebook cài đặt dự án và PostgreSQL/PostGIS, tải các artifact `v3.0.
 
 Không cần GPU, tải model, API key hay dịch vụ LLM.
 Các kết quả chính thức của LLM đã được tạo từ trước và được khôi phục từ các tệp cùng cache của release.
-Notebook trực tiếp chạy quy trình SQL/PostGIS, khám phá dữ liệu, đánh giá tập test, so sánh baseline, tái dựng records-to-answer, phân tích lỗi và xử lý demo.
+Notebook trực tiếp chạy quy trình SQL/PostGIS, khám phá dữ liệu, đánh giá tập test, so sánh baseline, tái dựng Records-to-Answer Rescue, phân tích lỗi và xử lý demo.
 
 Notebook đáp ứng các yêu cầu môn học theo thứ tự sau:
 
 1. cài đặt môi trường và khôi phục artifact;
 2. kiểm tra và khám phá bộ dữ liệu;
 3. trình bày kết quả baseline chính thức và so sánh trên tập test;
-4. đánh giá cải tiến records-to-answer trên split dev/test;
+4. đánh giá Records-to-Answer Rescue trên split dev/test;
 5. phân tích lỗi tiếng Việt;
 6. demo trên các câu hỏi tiếng Việt mới.
 
@@ -122,7 +122,7 @@ ViGSQA dùng Ornith làm parser chung cho cả bốn run để phép so sánh s�
 | `scripts/restore_llm_cache.sh` | Khôi phục cache kết quả LLM |
 | `scripts/run_raw_inference.py` / `scripts/inference.sh` | Chạy inference Direct và Text2SQL |
 | `scripts/run_evaluation.py` / `scripts/evaluate.sh` | Parse và đánh giá câu trả lời của model |
-| `scripts/records_to_answer.py` | Tái dựng cải tiến records-to-answer |
+| `scripts/records_to_answer.py` | Tái dựng Records-to-Answer Rescue |
 | `scripts/error_taxonomy.py` | Sinh kết quả phân tích lỗi |
 | `scripts/run_demo.py` | Xử lý demo tiếng Việt |
 | `docs/data_generation.md` | Mô tả quy trình sinh và kiểm chứng dữ liệu |
